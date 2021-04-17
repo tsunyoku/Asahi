@@ -6,10 +6,11 @@ import bcrypt
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
+import packets
 
 app = Quart(__name__) # handler for webserver :D
 glob.db = AsyncSQLPool() # define db globally
-glob.version = Version(0, 0, 2) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 0, 3) # set Asahi version, mainly for future updater but also for tracking
 
 @app.before_serving
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
@@ -45,9 +46,15 @@ async def login():
         user = await glob.db.fetch('SELECT id, pw, country FROM users WHERE name = %s', [username])
         if not user: # ensure user actually exists before attempting to do anything else
             log(f'User {username} does not exist.', Ansi.LRED)
+            resp = await make_response(packets.userID(-1))
+            resp.headers['cho-token'] = 'no'
+            return resp
 
         pw_bcrypt = user['pw'].encode()
         if not bcrypt.checkpw(pw, pw_bcrypt): # compare provided md5 with the stored bcrypt to ensure they have provided the correct password
             log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
+            resp = await make_response(packets.userID(-1))
+            resp.headers['cho-token'] = 'no'
+            return resp
 
     # if we have made it this far then it's a reconnect attempt with token already provided, i will handle this later
