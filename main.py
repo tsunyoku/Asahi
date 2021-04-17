@@ -36,3 +36,6 @@ async def login():
 
     if 'osu-token' not in headers: # sometimes a login request will be a re-connect attempt, in which case they will already have a token, if not: login the user
         data = await request.data # request data, used to get info such as username to login the user
+
+if __name__ == "__main__":
+    app.run(host="localhost", port=glob.config.port, debug=glob.config.debug)
