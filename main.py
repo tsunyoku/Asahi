@@ -3,6 +3,7 @@ from quart import Quart, Response, request, make_response # web server :blobcowb
 from cmyui import AsyncSQLPool, Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 import pyfiglet
 import bcrypt
+import uuid
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
@@ -43,7 +44,7 @@ async def login():
         username = info[0]
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later
 
-        user = await glob.db.fetch('SELECT id, pw, country FROM users WHERE name = %s', [username])
+        user = await glob.db.fetch('SELECT id, pw, country, name FROM users WHERE name = %s', [username])
         if not user: # ensure user actually exists before attempting to do anything else
             log(f'User {username} does not exist.', Ansi.LRED)
             resp = await make_response(packets.userID(-1))
@@ -56,5 +57,18 @@ async def login():
             resp = await make_response(packets.userID(-1))
             resp.headers['cho-token'] = 'no'
             return resp
+
+        token = uuid.uuid4() # generate token for client to use as auth
+        data = bytearray(packets.userID(user['id'])) # initiate login by providing the user's id
+        data += packets.protocolVersion(19) # no clue what this does
+        data += packets.banchoPrivileges(1 << 4) # force priv to developer for now
+        data += (packets.userPresence(user) + packets.userStats(user)) # provide user & other user's presence/stats (for f9 + user stats)
+        data += packets.notification(f'Welcome to Asahi v{glob.version}') # send notification as indicator they've logged in iguess
+        data += packets.channelInfoEnd() # no clue what this does either
+
+        resp = await make_response(bytes(data))
+        resp.headers['cho-token'] = token
+        log(f'{username} successfully logged in.', Ansi.GREEN)
+        return resp
 
     # if we have made it this far then it's a reconnect attempt with token already provided, i will handle this later
