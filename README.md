@@ -1,5 +1,5 @@
 # Asahi
-avatar server, bancho & /web/ server hybrid for osu! 😎
+avatar, bancho & /web/ server hybrid for osu! 😎
 
 Note: This has only been tested on Ubuntu 18.04 LTS and other operating systems may have unpredicted behaviour
 
