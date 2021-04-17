@@ -406,5 +406,54 @@ def write(packid: int, *args: tuple[Any, ...]) -> bytes:
     ret[3:3] = struct.pack('<I', len(ret) - 3)
     return bytes(ret)
 
+@cache
 def userID(id: int) -> bytes:
     return write(Packets.CHO_USER_ID, (id, osuTypes.i32))
+
+@cache
+def protocolVersion(ver: int) -> bytes:
+    return write(Packets.CHO_PROTOCOL_VERSION, (ver, osuTypes.i32))
+
+@cache
+def banchoPrivileges(priv: int) -> bytes:
+    return write(Packets.CHO_PRIVILEGES, (priv, osuTypes.i32))
+
+def userPresence(player) -> bytes:
+    # temporarily hardcode most stats until we have working player object
+
+    return write(
+        Packets.CHO_USER_PRESENCE,
+        (player['id'], osuTypes.i32),
+        (player['name'], osuTypes.string),
+        (24, osuTypes.u8),
+        (1, osuTypes.u8),
+        (1 << 4 | 0 << 5, osuTypes.u8),
+        (24.0, osuTypes.f32),
+        (24.0, osuTypes.f32),
+        (1, osuTypes.i32)
+    )
+
+def userStats(player) -> bytes:
+    return write(
+        Packets.CHO_USER_STATS,
+        (player['id'], osuTypes.i32),
+        (0, osuTypes.u8), # action
+        ('gaming', osuTypes.string), # info text
+        ('', osuTypes.string), # map md5
+        (0, osuTypes.i32), # mods
+        (0, osuTypes.u8), # game mode
+        (0, osuTypes.i32), # map id
+        (0, osuTypes.i64), # ranked score
+        (100.00, osuTypes.f32), # accuracy
+        (0, osuTypes.i32), # playcount
+        (0, osuTypes.i64), # total score
+        (1, osuTypes.i32), # rank
+        (0, osuTypes.i16) # pp
+    )
+
+def notification(msg: str) -> bytes:
+    return write(Packets.CHO_NOTIFICATION, (msg, osuTypes.string))
+
+@cache
+def channelInfoEnd() -> bytes:
+    return write(Packets.CHO_CHANNEL_INFO_END)
