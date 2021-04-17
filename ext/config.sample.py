@@ -8,3 +8,4 @@ mysql = {
 
 # debug is used to print more info & help to debug if you are experiencing issues with the server
 debug = True
+port = '8000'
