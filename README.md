@@ -2,6 +2,7 @@
 avatar, bancho & /web/ server hybrid for osu! 😎
 
 Note: This has only been tested on Ubuntu 18.04 LTS and other operating systems may have unpredicted behaviour
+
 Note 2: This is a very experimental project mainly for my own learning and I don't suggest in any world using this on your own server in its current state for the forseeable future.
 
 ## Setup
