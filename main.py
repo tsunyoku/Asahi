@@ -1,14 +1,15 @@
 # external imports (some may require to be installed, install using ext/requirements.txt)
-from quart import Quart, Response, request # web server :blobcowboi:
+from quart import Quart, Response, request, make_response # web server :blobcowboi:
 from cmyui import AsyncSQLPool, Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 import pyfiglet
+import bcrypt
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
 
 app = Quart(__name__) # handler for webserver :D
 glob.db = AsyncSQLPool() # define db globally
-glob.version = Version(0, 0, 1) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 0, 2) # set Asahi version, mainly for future updater but also for tracking
 
 @app.before_serving
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
@@ -36,3 +37,17 @@ async def login():
 
     if 'osu-token' not in headers: # sometimes a login request will be a re-connect attempt, in which case they will already have a token, if not: login the user
         data = await request.data # request data, used to get info such as username to login the user
+        info = data.decode().split('\n')[:-1] # format data so we can use it easier
+
+        username = info[0]
+        pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later
+
+        user = await glob.db.fetch('SELECT id, pw, country FROM users WHERE name = %s', [username])
+        if not user: # ensure user actually exists before attempting to do anything else
+            log(f'User {username} does not exist.', Ansi.LRED)
+
+        pw_bcrypt = user['pw'].encode()
+        if not bcrypt.checkpw(pw, pw_bcrypt): # compare provided md5 with the stored bcrypt to ensure they have provided the correct password
+            log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
+
+    # if we have made it this far then it's a reconnect attempt with token already provided, i will handle this later
