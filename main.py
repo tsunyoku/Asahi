@@ -11,7 +11,7 @@ import packets
 
 app = Quart(__name__) # handler for webserver :D
 glob.db = AsyncSQLPool() # define db globally
-glob.version = Version(0, 0, 3) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 0, 4) # set Asahi version, mainly for future updater but also for tracking
 
 @app.before_serving
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
@@ -51,14 +51,27 @@ async def login():
             resp.headers['cho-token'] = 'no'
             return resp
 
+        bcache = glob.cache['bcrypt'] # get our cached bcrypts to potentially enhance speed
         pw_bcrypt = user['pw'].encode()
-        if not bcrypt.checkpw(pw, pw_bcrypt): # compare provided md5 with the stored bcrypt to ensure they have provided the correct password
-            log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
-            resp = await make_response(packets.userID(-1))
-            resp.headers['cho-token'] = 'no'
-            return resp
+        if pw_bcrypt in bcache:
+            if pw != bcache[pw_bcrypt]: # compare provided md5 with the stored (cached) bcrypt to ensure they have provided the correct password
+                log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
+                resp = await make_response(packets.userID(-1))
+                resp.headers['cho-token'] = 'no'
+                return resp
+        else:
+            if not bcrypt.checkpw(pw, pw_bcrypt): # compare provided md5 with the stored bcrypt to ensure they have provided the correct password
+                log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
+                resp = await make_response(packets.userID(-1))
+                resp.headers['cho-token'] = 'no'
+                return resp
+            
+            bcache[pw_bcrypt] = pw # cache pw for future
 
         token = uuid.uuid4() # generate token for client to use as auth
+        ucache = glob.cache['user']
+        if str(token) not in ucache:
+            ucache[str(token)] = user['id'] # cache token to use outside of this request
         data = bytearray(packets.userID(user['id'])) # initiate login by providing the user's id
         data += packets.protocolVersion(19) # no clue what this does
         data += packets.banchoPrivileges(1 << 4) # force priv to developer for now
@@ -70,5 +83,19 @@ async def login():
         resp.headers['cho-token'] = token
         log(f'{username} successfully logged in.', Ansi.GREEN)
         return resp
+    
+    # if we have made it this far then it's a reconnect attempt with token already provided
+    user_token = headers['osu-token'] # client-provided token
+    tcache = glob.cache['user'] # get token/userid cache to see if we need to relog the user or not
+    if user_token not in tcache:
+        # user is logged in but token is not found? most likely a restart so we force a reconnection
+        return packets.restartServer(0)
 
-    # if we have made it this far then it's a reconnect attempt with token already provided, i will handle this later
+    # if you wanted to grab their userid from this point then you could just grab it using tcache[user_token] | this will change as will this entire token cache idea when i have a player object
+
+    # packets will be handled here once i have handlers for them
+
+    resp = await make_response(b'')
+    resp.headers['Content-Type'] = 'text/html; charset=UTF-8' # ?
+    return resp
+

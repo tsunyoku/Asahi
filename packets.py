@@ -457,3 +457,7 @@ def notification(msg: str) -> bytes:
 @cache
 def channelInfoEnd() -> bytes:
     return write(Packets.CHO_CHANNEL_INFO_END)
+
+@cache
+def restartServer(time: int) -> bytes:
+    return write(Packets.CHO_RESTART, (time, osuTypes.i32))
