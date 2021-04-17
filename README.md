@@ -31,5 +31,5 @@ cp ext/config.sample.py config.py
 
 Finally, startup Asahi using hypercorn:
 ```bash
-hypercorn main.py -b unix:/tmp/asahi.sock --reload
+hypercorn main.py -b 127.0.0.1:9384 --reload
 ```
