@@ -11,7 +11,7 @@ glob.db = AsyncSQLPool() # define db globally
 glob.version = Version(0, 0, 1) # set Asahi version, mainly for future updater but also for tracking
 
 @app.before_serving
-async def connect() -> None: # ran before server startup, used to do things like connecting to mysql :D | "-> None" to specify we don't want to return anything
+async def connect(): # ran before server startup, used to do things like connecting to mysql :D
     log(f'==== Asahi v{glob.version} starting ====', Ansi.GREEN)
     try:
         await glob.db.connect(glob.config.mysql) # connect to db using config :p
@@ -22,7 +22,7 @@ async def connect() -> None: # ran before server startup, used to do things like
     
 
 @app.route("/", methods=['GET']) # only accept GET requests as POST is for login method, see login method below
-async def root() -> Response: # specify we are going to return Response
+async def root():
     message = f"{pyfiglet.figlet_format('Asahi')}\n\ntsunyoku attempts bancho v2, gone right :sunglasses:"
     return Response(message, mimetype='text/plain')
 
