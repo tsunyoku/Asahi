@@ -8,10 +8,17 @@ import uuid
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
 import packets
+from packets import BanchoPacketReader, BanchoPacket, Packets
 
 app = Quart(__name__) # handler for webserver :D
 glob.db = AsyncSQLPool() # define db globally
 glob.version = Version(0, 0, 4) # set Asahi version, mainly for future updater but also for tracking
+
+glob.packets = {}
+
+def register(cls: BanchoPacket): # not a register handler, used for packets
+    glob.packets |= {cls.type: cls}
+    return cls
 
 @app.before_serving
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
@@ -91,9 +98,13 @@ async def login():
         # user is logged in but token is not found? most likely a restart so we force a reconnection
         return packets.restartServer(0)
 
-    # if you wanted to grab their userid from this point then you could just grab it using tcache[user_token] | this will change as will this entire token cache idea when i have a player object
+    user = await glob.db.fetch('SELECT id, pw, country, name FROM users WHERE id = %s', [tcache[user_token]])
+    body = await request.body
 
-    # packets will be handled here once i have handlers for them
+    # handle any packets the client has sent | doesn't really work **for now**
+    for packet in BanchoPacketReader(body, glob.packets):
+        await packet.handle(user)
+        log(f'Handled packet {packet}')
 
     resp = await make_response(b'')
     resp.headers['Content-Type'] = 'text/html; charset=UTF-8' # ?

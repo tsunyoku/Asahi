@@ -149,7 +149,7 @@ class BanchoPacket:
             if x in cls.args:
                 del cls.args[x]
 
-    async def handle(self) -> None: ...
+    async def handle(self, player) -> None: ...
 
 class BanchoPacketReader:
     """\
