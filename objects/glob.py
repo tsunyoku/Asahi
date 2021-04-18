@@ -10,3 +10,5 @@ cache = {
     'bcrypt': {}, # store bcrypt pws for speed hours
     'user': {} # temporarily used to cache tokens until we have a player object
 }
+
+players = [] # player list
