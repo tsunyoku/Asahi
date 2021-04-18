@@ -6,7 +6,6 @@ import pyfiglet
 import bcrypt
 import uuid
 import time
-import aiohttp
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
@@ -63,7 +62,7 @@ async def login():
         user = await glob.db.fetch('SELECT id, pw, country, name FROM users WHERE name = %s', [username])
         if not user: # ensure user actually exists before attempting to do anything else
             if glob.config.debug:
-                log(f'User {username} does not exist. | Time Elapsed: {(time.time() - start) * 1000}ms', Ansi.LRED)
+                log(f'User {username} does not exist. | Time Elapsed: {(time.time() - start) * 1000:.2f}ms', Ansi.LRED)
             resp = await make_response(packets.userID(-1)) # -1 userid informs client of an auth error
             resp.headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
             return resp
@@ -73,7 +72,7 @@ async def login():
         if pw_bcrypt in bcache:
             if pw != bcache[pw_bcrypt]: # compare provided md5 with the stored (cached) bcrypt to ensure they have provided the correct password
                 if glob.config.debug:
-                    log(f"{username}'s login attempt failed: provided an incorrect password | Time Elapsed (with cached bcrypt): {(time.time() - start) * 1000}ms", Ansi.LRED)
+                    log(f"{username}'s login attempt failed: provided an incorrect password | Time Elapsed (with cached bcrypt): {(time.time() - start) * 1000:.2f}ms", Ansi.LRED)
                 resp = await make_response(packets.userID(-1))
                 resp.headers['cho-token'] = 'no'
                 return resp
@@ -81,7 +80,7 @@ async def login():
         else:
             if not bcrypt.checkpw(pw, pw_bcrypt): # compare provided md5 with the stored bcrypt to ensure they have provided the correct password
                 if glob.config.debug:
-                    log(f"{username}'s login attempt failed: provided an incorrect password | Time Elapsed (bcrypt not cached): {(time.time() - start) * 1000}ms", Ansi.LRED)
+                    log(f"{username}'s login attempt failed: provided an incorrect password | Time Elapsed (bcrypt not cached): {(time.time() - start) * 1000:.2f}ms", Ansi.LRED)
                 resp = await make_response(packets.userID(-1))
                 resp.headers['cho-token'] = 'no'
                 return resp
@@ -95,7 +94,7 @@ async def login():
         # sort out geoloc | SPEEEEEEEEEEEEEED gains
         ip = headers['X-Real-IP']
         reader = database.Reader('ext/geoloc.mmdb')
-        geoloc = reader.city(str(ip))
+        geoloc = reader.city(ip)
         country, user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
         user['country'] = country_codes[country]
         await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [country.lower(), user['id']]) # update country code in db
@@ -110,10 +109,16 @@ async def login():
         data += packets.notification(f'Welcome to Asahi v{glob.version}') # send notification as indicator they've logged in i guess
         data += packets.channelInfoEnd() # no clue what this does either
 
+        # add user to cache?
+        pcache = glob.players
+        pcache.append(user)
+        for p in pcache: # enqueue other users to client
+            data += (packets.userPresence(p) + packets.userStats(p))
+
         resp = await make_response(bytes(data))
         resp.headers['cho-token'] = token
         if glob.config.debug:
-            log(f'{username} successfully logged in. | Time Elapsed (using bcrypt cache: {ub}): {(time.time() - start) * 1000}ms', Ansi.GREEN)
+            log(f'{username} successfully logged in. | Time Elapsed (using bcrypt cache: {ub}): {(time.time() - start) * 1000:.2f}ms', Ansi.GREEN)
         return resp
     
     # if we have made it this far then it's a reconnect attempt with token already provided
