@@ -4,3 +4,4 @@ cmyui
 hypercorn
 bcrypt
 aiohttp
+geoip2
