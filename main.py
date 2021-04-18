@@ -15,7 +15,7 @@ from packets import BanchoPacketReader, BanchoPacket, Packets
 
 app = Quart(__name__) # handler for webserver :D
 glob.db = AsyncSQLPool() # define db globally
-glob.version = Version(0, 0, 5) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 0, 6) # set Asahi version, mainly for future updater but also for tracking
 glob.packets = {}
 
 def register(cls: BanchoPacket): # not a register handler, used for packets
@@ -31,6 +31,24 @@ async def connect(): # ran before server startup, used to do things like connect
             log('==== Asahi connected to MySQL ====', Ansi.GREEN)
     except Exception as error:
         log(f'==== Asahi failed to connect to MySQL ====\n\n{error}', Ansi.LRED)
+
+    # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
+    bot = {}
+    botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
+    bot['id'] = 1
+    bot['pw'] = botinfo['pw']
+    bot['country'] = country_codes[botinfo['country'].upper()]
+    bot['name'] = botinfo['name']
+    bot['offset'] = 1
+    bot['lat'] = 0
+    bot['lon'] = 0
+    bot['bot'] = True
+    glob.players.append(bot)
+    if glob.config.debug:
+        log(f"==== Added bot {botinfo['name']} to player list ====", Ansi.GREEN)
+
+    log(f'==== Asahi v{glob.version} started ====', Ansi.GREEN)
+
 
 @app.route("/", methods=['GET']) # only accept GET requests as POST is for login method, see login method below
 async def root():
@@ -108,8 +126,13 @@ async def login():
         data += (packets.userPresence(user) + packets.userStats(user)) # provide user & other user's presence/stats (for f9 + user stats)
         data += packets.notification(f'Welcome to Asahi v{glob.version}') # send notification as indicator they've logged in i guess
         data += packets.channelInfoEnd() # no clue what this does either
+        data += packets.menuIcon() # set main menu icon
+        data += packets.friends(user) # send user friend list
+        data += packets.silenceEnd(0) # force to 0 for now since silences arent a thing
+        #data += packets.sendMessage(user['name'], 'test message lol so cool', user['name'], user['id']) # test message
 
         # add user to cache?
+        user['bot'] = False
         pcache = glob.players
         pcache.append(user)
         for p in pcache: # enqueue other users to client
