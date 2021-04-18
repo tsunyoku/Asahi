@@ -425,11 +425,11 @@ def userPresence(player) -> bytes:
         Packets.CHO_USER_PRESENCE,
         (player['id'], osuTypes.i32),
         (player['name'], osuTypes.string),
-        (24, osuTypes.u8),
-        (1, osuTypes.u8),
+        (player['offset'] + 24, osuTypes.u8), # utc offset
+        (player['country'], osuTypes.u8),
         (1 << 4 | 0 << 5, osuTypes.u8),
-        (24.0, osuTypes.f32),
-        (24.0, osuTypes.f32),
+        (float(player['lon']), osuTypes.f32), # long
+        (float(player['lat']), osuTypes.f32), # lat
         (1, osuTypes.i32)
     )
 

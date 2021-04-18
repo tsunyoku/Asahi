@@ -3,3 +3,4 @@ pyfiglet
 cmyui
 hypercorn
 bcrypt
+aiohttp
