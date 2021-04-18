@@ -36,12 +36,8 @@ async def connect(): # ran before server startup, used to do things like connect
     bot = {}
     botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
     bot['id'] = 1
-    bot['pw'] = botinfo['pw']
     bot['country'] = country_codes[botinfo['country'].upper()]
     bot['name'] = botinfo['name']
-    bot['offset'] = 1
-    bot['lat'] = 0
-    bot['lon'] = 0
     bot['bot'] = True
     glob.players.append(bot)
     if glob.config.debug:
@@ -108,6 +104,7 @@ async def login():
 
         token = uuid.uuid4() # generate token for client to use as auth
         user['offset'] = int(cinfo[1]) # utc offset for time
+        user['bot'] = False # used to specialise bot functions, kinda gay setup ngl
 
         # sort out geoloc | SPEEEEEEEEEEEEEED gains
         ip = headers['X-Real-IP']
@@ -132,7 +129,6 @@ async def login():
         #data += packets.sendMessage(user['name'], 'test message lol so cool', user['name'], user['id']) # test message
 
         # add user to cache?
-        user['bot'] = False
         pcache = glob.players
         pcache.append(user)
         for p in pcache: # enqueue other users to client
