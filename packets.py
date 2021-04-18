@@ -433,9 +433,24 @@ def protocolVersion(ver: int) -> bytes:
 def banchoPrivileges(priv: int) -> bytes:
     return write(Packets.CHO_PRIVILEGES, (priv, osuTypes.i32))
 
-def userPresence(player) -> bytes:
-    # temporarily hardcode most stats until we have working player object
+def botPresence(player) -> bytes:
+    return write(
+        Packets.CHO_USER_PRESENCE,
+        (player['id'], osuTypes.i32),
+        (player['name'], osuTypes.string),
+        (25, osuTypes.u8), # utc offset
+        (player['country'], osuTypes.u8),
+        (31, osuTypes.u8),
+        (1111.0, osuTypes.f32), # long | off map cus bot
+        (2222.0, osuTypes.f32), # lat | off map cus bot
+        (1, osuTypes.i32)
+    )
 
+def userPresence(player) -> bytes:
+    if player['bot']:
+        return botPresence(player)
+
+    # temporarily hardcode most stats until we have working player object
     return write(
         Packets.CHO_USER_PRESENCE,
         (player['id'], osuTypes.i32),
@@ -448,7 +463,28 @@ def userPresence(player) -> bytes:
         (1, osuTypes.i32)
     )
 
+def botStats(player) -> bytes:
+    return write(
+        Packets.CHO_USER_STATS,
+        (1, osuTypes.i32),
+        (6, osuTypes.u8), # action, hardcoded for good because its the bot | id 6 = watching
+        ('over Asahi...', osuTypes.string), # action text (e.g Watching over Asahi...)
+        ('', osuTypes.string), # map md5
+        (0, osuTypes.i32), # mods
+        (0, osuTypes.u8), # game mode
+        (0, osuTypes.i32), # map id
+        (0, osuTypes.i64), # ranked score
+        (0.00, osuTypes.f32), # accuracy
+        (0, osuTypes.i32), # playcount
+        (0, osuTypes.i64), # total score
+        (0, osuTypes.i32), # rank
+        (0, osuTypes.i16) # pp
+    )
+
 def userStats(player) -> bytes:
+    if player['bot']:
+        return botStats(player)
+
     return write(
         Packets.CHO_USER_STATS,
         (player['id'], osuTypes.i32),
