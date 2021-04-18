@@ -11,12 +11,13 @@ import queue
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
 from constants.countries import country_codes
+from constants.types import osuTypes
 import packets
 from packets import BanchoPacketReader, BanchoPacket, Packets
 
 app = Quart(__name__) # handler for webserver :D
 glob.db = AsyncSQLPool() # define db globally
-glob.version = Version(0, 0, 7) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 0, 8) # set Asahi version, mainly for future updater but also for tracking
 glob.packets = {}
 glob.queue = queue.SimpleQueue()
 
@@ -42,6 +43,26 @@ class updateStats(BanchoPacket, type=Packets.OSU_REQUEST_STATUS_UPDATE):
         enqueue(packets.userStats(user))
 
 @register
+class addFriend(BanchoPacket, type=Packets.OSU_FRIEND_ADD):
+    uid: osuTypes.i32
+
+    async def handle(self, user):
+        req = user['id']
+        tar = self.uid
+        await glob.db.execute('INSERT INTO friends (user1, user2) VALUES (%s, %s)', [req, tar])
+        log(f"{user['name']} added UID {tar} into their friends list.", Ansi.LBLUE)
+
+@register
+class removeFriend(BanchoPacket, type=Packets.OSU_FRIEND_REMOVE):
+    uid: osuTypes.i32
+
+    async def handle(self, user):
+        req = user['id']
+        tar = self.uid
+        await glob.db.execute('DELETE FROM friends WHERE user1 = %s AND user2 = %s', [req, tar])
+        log(f"{user['name']} removed UID {tar} from their friends list.", Ansi.LBLUE)
+
+@register
 class Logout(BanchoPacket, type=Packets.OSU_LOGOUT):
     async def handle(self, user):
         if (time.time() - user['ltime']) < 1:
@@ -53,9 +74,20 @@ class Logout(BanchoPacket, type=Packets.OSU_LOGOUT):
         enqueue(packets.logout(user['id']))
         log(f"{user['name']} logged out.", Ansi.LBLUE)
 
+@register
+class sendMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
+    msg: osuTypes.message # i am so confused man wtf
+
+    async def handle(self, user):
+        msg = self.msg.msg
+        tarname = self.msg.tarname
+        # messages dont work rn - always sends to requester because i need to add a player object (soon)
+        #enqueue(packets.sendMessage(fromname = user['name'], msg = msg, tarname = tarname, fromid = user['id']))
+        #log(f'{user["name"]} sent message "{msg}" to {tarname}')
+
 @app.before_serving
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
-    log(f'==== Asahi v{glob.version} starting ====', Ansi.LBLUE)
+    log(f'==== Asahi v{glob.version} starting ====', Ansi.GREEN)
     try:
         await glob.db.connect(glob.config.mysql) # connect to db using config :p
         if glob.config.debug:
@@ -150,6 +182,8 @@ async def login():
         user['country'] = country_codes[country]
         await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [country.lower(), user['id']]) # update country code in db
 
+        friends = {row['user2'] async for row in glob.db.iterall('SELECT user2 FROM friends WHERE user1 = %s', [user['id']])} # select all friends from db
+
         ucache = glob.cache['user']
         if str(token) not in ucache:
             ucache[str(token)] = user['id'] # cache token to use outside of this request
@@ -160,7 +194,7 @@ async def login():
         data += packets.notification(f'Welcome to Asahi v{glob.version}') # send notification as indicator they've logged in i guess
         data += packets.channelInfoEnd() # no clue what this does either
         data += packets.menuIcon() # set main menu icon
-        data += packets.friends(user) # send user friend list
+        data += packets.friends(*friends) # send user friend list
         data += packets.silenceEnd(0) # force to 0 for now since silences arent a thing
         #data += packets.sendMessage(user['name'], 'test message lol so cool', user['name'], user['id']) # test message
 
