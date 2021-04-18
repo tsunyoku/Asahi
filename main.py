@@ -179,6 +179,8 @@ async def login():
         reader = database.Reader('ext/geoloc.mmdb')
         geoloc = reader.city(ip)
         country, user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
+        if country == None:
+            country = "XX"
         user['country'] = country_codes[country]
         await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [country.lower(), user['id']]) # update country code in db
 
