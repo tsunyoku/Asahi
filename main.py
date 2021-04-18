@@ -6,6 +6,7 @@ import pyfiglet
 import bcrypt
 import uuid
 import time
+import queue
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
@@ -15,16 +16,46 @@ from packets import BanchoPacketReader, BanchoPacket, Packets
 
 app = Quart(__name__) # handler for webserver :D
 glob.db = AsyncSQLPool() # define db globally
-glob.version = Version(0, 0, 6) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 0, 7) # set Asahi version, mainly for future updater but also for tracking
 glob.packets = {}
+glob.queue = queue.SimpleQueue()
+
+def enqueue(b: bytes):
+    glob.queue.put_nowait(b)
+
+def dequeue():
+    try:
+        return glob.queue.get_nowait()
+    except queue.Empty:
+        pass
+
+def queue_empty():
+    return glob.queue.empty()
 
 def register(cls: BanchoPacket): # not a register handler, used for packets
     glob.packets |= {cls.type: cls}
     return cls
 
+@register
+class updateStats(BanchoPacket, type=Packets.OSU_REQUEST_STATUS_UPDATE):
+    async def handle(self, user):
+        enqueue(packets.userStats(user))
+
+@register
+class Logout(BanchoPacket, type=Packets.OSU_LOGOUT):
+    async def handle(self, user):
+        if (time.time() - user['ltime']) < 1:
+            return # osu sends random logout packet token on login ?
+
+        ucache = glob.cache['user']
+        del ucache[user['token']]
+        glob.players.remove(user)
+        enqueue(packets.logout(user['id']))
+        log(f"{user['name']} logged out.", Ansi.LBLUE)
+
 @app.before_serving
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
-    log(f'==== Asahi v{glob.version} starting ====', Ansi.GREEN)
+    log(f'==== Asahi v{glob.version} starting ====', Ansi.LBLUE)
     try:
         await glob.db.connect(glob.config.mysql) # connect to db using config :p
         if glob.config.debug:
@@ -57,13 +88,16 @@ async def login():
     headers = request.headers # request headers, used for things such as user ip and agent
 
     if 'User-Agent' not in headers or headers['User-Agent'] != 'osu!':
-        # request isn't sent from osu client, return nothing
-        return
+        # request isn't sent from osu client, return html
+        message = f"{pyfiglet.figlet_format(f'Asahi v{glob.version}')}\n\ntsunyoku attempts bancho v2, gone right :sunglasses:"
+        return Response(message, mimetype='text/plain')
 
     if 'osu-token' not in headers: # sometimes a login request will be a re-connect attempt, in which case they will already have a token, if not: login the user
         data = await request.data # request data, used to get info such as username to login the user
         if len(info := data.decode().split('\n')[:-1]) != 3: # format data so we can use it easier & also ensure it is valid at the same time
-            return
+            resp = await make_response(packets.userID(-2)) # -2 userid informs client it is too old | i assume that is the only valid reason for this to happen
+            resp.headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
+            return resp
 
         if len(cinfo := info[2].split('|')) != 5: # format client data (hash, utc etc.) & ensure it is valid
             resp = await make_response(packets.userID(-2)) # -2 userid informs client it is too old
@@ -105,6 +139,8 @@ async def login():
         token = uuid.uuid4() # generate token for client to use as auth
         user['offset'] = int(cinfo[1]) # utc offset for time
         user['bot'] = False # used to specialise bot functions, kinda gay setup ngl
+        user['token'] = str(token) # this may be useful in the future
+        user['ltime'] = time.time() # useful for handling random logouts
 
         # sort out geoloc | SPEEEEEEEEEEEEEED gains
         ip = headers['X-Real-IP']
@@ -137,7 +173,7 @@ async def login():
         resp = await make_response(bytes(data))
         resp.headers['cho-token'] = token
         if glob.config.debug:
-            log(f'{username} successfully logged in. | Time Elapsed (using bcrypt cache: {ub}): {(time.time() - start) * 1000:.2f}ms', Ansi.GREEN)
+            log(f'{username} successfully logged in. | Time Elapsed (using bcrypt cache: {ub}): {(time.time() - start) * 1000:.2f}ms', Ansi.LBLUE)
         return resp
     
     # if we have made it this far then it's a reconnect attempt with token already provided
@@ -150,13 +186,23 @@ async def login():
     user = await glob.db.fetch('SELECT id, pw, country, name FROM users WHERE id = %s', [tcache[user_token]])
     body = await request.body
 
-    # handle any packets the client has sent | doesn't really work **for now**
+    # ew
+    ucache = glob.players
+    for p in ucache:
+        if p.get('id') == user['id']:
+            user = p
+
+    # handle any packets the client has sent
     for packet in BanchoPacketReader(body, glob.packets):
         await packet.handle(user)
         if glob.config.debug:
-            log(f'Handled packet {packet}')
+            log(f'Handled packet {packet.type!r}', Ansi.LBLUE)
+ 
+    data = bytearray()
+    while not queue_empty():
+        data += dequeue()
 
-    resp = await make_response(b'')
+    resp = await make_response(bytes(data))
     resp.headers['Content-Type'] = 'text/html; charset=UTF-8' # ?
     return resp
 
