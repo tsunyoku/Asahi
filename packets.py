@@ -525,3 +525,7 @@ def silenceEnd(unix: int) -> bytes:
 
 def sendMessage(fromname: str, msg: str, tarname: str, fromid: int) -> bytes:
     return write(Packets.CHO_SEND_MESSAGE, ((fromname, msg, tarname, fromid), osuTypes.message))
+
+@cache
+def logout(uid: int) -> bytes:
+    return write(Packets.CHO_USER_LOGOUT, (uid, osuTypes.i32), (0, osuTypes.u8)) # delay for logout ????

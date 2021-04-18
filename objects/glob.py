@@ -12,3 +12,4 @@ cache = {
 }
 
 players = [] # player list
+queue: 'SimpleQueue'
