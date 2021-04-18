@@ -19,6 +19,8 @@ _specifiers = (
     '<q', '<Q', '<d'  # 64
 )
 
+Message = namedtuple('Message', ['fromname', 'msg', 'tarid', 'fromid'])
+
 @unique
 class Packets(IntEnum):
     OSU_CHANGE_ACTION = 0
@@ -235,6 +237,8 @@ class BanchoPacketReader:
                 val = self.read_i32_list_i16l()
             elif arg_type == osuTypes.i32_list4l:
                 val = self.read_i32_list_i32l()
+            elif arg_type == osuTypes.message:
+                val = self.read_message()
 
             elif arg_type == osuTypes.raw:
                 # return all packet data raw.
@@ -331,6 +335,15 @@ class BanchoPacketReader:
         val = self.view[:length].tobytes().decode() # copy
         self.view = self.view[length:]
         return val
+    
+    def read_message(self) -> Message: # namedtuple
+        """Read an osu! message from the internal buffer."""
+        return Message(
+            client = self.read_string(),
+            msg = self.read_string(),
+            target = self.read_string(),
+            client_id = self.read_i32()
+        )
 
 def write_uleb128(num: int) -> bytearray:
     """ Write `num` into an unsigned LEB128. """
@@ -398,6 +411,8 @@ def write(packid: int, *args: tuple[Any, ...]) -> bytes:
             ret += write_string(p_args)
         elif p_type == osuTypes.i32_list:
             ret += write_i32_list(p_args)
+        elif p_type == osuTypes.message:
+            ret += write_message(*p_args)
         else:
             # not a custom type, use struct to pack the data.
             ret += struct.pack(_specifiers[p_type], p_args)
@@ -461,3 +476,16 @@ def channelInfoEnd() -> bytes:
 @cache
 def restartServer(time: int) -> bytes:
     return write(Packets.CHO_RESTART, (time, osuTypes.i32))
+
+@cache
+def menuIcon() -> bytes:
+    return write(Packets.CHO_MAIN_MENU_ICON, ('https://a.iteki.pw/1|https://tsunyoku.xyz', osuTypes.string)) # temporary url for menu icon, ill make it config bound soon
+
+def friends(user) -> bytes:
+    return write(Packets.CHO_FRIENDS_LIST, ({user['id']}, osuTypes.i32_list)) # force just user itself for now to make sure it works
+
+def silenceEnd(unix: int) -> bytes:
+    return write(Packets.CHO_SILENCE_END, (unix, osuTypes.i32))
+
+def sendMessage(fromname: str, msg: str, tarname: str, fromid: int) -> bytes:
+    return write(Packets.CHO_SEND_MESSAGE, ((fromname, msg, tarname, fromid), osuTypes.message))

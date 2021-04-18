@@ -14,6 +14,9 @@ class osuTypes(IntEnum):
     u64 = 8
     f64 = 9
 
+    # osu
+    message = 11
+
     # misc
     i32_list   = 17 # 2 bytes len
     i32_list4l = 18 # 4 bytes len
