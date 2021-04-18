@@ -1,6 +1,7 @@
 # external imports (some may require to be installed, install using ext/requirements.txt)
 from quart import Quart, Response, request, make_response # web server :blobcowboi:
 from cmyui import AsyncSQLPool, Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
+from geoip2 import database # for geoloc
 import pyfiglet
 import bcrypt
 import uuid
@@ -91,16 +92,13 @@ async def login():
         token = uuid.uuid4() # generate token for client to use as auth
         user['offset'] = int(cinfo[1]) # utc offset for time
 
-        # sort out geoloc
+        # sort out geoloc | SPEEEEEEEEEEEEEED gains
         ip = headers['X-Real-IP']
-        async with aiohttp.ClientSession() as session: # this is only temporary as this provides very shit speeds (~800ms)
-            async with session.get(f'https://country.kurikku.pw/{ip}?pretty=1') as creq:
-                ret = await creq.json()
-
-        country = ret['country']
-        await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [country.lower(), user['id']]) # update country code in db
+        reader = database.Reader('ext/geoloc.mmdb')
+        geoloc = reader.city(str(ip))
+        country, user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
         user['country'] = country_codes[country]
-        user['lon'], user['lat'] = ret['loc'].split(',') # long & lat coords
+        await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [country.lower(), user['id']]) # update country code in db
 
         ucache = glob.cache['user']
         if str(token) not in ucache:
