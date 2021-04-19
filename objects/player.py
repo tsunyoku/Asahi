@@ -1,5 +1,6 @@
 from objects import glob
 import queue
+import packets
 
 class Player:
     def __init__(self, **uinfo):
@@ -32,6 +33,9 @@ class Player:
     def logout(self):
         glob.players.pop(self.token)
         self.token = ''
+        glob.players_name.pop(self.name)
+        for o in glob.players.values():
+            o.enqueue(packets.logout(self.id))
 
     def enqueue(self, b: bytes):
         self.queue.put_nowait(b)
