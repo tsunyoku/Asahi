@@ -27,8 +27,12 @@ async def connect(): # ran before server startup, used to do things like connect
 
     ava_path = Path.cwd() / 'resources/avatars'
     if not ava_path.exists():
-        os.mkdirs(ava_path)
+        os.makedirs(ava_path, exist_ok=True)
         log('Avatars folder has been created, please set a default avatar by placing a file named "default.png" into resources/avatars!', Ansi.LRED)
+    
+    ss_path = Path.cwd() / 'resources/screenshots'
+    if not ss_path.exists():
+        os.makedirs(ss_path, exist_ok=True)
 
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
