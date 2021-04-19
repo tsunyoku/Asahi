@@ -12,4 +12,3 @@ cache = {
 
 players = {} # player dict | player[token] = player
 players_name = {} # playername dict | player[name] = token
-queue: 'SimpleQueue'
