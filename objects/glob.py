@@ -7,8 +7,7 @@ packets: dict['Packets', 'BanchoPacket']
 
 # cache some things like bcrypt for speeeeeeeeeeeeeeeeeed hours
 cache = {
-    'bcrypt': {}, # store bcrypt pws for speed hours
-    'user': {} # temporarily used to cache tokens until we have a player object
+    'bcrypt': {} # store bcrypt pws for speed hours
 }
 
 players = {} # player dict | player[token] = player
