@@ -10,9 +10,8 @@ from functools import lru_cache
 from functools import partialmethod
 from typing import Any
 from typing import Optional
-from constants.types import osuTypes
-from objects import glob
 
+from constants.types import osuTypes
 from objects import glob
 
 _specifiers = (
