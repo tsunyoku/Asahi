@@ -1,6 +1,7 @@
 # external imports (some may require to be installed, install using ext/requirements.txt)
 from quart import Quart, Response, request, make_response # web server :blobcowboi:
 from cmyui import AsyncSQLPool, Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
+from pathlib import Path
 import pyfiglet
 
 # internal imports
@@ -22,6 +23,11 @@ async def connect(): # ran before server startup, used to do things like connect
             log('==== Asahi connected to MySQL ====', Ansi.GREEN)
     except Exception as error:
         log(f'==== Asahi failed to connect to MySQL ====\n\n{error}', Ansi.LRED)
+
+    ava_path = Path.cwd() / 'resources/avatars'
+    if not ava_path.exists():
+        os.mkdirs(ava_path)
+        log('Avatars folder has been created, please set a default avatar by placing a file named "default.png" into resources/avatars!', Ansi.LRED)
 
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
