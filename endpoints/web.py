@@ -4,6 +4,7 @@ from cmyui import log, Ansi
 import string
 import random
 import os
+import orjson
 
 from objects import glob
 
@@ -30,3 +31,15 @@ async def getScreenshot(scr):
         return await send_file(ss)
     else:
         return Response('could not find screenshot')
+
+@web.route("/web/osu-getseasonal.php")
+async def seasonalBG():
+    return Response(f'{glob.config.menu_bgs}', mimetype='application/json')
+
+@web.route("/web/bancho_connect.php")
+async def banchoConnect():
+    verif = request.args.get('v')
+    if verif:
+        return Response(b'asahi is gamer')
+
+    return Response(b'')
