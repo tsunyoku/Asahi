@@ -6,10 +6,10 @@ import pyfiglet
 import bcrypt
 import uuid
 import time
-import queue
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
+from objects.player import Player # Player - player object to store stats, info etc.
 from constants.countries import country_codes
 from constants.types import osuTypes
 import packets
@@ -17,21 +17,8 @@ from packets import BanchoPacketReader, BanchoPacket, Packets
 
 app = Quart(__name__) # handler for webserver :D
 glob.db = AsyncSQLPool() # define db globally
-glob.version = Version(0, 0, 8) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 0, 9) # set Asahi version, mainly for future updater but also for tracking
 glob.packets = {}
-glob.queue = queue.SimpleQueue()
-
-def enqueue(b: bytes):
-    glob.queue.put_nowait(b)
-
-def dequeue():
-    try:
-        return glob.queue.get_nowait()
-    except queue.Empty:
-        pass
-
-def queue_empty():
-    return glob.queue.empty()
 
 def register(cls: BanchoPacket): # not a register handler, used for packets
     glob.packets |= {cls.type: cls}
@@ -40,39 +27,36 @@ def register(cls: BanchoPacket): # not a register handler, used for packets
 @register
 class updateStats(BanchoPacket, type=Packets.OSU_REQUEST_STATUS_UPDATE):
     async def handle(self, user):
-        enqueue(packets.userStats(user))
+        user.enqueue(packets.userStats(user))
 
 @register
 class addFriend(BanchoPacket, type=Packets.OSU_FRIEND_ADD):
     uid: osuTypes.i32
 
     async def handle(self, user):
-        req = user['id']
+        req = user.id
         tar = self.uid
         await glob.db.execute('INSERT INTO friends (user1, user2) VALUES (%s, %s)', [req, tar])
-        log(f"{user['name']} added UID {tar} into their friends list.", Ansi.LBLUE)
+        log(f"{user.name} added UID {tar} into their friends list.", Ansi.LBLUE)
 
 @register
 class removeFriend(BanchoPacket, type=Packets.OSU_FRIEND_REMOVE):
     uid: osuTypes.i32
 
     async def handle(self, user):
-        req = user['id']
+        req = user.id
         tar = self.uid
         await glob.db.execute('DELETE FROM friends WHERE user1 = %s AND user2 = %s', [req, tar])
-        log(f"{user['name']} removed UID {tar} from their friends list.", Ansi.LBLUE)
+        log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LBLUE)
 
 @register
 class Logout(BanchoPacket, type=Packets.OSU_LOGOUT):
     async def handle(self, user):
-        if (time.time() - user['ltime']) < 1:
+        if (time.time() - user.login_time) < 1:
             return # osu sends random logout packet token on login ?
 
-        ucache = glob.cache['user']
-        del ucache[user['token']]
-        glob.players.remove(user)
-        enqueue(packets.logout(user['id']))
-        log(f"{user['name']} logged out.", Ansi.LBLUE)
+        user.logout()
+        log(f"{user.name} logged out.", Ansi.LBLUE)
 
 @register
 class sendMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
@@ -81,9 +65,12 @@ class sendMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
     async def handle(self, user):
         msg = self.msg.msg
         tarname = self.msg.tarname
-        # messages dont work rn - always sends to requester because i need to add a player object (soon)
-        #enqueue(packets.sendMessage(fromname = user['name'], msg = msg, tarname = tarname, fromid = user['id']))
-        #log(f'{user["name"]} sent message "{msg}" to {tarname}')
+
+        tarto = glob.players_name[tarname]
+        target = glob.players[tarto]
+
+        target.enqueue(packets.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
+        log(f'{user.name} sent message "{msg}" to {tarname}')
 
 @app.before_serving
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
@@ -96,13 +83,10 @@ async def connect(): # ran before server startup, used to do things like connect
         log(f'==== Asahi failed to connect to MySQL ====\n\n{error}', Ansi.LRED)
 
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
-    bot = {}
     botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
-    bot['id'] = 1
-    bot['country'] = country_codes[botinfo['country'].upper()]
-    bot['name'] = botinfo['name']
-    bot['bot'] = True
-    glob.players.append(bot)
+    bot = Player(id=1, name=botinfo['name'], offset=25, is_bot=True, country_iso=botinfo['country'], country=country_codes[botinfo['country'].upper()])
+    glob.players[''] = bot
+    glob.players_name[bot.name] = ''
     if glob.config.debug:
         log(f"==== Added bot {botinfo['name']} to player list ====", Ansi.GREEN)
 
@@ -178,19 +162,17 @@ async def login():
         ip = headers['X-Real-IP']
         reader = database.Reader('ext/geoloc.mmdb')
         geoloc = reader.city(ip)
-        country, user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
-        user['country'] = country_codes[country]
-        await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [country.lower(), user['id']]) # update country code in db
+        user['country_iso'], user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
+        user['country'] = country_codes[user['country_iso']]
+        await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [user['country_iso'].lower(), user['id']]) # update country code in db
 
         friends = {row['user2'] async for row in glob.db.iterall('SELECT user2 FROM friends WHERE user1 = %s', [user['id']])} # select all friends from db
 
-        ucache = glob.cache['user']
-        if str(token) not in ucache:
-            ucache[str(token)] = user['id'] # cache token to use outside of this request
-        data = bytearray(packets.userID(user['id'])) # initiate login by providing the user's id
+        p = Player.login(user)
+        data = bytearray(packets.userID(p.id)) # initiate login by providing the user's id
         data += packets.protocolVersion(19) # no clue what this does
         data += packets.banchoPrivileges(1 << 4) # force priv to developer for now
-        data += (packets.userPresence(user) + packets.userStats(user)) # provide user & other user's presence/stats (for f9 + user stats)
+        data += (packets.userPresence(p) + packets.userStats(p)) # provide user & other user's presence/stats (for f9 + user stats)
         data += packets.notification(f'Welcome to Asahi v{glob.version}') # send notification as indicator they've logged in i guess
         data += packets.channelInfoEnd() # no clue what this does either
         data += packets.menuIcon() # set main menu icon
@@ -199,42 +181,36 @@ async def login():
         #data += packets.sendMessage(user['name'], 'test message lol so cool', user['name'], user['id']) # test message
 
         # add user to cache?
-        pcache = glob.players
-        pcache.append(user)
-        for p in pcache: # enqueue other users to client
-            data += (packets.userPresence(p) + packets.userStats(p))
+        glob.players[p.token] = p
+        glob.players_name[p.name] = p.token
+        for o in glob.players.values(): # enqueue other users to client
+            data += (packets.userPresence(o) + packets.userStats(o))
 
         resp = await make_response(bytes(data))
         resp.headers['cho-token'] = token
         if glob.config.debug:
-            log(f'{username} successfully logged in. | Time Elapsed (using bcrypt cache: {ub}): {(time.time() - start) * 1000:.2f}ms', Ansi.LBLUE)
+            log(f'{p.name} successfully logged in. | Time Elapsed (using bcrypt cache: {ub}): {(time.time() - start) * 1000:.2f}ms', Ansi.LBLUE)
         return resp
     
     # if we have made it this far then it's a reconnect attempt with token already provided
     user_token = headers['osu-token'] # client-provided token
-    tcache = glob.cache['user'] # get token/userid cache to see if we need to relog the user or not
-    if user_token not in tcache:
+    try:
+        p = glob.players[user_token]
+    except:
         # user is logged in but token is not found? most likely a restart so we force a reconnection
         return packets.restartServer(0)
 
-    user = await glob.db.fetch('SELECT id, pw, country, name FROM users WHERE id = %s', [tcache[user_token]])
     body = await request.body
-
-    # ew
-    ucache = glob.players
-    for p in ucache:
-        if p.get('id') == user['id']:
-            user = p
 
     # handle any packets the client has sent
     for packet in BanchoPacketReader(body, glob.packets):
-        await packet.handle(user)
+        await packet.handle(p)
         if glob.config.debug:
             log(f'Handled packet {packet.type!r}', Ansi.LBLUE)
  
     data = bytearray()
-    while not queue_empty():
-        data += dequeue()
+    while not p.queue_empty():
+        data += p.dequeue()
 
     resp = await make_response(bytes(data))
     resp.headers['Content-Type'] = 'text/html; charset=UTF-8' # ?
