@@ -11,5 +11,6 @@ cache = {
     'user': {} # temporarily used to cache tokens until we have a player object
 }
 
-players = [] # player list
+players = {} # player dict | player[token] = player
+players_name = {} # playername dict | player[name] = token
 queue: 'SimpleQueue'

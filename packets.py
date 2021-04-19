@@ -12,6 +12,8 @@ from typing import Any
 from typing import Optional
 from constants.types import osuTypes
 
+from objects import glob
+
 _specifiers = (
     '<b', '<B', # 8
     '<h', '<H', # 16
@@ -436,34 +438,33 @@ def banchoPrivileges(priv: int) -> bytes:
 def botPresence(player) -> bytes:
     return write(
         Packets.CHO_USER_PRESENCE,
-        (player['id'], osuTypes.i32),
-        (player['name'], osuTypes.string),
-        (25, osuTypes.u8), # utc offset
-        (player['country'], osuTypes.u8),
+        (player.id, osuTypes.i32),
+        (player.name, osuTypes.string),
+        (player.offset + 24, osuTypes.u8), # utc offset
+        (player.country, osuTypes.u8),
         (31, osuTypes.u8),
-        (1111.0, osuTypes.f32), # long | off map cus bot
-        (2222.0, osuTypes.f32), # lat | off map cus bot
+        (player.loc[0], osuTypes.f32), # long | off map cus bot
+        (player.loc[1], osuTypes.f32), # lat | off map cus bot
         (1, osuTypes.i32)
     )
 
 def userPresence(player) -> bytes:
-    if player['bot']:
+    if player.is_bot:
         return botPresence(player)
 
-    # temporarily hardcode most stats until we have working player object
     return write(
         Packets.CHO_USER_PRESENCE,
-        (player['id'], osuTypes.i32),
-        (player['name'], osuTypes.string),
-        (player['offset'] + 24, osuTypes.u8), # utc offset
-        (player['country'], osuTypes.u8),
+        (player.id, osuTypes.i32),
+        (player.name, osuTypes.string),
+        (player.offset + 24, osuTypes.u8), # utc offset
+        (player.country, osuTypes.u8),
         (1 << 4 | 0 << 5, osuTypes.u8),
-        (float(player['lon']), osuTypes.f32), # long
-        (float(player['lat']), osuTypes.f32), # lat
+        (player.loc[0], osuTypes.f32), # long
+        (player.loc[1], osuTypes.f32), # lat
         (1, osuTypes.i32)
     )
 
-def botStats(player) -> bytes:
+def botStats() -> bytes:
     return write(
         Packets.CHO_USER_STATS,
         (1, osuTypes.i32),
@@ -482,12 +483,12 @@ def botStats(player) -> bytes:
     )
 
 def userStats(player) -> bytes:
-    if player['bot']:
-        return botStats(player)
+    if player.is_bot:
+        return botStats()
 
     return write(
         Packets.CHO_USER_STATS,
-        (player['id'], osuTypes.i32),
+        (player.id, osuTypes.i32),
         (0, osuTypes.u8), # action
         ('gaming', osuTypes.string), # info text
         ('', osuTypes.string), # map md5
@@ -515,7 +516,7 @@ def restartServer(time: int) -> bytes:
 
 @cache
 def menuIcon() -> bytes:
-    return write(Packets.CHO_MAIN_MENU_ICON, ('https://a.iteki.pw/1|https://tsunyoku.xyz', osuTypes.string)) # temporary url for menu icon, ill make it config bound soon
+    return write(Packets.CHO_MAIN_MENU_ICON, (f'{glob.config.menu_image}|{glob.config.domain}', osuTypes.string))
 
 def friends(*friends) -> bytes:
     return write(Packets.CHO_FRIENDS_LIST, (friends, osuTypes.i32_list)) # force just user itself for now to make sure it works
@@ -529,3 +530,7 @@ def sendMessage(fromname: str, msg: str, tarname: str, fromid: int) -> bytes:
 @cache
 def logout(uid: int) -> bytes:
     return write(Packets.CHO_USER_LOGOUT, (uid, osuTypes.i32), (0, osuTypes.u8)) # delay for logout ????
+
+@cache
+def blockDM() -> bytes:
+    return write(Packets.CHO_USER_DM_BLOCKED)
