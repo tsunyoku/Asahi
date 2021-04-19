@@ -172,7 +172,7 @@ async def login():
         p = Player.login(user)
         data = bytearray(packets.userID(p.id)) # initiate login by providing the user's id
         data += packets.protocolVersion(19) # no clue what this does
-        data += packets.banchoPrivileges(1 << 4) # force priv to developer for now
+        data += packets.banchoPrivileges(1 << 0 | 1 << 2) # force priv to developer for now
         data += (packets.userPresence(p) + packets.userStats(p)) # provide user & other user's presence/stats (for f9 + user stats)
         data += packets.notification(f'Welcome to Asahi v{glob.version}') # send notification as indicator they've logged in i guess
         data += packets.channelInfoEnd() # no clue what this does either

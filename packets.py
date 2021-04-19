@@ -458,7 +458,7 @@ def userPresence(player) -> bytes:
         (player.name, osuTypes.string),
         (player.offset + 24, osuTypes.u8), # utc offset
         (player.country, osuTypes.u8),
-        (1 << 4 | 0 << 5, osuTypes.u8),
+        ((1 << 0 | 1 << 2) | 0 << 5, osuTypes.u8),
         (player.loc[0], osuTypes.f32), # long
         (player.loc[1], osuTypes.f32), # lat
         (1, osuTypes.i32)
