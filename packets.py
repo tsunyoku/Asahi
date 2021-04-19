@@ -516,7 +516,7 @@ def restartServer(time: int) -> bytes:
 
 @cache
 def menuIcon() -> bytes:
-    return write(Packets.CHO_MAIN_MENU_ICON, (f'{glob.config.menu_image}|{glob.config.domain}', osuTypes.string))
+    return write(Packets.CHO_MAIN_MENU_ICON, (f'{glob.config.menu_image}|{glob.config.menu_url}', osuTypes.string))
 
 def friends(*friends) -> bytes:
     return write(Packets.CHO_FRIENDS_LIST, (friends, osuTypes.i32_list)) # force just user itself for now to make sure it works

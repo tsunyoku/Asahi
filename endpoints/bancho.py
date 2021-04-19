@@ -179,7 +179,6 @@ async def login():
         data += packets.menuIcon() # set main menu icon
         data += packets.friends(*friends) # send user friend list
         data += packets.silenceEnd(0) # force to 0 for now since silences arent a thing
-        #data += packets.sendMessage(user['name'], 'test message lol so cool', user['name'], user['id']) # test message
 
         # add user to cache?
         glob.players[p.token] = p
@@ -198,7 +197,7 @@ async def login():
     user_token = headers['osu-token'] # client-provided token
     try:
         p = glob.players[user_token]
-    except:
+    except KeyError:
         # user is logged in but token is not found? most likely a restart so we force a reconnection
         return packets.restartServer(0)
 
