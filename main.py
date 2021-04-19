@@ -30,6 +30,30 @@ class updateStats(BanchoPacket, type=Packets.OSU_REQUEST_STATUS_UPDATE):
         user.enqueue(packets.userStats(user))
 
 @register
+class statsRequest(BanchoPacket, type=Packets.OSU_USER_STATS_REQUEST):
+    uids: osuTypes.i32_list
+
+    async def handle(self, user):
+        for o in glob.players.values():
+            if o.id != user.id and o.id in self.uids:
+                user.enqueue(packets.userStats(o))
+
+@register
+class presenceRequest(BanchoPacket, type=Packets.OSU_USER_PRESENCE_REQUEST):
+    uids: osuTypes.i32_list
+
+    async def handle(self, user):
+        for o in glob.players.values():
+            user.enqueue(packets.userPresence(o))
+
+@register
+class presenceRequestAll(BanchoPacket, type=Packets.OSU_USER_PRESENCE_REQUEST_ALL):
+    async def handle(self, user):
+        for o in glob.players.values():
+            if o.id != user.id:
+                user.enqueue(packets.userPresence(o))
+
+@register
 class addFriend(BanchoPacket, type=Packets.OSU_FRIEND_ADD):
     uid: osuTypes.i32
 
@@ -184,7 +208,8 @@ async def login():
         glob.players[p.token] = p
         glob.players_name[p.name] = p.token
         for o in glob.players.values(): # enqueue other users to client
-            data += (packets.userPresence(o) + packets.userStats(o))
+            o.enqueue((packets.userPresence(p) + packets.userStats(p))) # enqueue this user to every other logged in user
+            data += (packets.userPresence(o) + packets.userStats(o)) # enqueue every other logged in user to this user
 
         resp = await make_response(bytes(data))
         resp.headers['cho-token'] = token
