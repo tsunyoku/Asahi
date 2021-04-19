@@ -11,6 +11,7 @@ from functools import partialmethod
 from typing import Any
 from typing import Optional
 from constants.types import osuTypes
+from objects import glob
 
 _specifiers = (
     '<b', '<B', # 8
@@ -515,7 +516,7 @@ def restartServer(time: int) -> bytes:
 
 @cache
 def menuIcon() -> bytes:
-    return write(Packets.CHO_MAIN_MENU_ICON, ('https://a.iteki.pw/1|https://tsunyoku.xyz', osuTypes.string)) # temporary url for menu icon, ill make it config bound soon
+    return write(Packets.CHO_MAIN_MENU_ICON, (f'{glob.config.menu_image}|{glob.config.domain}', osuTypes.string))
 
 def friends(*friends) -> bytes:
     return write(Packets.CHO_FRIENDS_LIST, (friends, osuTypes.i32_list)) # force just user itself for now to make sure it works
