@@ -183,7 +183,7 @@ async def login():
         user['ltime'] = time.time() # useful for handling random logouts
 
         # sort out geoloc | SPEEEEEEEEEEEEEED gains
-        ip = headers['X-Real-IP']
+        ip = headers['X-Forwarded-For']
         reader = database.Reader('ext/geoloc.mmdb')
         geoloc = reader.city(ip)
         user['country_iso'], user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
