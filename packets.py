@@ -11,6 +11,7 @@ from functools import partialmethod
 from typing import Any
 from typing import Optional
 from constants.types import osuTypes
+from objects import glob
 
 from objects import glob
 
