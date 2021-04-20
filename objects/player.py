@@ -7,6 +7,7 @@ class Player:
         self.id: int = uinfo.get('id')
         self.name: str = uinfo.get('name')
         self.token: str = uinfo.get('token', '') # we will set default token in case of bot which won't have a token provided
+        self.pw: str = uinfo.get('pw') # used for /web/ auth
         self.offset: int = uinfo.get('offset')
         self.login_time: int = uinfo.get('login_time')
         self.is_bot: bool = uinfo.get('is_bot', False)
@@ -31,14 +32,14 @@ class Player:
             login_time=user['ltime'],
             country_iso=user['country_iso'],
             country=user['country'],
-            loc=[user['lon'], user['lat']]
+            loc=[user['lon'], user['lat']],
+            pw=user['md5'].decode()
         )
 
         return p
 
     def logout(self):
         glob.players.pop(self.token)
-        self.token = ''
         glob.players_name.pop(self.name)
         for o in glob.players.values():
             o.enqueue(packets.logout(self.id))

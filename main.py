@@ -39,6 +39,7 @@ async def connect(): # ran before server startup, used to do things like connect
     bot = Player(id=1, name=botinfo['name'], offset=1, is_bot=True, country_iso=botinfo['country'], country=country_codes[botinfo['country'].upper()])
     glob.players[''] = bot
     glob.players_name[bot.name] = ''
+    glob.bot = bot # might be useful in the future?
     if glob.config.debug:
         log(f"==== Added bot {bot.name} to player list ====", Ansi.GREEN)
 

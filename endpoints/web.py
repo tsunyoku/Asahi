@@ -10,8 +10,22 @@ from objects import glob
 ss_path = os.path.join(os.getcwd(), 'resources/screenshots')
 web = Blueprint('web', __name__)
 
+def auth(name, md5):
+    player = glob.players_name.get(name)
+    if not player:
+        return False
+
+    if player.pw != md5:
+        return False
+
+    return True
+
 @web.route("/web/osu-screenshot.php", methods=['POST'])
 async def uploadScreenshot():
+    mpargs = await request.form
+    if not auth(mpargs['u'], mpargs['p']):
+        return b''
+
     files = await request.files
     screenshot = files['ss']
     if not screenshot:
@@ -37,8 +51,4 @@ async def seasonalBG():
 
 @web.route("/web/bancho_connect.php")
 async def banchoConnect():
-    verif = request.args.get('v')
-    if verif:
-        return Response(b'asahi is gamer')
-
-    return Response(b'')
+    return Response(b'asahi is gamer')
