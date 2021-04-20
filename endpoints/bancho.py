@@ -12,6 +12,7 @@ from objects import glob # glob = global, server-wide objects will be stored her
 from objects.player import Player # Player - player object to store stats, info etc.
 from constants.countries import country_codes
 from constants.types import osuTypes
+from constants.privs import Privileges, ClientPrivileges
 import packets
 from packets import BanchoPacketReader, BanchoPacket, Packets
 
@@ -145,7 +146,7 @@ async def login():
         username = info[0]
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later
 
-        user = await glob.db.fetch('SELECT id, pw, country, name FROM users WHERE name = %s', [username])
+        user = await glob.db.fetch('SELECT id, pw, country, name, priv FROM users WHERE name = %s', [username])
         if not user: # ensure user actually exists before attempting to do anything else
             if glob.config.debug:
                 log(f'User {username} does not exist. | Time Elapsed: {(time.time() - start) * 1000:.2f}ms', Ansi.LRED)
@@ -181,18 +182,24 @@ async def login():
         user['ltime'] = time.time() # useful for handling random logouts
         user['md5'] = pw # used for auth on /web/
 
-        # sort out geoloc | SPEEEEEEEEEEEEEED gains
+        # geoloc | SPEEED
         ip = headers['X-Forwarded-For']
         reader = database.Reader('ext/geoloc.mmdb')
         geoloc = reader.city(ip)
         user['country_iso'], user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
         user['country'] = country_codes[user['country_iso']]
-        await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [user['country_iso'].lower(), user['id']]) # update country code in db
 
+        # set player object
         p = await Player.login(user)
+
+        if not p.priv & Privileges.Verified:
+            await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [user['country_iso'].lower(), user['id']]) # set country code in db
+            await p.add_priv(Privileges.Verified) # verify user
+            log(f'{p.name} has been successfully verified.', Ansi.LBLUE)
+
         data = bytearray(packets.userID(p.id)) # initiate login by providing the user's id
         data += packets.protocolVersion(19) # no clue what this does
-        data += packets.banchoPrivileges(1 << 0 | 1 << 2) # force priv to developer for now
+        data += packets.banchoPrivileges(p.client_priv | ClientPrivileges.Supporter) # force priv to developer for now
         data += (packets.userPresence(p) + packets.userStats(p)) # provide user & other user's presence/stats (for f9 + user stats)
         data += packets.notification(f'Welcome to Asahi v{glob.version}') # send notification as indicator they've logged in i guess
         data += packets.channelInfoEnd() # no clue what this does either
