@@ -149,7 +149,7 @@ async def login():
         user = await glob.db.fetch('SELECT id, pw, country, name, priv FROM users WHERE name = %s', [username])
         if not user: # ensure user actually exists before attempting to do anything else
             if glob.config.debug:
-                log(f'User {username} does not exist. | Time Elapsed: {(time.time() - start) * 1000:.2f}ms', Ansi.LRED)
+                log(f'User {username} does not exist.', Ansi.LRED)
             resp = await make_response(packets.userID(-1)) # -1 userid informs client of an auth error
             resp.headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
             return resp
@@ -159,19 +159,17 @@ async def login():
         if pw_bcrypt in bcache:
             if pw != bcache[pw_bcrypt]: # compare provided md5 with the stored (cached) bcrypt to ensure they have provided the correct password
                 if glob.config.debug:
-                    log(f"{username}'s login attempt failed: provided an incorrect password | Time Elapsed (with cached bcrypt): {(time.time() - start) * 1000:.2f}ms", Ansi.LRED)
+                    log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
                 resp = await make_response(packets.userID(-1))
                 resp.headers['cho-token'] = 'no'
                 return resp
-            ub = True
         else:
             if not bcrypt.checkpw(pw, pw_bcrypt): # compare provided md5 with the stored bcrypt to ensure they have provided the correct password
                 if glob.config.debug:
-                    log(f"{username}'s login attempt failed: provided an incorrect password | Time Elapsed (bcrypt not cached): {(time.time() - start) * 1000:.2f}ms", Ansi.LRED)
+                    log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
                 resp = await make_response(packets.userID(-1))
                 resp.headers['cho-token'] = 'no'
                 return resp
-            ub = False
             
             bcache[pw_bcrypt] = pw # cache pw for future
 
@@ -226,7 +224,7 @@ async def login():
         resp = await make_response(bytes(data))
         resp.headers['cho-token'] = token
         if glob.config.debug:
-            log(f'{p.name} successfully logged in. | Time Elapsed (using bcrypt cache: {ub}): {(time.time() - start) * 1000:.2f}ms', Ansi.LBLUE)
+            log(f'{p.name} successfully logged in. | Time Elapsed: {(time.time() - start) * 1000:.2f}ms', Ansi.LBLUE)
         return resp
     
     # if we have made it this far then it's a reconnect attempt with token already provided

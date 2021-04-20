@@ -30,10 +30,16 @@ def auth(name, md5):
 async def bRequest():
     g.req_url = request.base_url
     g.req_method = request.method
+    g.start = time.time()
 
 @web.after_request
 async def logRequest(resp):
-    log(f'[{g.pop("req_method")}] {resp.status_code} {g.pop("req_url")} | Request by {g.pop("player")}', Ansi.LCYAN)
+    if g.get('player'):
+        ret = f' | Request by {g.pop("player")}'
+    else:
+        ret = ''
+
+    log(f'[{g.pop("req_method")}] {resp.status_code} {g.pop("req_url")}{ret} | Time Elapsed: {(time.time() - g.pop("start")) * 1000:.2f}ms', Ansi.LCYAN)
     return resp
 
 @web.route("/web/osu-screenshot.php", methods=['POST'])
@@ -67,7 +73,6 @@ async def seasonalBG():
 
 @web.route("/web/bancho_connect.php")
 async def banchoConnect():
-    g.player = request.args['u']
     return Response(b'asahi is gamer')
 
 @web.route("/web/osu-getfriends.php")
