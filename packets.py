@@ -518,7 +518,7 @@ def restartServer(time: int) -> bytes:
 def menuIcon() -> bytes:
     return write(Packets.CHO_MAIN_MENU_ICON, (f'{glob.config.menu_image}|{glob.config.menu_url}', osuTypes.string))
 
-def friends(*friends) -> bytes:
+def friends(friends) -> bytes:
     return write(Packets.CHO_FRIENDS_LIST, (friends, osuTypes.i32_list)) # force just user itself for now to make sure it works
 
 def silenceEnd(unix: int) -> bytes:
