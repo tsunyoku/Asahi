@@ -489,12 +489,12 @@ def userStats(player) -> bytes:
     return write(
         Packets.CHO_USER_STATS,
         (player.id, osuTypes.i32),
-        (0, osuTypes.u8), # action
-        ('gaming', osuTypes.string), # info text
-        ('', osuTypes.string), # map md5
-        (0, osuTypes.i32), # mods
-        (0, osuTypes.u8), # game mode
-        (0, osuTypes.i32), # map id
+        (player.action, osuTypes.u8), # action
+        (player.info, osuTypes.string), # info text
+        (player.map_md5, osuTypes.string), # map md5
+        (player.mods, osuTypes.i32), # mods
+        (player.mode, osuTypes.u8), # game mode
+        (player.map_id, osuTypes.i32), # map id
         (0, osuTypes.i64), # ranked score
         (100.00, osuTypes.f32), # accuracy
         (0, osuTypes.i32), # playcount
