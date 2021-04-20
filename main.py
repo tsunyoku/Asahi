@@ -2,8 +2,8 @@
 from quart import Quart, Response, request, make_response # web server :blobcowboi:
 from cmyui import AsyncSQLPool, Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from pathlib import Path
-import pyfiglet
 from os import makedirs
+import pyfiglet
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler

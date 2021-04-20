@@ -1,4 +1,5 @@
 from objects import glob
+from constants.privs import Privileges, ClientPrivileges
 import queue
 import packets
 
@@ -11,6 +12,7 @@ class Player:
         self.offset: int = uinfo.get('offset')
         self.login_time: int = uinfo.get('login_time')
         self.is_bot: bool = uinfo.get('is_bot', False)
+        self.priv = uinfo.get('priv', Privileges(0))
         self.country_iso: str = uinfo.get('country_iso')
         self.country: int = uinfo.get('country')
         self.loc: list[float, float] = uinfo.get('loc', [0.0, 0.0]) # store as list cus y not (long, lat)
@@ -34,12 +36,32 @@ class Player:
             country_iso=user['country_iso'],
             country=user['country'],
             loc=[user['lon'], user['lat']],
-            pw=user['md5'].decode()
+            pw=user['md5'].decode(),
+            priv=Privileges(user['priv'])
         )
 
         p.friends = {row['user2'] async for row in glob.db.iterall('SELECT user2 FROM friends WHERE user1 = %s', [user['id']])} # select all friends from db
 
         return p
+
+    @property
+    def client_priv(self):
+        priv = ClientPrivileges(0)
+
+        if self.priv & Privileges.Normal:
+            priv |= ClientPrivileges.Player
+        if self.priv & Privileges.Admin:
+            priv |= ClientPrivileges.Moderator
+        if self.priv & Privileges.Developer:
+            priv |= ClientPrivileges.Developer
+        if self.priv & Privileges.Owner:
+            priv |= ClientPrivileges.Owner
+        
+        return priv
+
+    async def add_priv(self, priv):
+        self.priv |= priv
+        await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
 
     def logout(self):
         glob.players.pop(self.token)
