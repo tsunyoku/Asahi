@@ -198,6 +198,10 @@ async def login():
         p = await Player.login(user)
 
         if not p.priv & Privileges.Verified:
+            if p.id == 3:
+                # first user & not verified, give all permissions
+                await p.set_priv(Privileges.Master)
+
             await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [user['country_iso'].lower(), user['id']]) # set country code in db
             await p.add_priv(Privileges.Verified) # verify user
             log(f'{p.name} has been successfully verified.', Ansi.LBLUE)
