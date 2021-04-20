@@ -1,4 +1,4 @@
-from quart import Blueprint, request, Response, send_file, g
+from quart import Blueprint, request, Response, send_file, g, redirect
 from cmyui import log, Ansi
 from collections import defaultdict
 
@@ -83,6 +83,18 @@ async def getFriends():
     
     p = glob.players_name.get(args['u'])
     return '\n'.join(map(str, p.friends)).encode()
+
+@web.route("/d/<int:mid>")
+async def mapDownload(mid):
+    return redirect(f'https://tsuki.host/d/{mid}', code=307)
+
+@web.route("/web/osu-search.php")
+async def osuSearch():
+    return redirect('https://tsuki.host/web/osu-search.php', code=307)
+
+@web.route("/web/osu-search-set.php")
+async def osuSearchSet():
+    return redirect('https://tsuki.host/web/osu-search-set.php', code=307)
 
 @web.route("/users", methods=['POST'])
 async def ingameRegistration():
