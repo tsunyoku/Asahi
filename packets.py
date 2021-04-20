@@ -8,8 +8,7 @@ from enum import unique
 from functools import cache
 from functools import lru_cache
 from functools import partialmethod
-from typing import Any
-from typing import Optional
+from typing import Any, Optional
 
 from constants.types import osuTypes
 from objects import glob
@@ -534,3 +533,22 @@ def logout(uid: int) -> bytes:
 @cache
 def blockDM() -> bytes:
     return write(Packets.CHO_USER_DM_BLOCKED)
+
+@cache
+def spectatorJoined(uid: int) -> bytes:
+    return write(Packets.CHO_FELLOW_SPECTATOR_JOINED, (uid, osuTypes.i32))
+
+@cache
+def hostSpectatorJoined(uid: int) -> bytes:
+    return write(Packets.CHO_SPECTATOR_JOINED, (uid, osuTypes.i32))
+
+@cache
+def spectatorLeft(uid: int) -> bytes:
+    return write(Packets.CHO_FELLOW_SPECTATOR_LEFT, (uid, osuTypes.i32))
+
+@cache
+def hostSpectatorLeft(uid: int) -> bytes:
+    return write(Packets.CHO_SPECTATOR_LEFT, (uid, osuTypes.i32))
+
+def spectateFrames(frames: bytes) -> bytes:
+    return write(Packets.CHO_SPECTATE_FRAMES, (frames, osuTypes.raw))

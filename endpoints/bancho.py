@@ -91,7 +91,9 @@ class sendMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
         msg = self.msg.msg
         tarname = self.msg.tarname
 
-        target = glob.players_name[tarname]
+        if not (target := glob.players_name.get(tarname)):
+            log(f'{user.name} tried to send message to offline user {tarname}', Ansi.LRED)
+            return
 
         target.enqueue(packets.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
         log(f'{user.name} sent message "{msg}" to {tarname}')
@@ -116,13 +118,44 @@ class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
         for o in glob.players.values():
             o.enqueue(packets.userStats(user))
 
+@packet
+class startSpec(BanchoPacket, type=Packets.OSU_START_SPECTATING):
+    tid: osuTypes.i32
+
+    async def handle(self, user):
+        if self.tid == 1: # spectating bot is just gonna cause unnecessary errors
+            return
+
+        if not (target := glob.players_id.get(self.tid)):
+            log(f'{user.name} tried to spectate offline UID {self.tid}', Ansi.LRED)
+            return
+
+        target.add_spectator(user)
+        
+@packet
+class stopSpec(BanchoPacket, type=Packets.OSU_STOP_SPECTATING):
+    async def handle(self, user):
+        if not (host := user.spectating):
+            log(f'{user.name} tried to stop spectating someone while not spectating anyone.', Ansi.LRED)
+            return
+        
+        host.remove_spectator(user)
+
+@packet
+class specFrames(BanchoPacket, type=Packets.OSU_SPECTATE_FRAMES):
+    frames: osuTypes.raw
+
+    async def handle(self, user):
+        for u in user.spectators:
+            u.enqueue(packets.spectateFrames(self.frames))
+
 @bancho.route("/", methods=['GET']) # only accept GET requests as POST is for login method, see login method below
-async def root():
+async def root_http():
     message = f"{pyfiglet.figlet_format(f'Asahi v{glob.version}')}\n\ntsunyoku attempts bancho v2, gone right :sunglasses:"
     return Response(message, mimetype='text/plain')
 
 @bancho.route("/", methods=['POST']) # only accept POST requests, we can assume it is for a login request but we can deny access if not
-async def login():
+async def root_client():
     start = time.time()
     headers = request.headers # request headers, used for things such as user ip and agent
 
@@ -217,6 +250,7 @@ async def login():
         # add user to cache?
         glob.players[p.token] = p
         glob.players_name[p.name] = p
+        glob.players_id[p.id] = p
         for o in glob.players.values(): # enqueue other users to client
             o.enqueue((packets.userPresence(p) + packets.userStats(p))) # enqueue this user to every other logged in user
             data += (packets.userPresence(o) + packets.userStats(o)) # enqueue every other logged in user to this user
@@ -229,9 +263,7 @@ async def login():
     
     # if we have made it this far then it's a reconnect attempt with token already provided
     user_token = headers['osu-token'] # client-provided token
-    try:
-        p = glob.players[user_token]
-    except KeyError:
+    if not (p := glob.players.get(user_token)):
         # user is logged in but token is not found? most likely a restart so we force a reconnection
         return packets.restartServer(0)
 
@@ -240,7 +272,7 @@ async def login():
     # handle any packets the client has sent
     for packet in BanchoPacketReader(body, glob.packets):
         await packet.handle(p)
-        if glob.config.debug:
+        if glob.config.debug and packet.type != 18: # stop 18 from printing as it floods console
             log(f'Handled packet {packet.type!r}', Ansi.LBLUE)
  
     data = bytearray()

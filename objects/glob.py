@@ -11,6 +11,7 @@ cache = {
 }
 
 players = {} # player dict | player[token] = player
-players_name = {} # playername dict | player[name] = token
+players_name = {} # playername dict | player[name] = player
+players_id = {} # playerid dict | player[id] = player
 
 bot: 'Player'

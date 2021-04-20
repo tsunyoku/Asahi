@@ -1,5 +1,7 @@
 from objects import glob
 from constants.privs import Privileges, ClientPrivileges
+from typing import Optional
+from cmyui import log, Ansi
 import queue
 import packets
 
@@ -24,6 +26,9 @@ class Player:
         self.mods = int = 0
         self.mode: int = 0
         self.map_id: int = 0
+
+        self.spectators: list[Player] = []
+        self.spectating: Optional[Player] = None
 
     @classmethod
     async def login(self, user):
@@ -71,9 +76,36 @@ class Player:
         self.priv = priv
         await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
 
+    def add_spectator(self, user):
+        joiner = packets.spectatorJoined(user.id)
+
+        for u in self.spectators:
+            u.enqueue(joiner)
+            user.enqueue(packets.spectatorJoined(u.id))
+        
+        self.spectators.append(user)
+        user.spectating = self
+        self.enqueue(packets.hostSpectatorJoined(user.id))
+        log(f'{user.name} started spectating {self.name}.', Ansi.LBLUE)
+
+    def remove_spectator(self, user):
+        self.spectators.remove(user)
+        user.spectating = None
+
+        if self.spectators:
+            for u in self.spectators:
+                u.enqueue(packets.spectatorLeft(user.id))
+        
+        self.enqueue(packets.hostSpectatorLeft(user.id))
+        log(f'{user.name} stopped spectating {self.name}.', Ansi.LBLUE)
+
     def logout(self):
         glob.players.pop(self.token)
         glob.players_name.pop(self.name)
+
+        if host := self.spectating:
+            host.remove_spectator(self)
+
         for o in glob.players.values():
             o.enqueue(packets.logout(self.id))
 
