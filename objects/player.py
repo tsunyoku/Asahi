@@ -14,6 +14,12 @@ class Player:
         self.country: int = uinfo.get('country')
         self.loc: list[float, float] = uinfo.get('loc', [0.0, 0.0]) # store as list cus y not (long, lat)
         self.queue = queue.SimpleQueue()
+        self.action: int = 0
+        self.info: str = ''
+        self.map_md5: str = ''
+        self.mods = int = 0
+        self.mode: int = 0
+        self.map_id: int = 0
 
     @classmethod
     def login(self, user):

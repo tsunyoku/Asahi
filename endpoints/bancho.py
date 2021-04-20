@@ -94,6 +94,26 @@ class sendMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
         target.enqueue(packets.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
         log(f'{user.name} sent message "{msg}" to {tarname}')
 
+@register
+class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
+    actionid: osuTypes.u8
+    info: osuTypes.string
+    md5: osuTypes.string
+    mods: osuTypes.u32
+    mode: osuTypes.u8
+    mid: osuTypes.i32
+
+    async def handle(self, user):
+        user.action = self.actionid
+        user.info = self.info
+        user.map_md5 = self.md5
+        user.mods = self.mods
+        user.mode = self.mode
+        user.map_id = self.mid
+
+        for o in glob.players.values():
+            o.enqueue(packets.userStats(user))
+
 @bancho.route("/", methods=['GET']) # only accept GET requests as POST is for login method, see login method below
 async def root():
     message = f"{pyfiglet.figlet_format(f'Asahi v{glob.version}')}\n\ntsunyoku attempts bancho v2, gone right :sunglasses:"
