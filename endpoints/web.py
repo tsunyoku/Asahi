@@ -91,7 +91,7 @@ async def mapDownload(mid):
 
 @web.route("/web/osu-search.php")
 async def osuSearch():
-    args = request.args
+    	args = request.args
 	if not auth(args['u'], args['h']):
 		return Response(b'', status=400)
 
@@ -105,9 +105,22 @@ async def osuSearch():
 
 	return Response(direct_response)
 
+
 @web.route("/web/osu-search-set.php")
 async def osuSearchSet():
-    return redirect('https://tsuki.host/web/osu-search-set.php', code=307)
+	args = request.args
+	if not auth(args['u'], args['h']):
+		return Response(b'', status=400)
+
+	direct_args = {}
+	for key, _ in request.args.items():
+		direct_args[key] = request.args[key]
+
+		async with aiohttp.ClientSession() as session:
+			async with session.get("https://tsuki.host/web/osu-search-set.php", params=direct_args) as resp:
+				direct_response = await resp.read()
+
+	return Response(direct_response)
 
 @web.route("/users", methods=['POST'])
 async def ingameRegistration():
