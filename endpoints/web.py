@@ -39,7 +39,7 @@ async def logRequest(resp):
 async def uploadScreenshot():
     mpargs = await request.form
     if not auth(mpargs['u'], mpargs['p']):
-        return b''
+        return Response(b'', status=400)
 
     files = await request.files
     screenshot = files['ss']
@@ -58,7 +58,7 @@ async def getScreenshot(scr):
     if os.path.exists(ss):
         return await send_file(ss)
     else:
-        return Response('could not find screenshot')
+        return Response('could not find screenshot', status=400)
 
 @web.route("/web/osu-getseasonal.php")
 async def seasonalBG():
@@ -72,7 +72,7 @@ async def banchoConnect():
 async def getFriends():
     args = request.args
     if not auth(args['u'], args['h']):
-        return b''
+        return Response(b'', status=400)
     
     p = glob.players_name.get(args['u'])
     return '\n'.join(map(str, p.friends)).encode()
