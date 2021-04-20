@@ -9,6 +9,7 @@ import hashlib
 import bcrypt
 import time
 import orjson
+import aiohttp
 
 from objects import glob
 
@@ -90,7 +91,19 @@ async def mapDownload(mid):
 
 @web.route("/web/osu-search.php")
 async def osuSearch():
-    return redirect('https://tsuki.host/web/osu-search.php', code=307)
+    args = request.args
+	if not auth(args['u'], args['h']):
+		return Response(b'', status=400)
+
+	direct_args = {}
+	for key, _ in request.args.items():
+		direct_args[key] = request.args[key]
+
+		async with aiohttp.ClientSession() as session:
+			async with session.get("https://tsuki.host/web/osu-search.php", params=direct_args) as resp:
+				direct_response = await resp.read()
+
+	return Response(direct_response)
 
 @web.route("/web/osu-search-set.php")
 async def osuSearchSet():
