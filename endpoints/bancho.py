@@ -175,6 +175,11 @@ async def login():
             
             bcache[pw_bcrypt] = pw # cache pw for future
 
+        if not user['priv'] & Privileges.Normal:
+            resp = await make_response(packets.userID(-3)) # banned packet
+            resp.headers['cho-token'] = 'no'
+            return resp
+
         token = uuid.uuid4() # generate token for client to use as auth
         user['offset'] = int(cinfo[1]) # utc offset for time
         user['bot'] = False # used to specialise bot functions, kinda gay setup ngl

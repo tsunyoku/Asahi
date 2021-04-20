@@ -63,6 +63,10 @@ class Player:
         self.priv |= priv
         await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
 
+    async def remove_priv(self, priv):
+        self.priv &= ~priv
+        await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
+
     def logout(self):
         glob.players.pop(self.token)
         glob.players_name.pop(self.name)
