@@ -5,3 +5,4 @@ hypercorn
 bcrypt
 aiohttp
 geoip2
+orjson
