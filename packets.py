@@ -499,7 +499,7 @@ def userStats(player) -> bytes:
         (100.00, osuTypes.f32), # accuracy
         (0, osuTypes.i32), # playcount
         (0, osuTypes.i64), # total score
-        (1, osuTypes.i32), # rank
+        (0, osuTypes.i32), # rank
         (0, osuTypes.i16) # pp
     )
 

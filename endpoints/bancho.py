@@ -18,16 +18,16 @@ from packets import BanchoPacketReader, BanchoPacket, Packets
 bancho = Blueprint('bancho', __name__) # handler for webserver :D
 glob.packets = {}
 
-def register(cls: BanchoPacket): # not a register handler, used for packets
+def packet(cls: BanchoPacket):
     glob.packets |= {cls.type: cls}
     return cls
 
-@register
+@packet
 class updateStats(BanchoPacket, type=Packets.OSU_REQUEST_STATUS_UPDATE):
     async def handle(self, user):
         user.enqueue(packets.userStats(user))
 
-@register
+@packet
 class statsRequest(BanchoPacket, type=Packets.OSU_USER_STATS_REQUEST):
     uids: osuTypes.i32_list
 
@@ -36,7 +36,7 @@ class statsRequest(BanchoPacket, type=Packets.OSU_USER_STATS_REQUEST):
             if o.id != user.id and o.id in self.uids:
                 user.enqueue(packets.userStats(o))
 
-@register
+@packet
 class presenceRequest(BanchoPacket, type=Packets.OSU_USER_PRESENCE_REQUEST):
     uids: osuTypes.i32_list
 
@@ -44,14 +44,14 @@ class presenceRequest(BanchoPacket, type=Packets.OSU_USER_PRESENCE_REQUEST):
         for o in glob.players.values():
             user.enqueue(packets.userPresence(o))
 
-@register
+@packet
 class presenceRequestAll(BanchoPacket, type=Packets.OSU_USER_PRESENCE_REQUEST_ALL):
     async def handle(self, user):
         for o in glob.players.values():
             if o.id != user.id:
                 user.enqueue(packets.userPresence(o))
 
-@register
+@packet
 class addFriend(BanchoPacket, type=Packets.OSU_FRIEND_ADD):
     uid: osuTypes.i32
 
@@ -61,7 +61,7 @@ class addFriend(BanchoPacket, type=Packets.OSU_FRIEND_ADD):
         await glob.db.execute('INSERT INTO friends (user1, user2) VALUES (%s, %s)', [req, tar])
         log(f"{user.name} added UID {tar} into their friends list.", Ansi.LBLUE)
 
-@register
+@packet
 class removeFriend(BanchoPacket, type=Packets.OSU_FRIEND_REMOVE):
     uid: osuTypes.i32
 
@@ -71,7 +71,7 @@ class removeFriend(BanchoPacket, type=Packets.OSU_FRIEND_REMOVE):
         await glob.db.execute('DELETE FROM friends WHERE user1 = %s AND user2 = %s', [req, tar])
         log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LBLUE)
 
-@register
+@packet
 class Logout(BanchoPacket, type=Packets.OSU_LOGOUT):
     async def handle(self, user):
         if (time.time() - user.login_time) < 1:
@@ -80,7 +80,7 @@ class Logout(BanchoPacket, type=Packets.OSU_LOGOUT):
         user.logout()
         log(f"{user.name} logged out.", Ansi.LBLUE)
 
-@register
+@packet
 class sendMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
     msg: osuTypes.message # i am so confused man wtf
 
@@ -88,13 +88,12 @@ class sendMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
         msg = self.msg.msg
         tarname = self.msg.tarname
 
-        tarto = glob.players_name[tarname]
-        target = glob.players[tarto]
+        target = glob.players_name[tarname]
 
         target.enqueue(packets.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
         log(f'{user.name} sent message "{msg}" to {tarname}')
 
-@register
+@packet
 class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
     actionid: osuTypes.u8
     info: osuTypes.string
@@ -178,6 +177,7 @@ async def login():
         user['bot'] = False # used to specialise bot functions, kinda gay setup ngl
         user['token'] = str(token) # this may be useful in the future
         user['ltime'] = time.time() # useful for handling random logouts
+        user['md5'] = pw # used for auth on /web/
 
         # sort out geoloc | SPEEEEEEEEEEEEEED gains
         ip = headers['X-Forwarded-For']
@@ -202,7 +202,7 @@ async def login():
 
         # add user to cache?
         glob.players[p.token] = p
-        glob.players_name[p.name] = p.token
+        glob.players_name[p.name] = p
         for o in glob.players.values(): # enqueue other users to client
             o.enqueue((packets.userPresence(p) + packets.userStats(p))) # enqueue this user to every other logged in user
             data += (packets.userPresence(o) + packets.userStats(o)) # enqueue every other logged in user to this user
