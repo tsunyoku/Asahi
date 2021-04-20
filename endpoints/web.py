@@ -23,16 +23,17 @@ def auth(name, md5):
     if player.pw != md5:
         return False
 
+    g.player = player.name
     return True
 
 @web.before_request
 async def bRequest():
-    g.req_url = request.full_path
+    g.req_url = request.base_url
     g.req_method = request.method
 
 @web.after_request
 async def logRequest(resp):
-    log(f'[{g.pop("req_method")}] {resp.status_code} {g.pop("req_url")}', Ansi.LCYAN)
+    log(f'[{g.pop("req_method")}] {resp.status_code} {g.pop("req_url")} | Request by {g.pop("player")}', Ansi.LCYAN)
     return resp
 
 @web.route("/web/osu-screenshot.php", methods=['POST'])
