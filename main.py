@@ -3,7 +3,7 @@ from quart import Quart, Response, request, make_response # web server :blobcowb
 from cmyui import AsyncSQLPool, Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from pathlib import Path
 import pyfiglet
-import os
+from os import makedirs
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
@@ -27,12 +27,13 @@ async def connect(): # ran before server startup, used to do things like connect
 
     ava_path = Path.cwd() / 'resources/avatars'
     if not ava_path.exists():
-        os.makedirs(ava_path, exist_ok=True)
-        log('Avatars folder has been created, please set a default avatar by placing a file named "default.png" into resources/avatars!', Ansi.LRED)
+        makedirs(ava_path, exist_ok=True)
+        log('Avatars folder has been created, please set a default avatar by placing a file named "default.png" into resources/avatars!', Ansi.GREEN)
     
     ss_path = Path.cwd() / 'resources/screenshots'
     if not ss_path.exists():
-        os.makedirs(ss_path, exist_ok=True)
+        makedirs(ss_path, exist_ok=True)
+        log('Screenshots folder has been created at /resources/screenshots!', Ansi.GREEN)
 
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
