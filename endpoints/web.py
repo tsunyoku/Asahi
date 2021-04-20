@@ -67,6 +67,7 @@ async def seasonalBG():
 
 @web.route("/web/bancho_connect.php")
 async def banchoConnect():
+    g.player = request.args['u']
     return Response(b'asahi is gamer')
 
 @web.route("/web/osu-getfriends.php")
