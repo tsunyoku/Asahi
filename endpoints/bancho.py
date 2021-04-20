@@ -58,6 +58,7 @@ class addFriend(BanchoPacket, type=Packets.OSU_FRIEND_ADD):
     async def handle(self, user):
         req = user.id
         tar = self.uid
+        user.friends.add(tar)
         await glob.db.execute('INSERT INTO friends (user1, user2) VALUES (%s, %s)', [req, tar])
         log(f"{user.name} added UID {tar} into their friends list.", Ansi.LBLUE)
 
@@ -68,6 +69,7 @@ class removeFriend(BanchoPacket, type=Packets.OSU_FRIEND_REMOVE):
     async def handle(self, user):
         req = user.id
         tar = self.uid
+        user.friends.remove(tar)
         await glob.db.execute('DELETE FROM friends WHERE user1 = %s AND user2 = %s', [req, tar])
         log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LBLUE)
 
@@ -187,9 +189,7 @@ async def login():
         user['country'] = country_codes[user['country_iso']]
         await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [user['country_iso'].lower(), user['id']]) # update country code in db
 
-        friends = {row['user2'] async for row in glob.db.iterall('SELECT user2 FROM friends WHERE user1 = %s', [user['id']])} # select all friends from db
-
-        p = Player.login(user)
+        p = await Player.login(user)
         data = bytearray(packets.userID(p.id)) # initiate login by providing the user's id
         data += packets.protocolVersion(19) # no clue what this does
         data += packets.banchoPrivileges(1 << 0 | 1 << 2) # force priv to developer for now
@@ -197,7 +197,7 @@ async def login():
         data += packets.notification(f'Welcome to Asahi v{glob.version}') # send notification as indicator they've logged in i guess
         data += packets.channelInfoEnd() # no clue what this does either
         data += packets.menuIcon() # set main menu icon
-        data += packets.friends(*friends) # send user friend list
+        data += packets.friends(p.friends) # send user friend list
         data += packets.silenceEnd(0) # force to 0 for now since silences arent a thing
 
         # add user to cache?

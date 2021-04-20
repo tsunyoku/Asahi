@@ -14,6 +14,7 @@ class Player:
         self.country_iso: str = uinfo.get('country_iso')
         self.country: int = uinfo.get('country')
         self.loc: list[float, float] = uinfo.get('loc', [0.0, 0.0]) # store as list cus y not (long, lat)
+        self.friends: set[int] = set()
         self.queue = queue.SimpleQueue()
         self.action: int = 0
         self.info: str = ''
@@ -23,7 +24,7 @@ class Player:
         self.map_id: int = 0
 
     @classmethod
-    def login(self, user):
+    async def login(self, user):
         p = self(
             id=user['id'], 
             name=user['name'], 
@@ -35,6 +36,8 @@ class Player:
             loc=[user['lon'], user['lat']],
             pw=user['md5'].decode()
         )
+
+        p.friends = {row['user2'] async for row in glob.db.iterall('SELECT user2 FROM friends WHERE user1 = %s', [user['id']])} # select all friends from db
 
         return p
 
