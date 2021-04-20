@@ -33,7 +33,6 @@ async def connect(): # ran before server startup, used to do things like connect
     ss_path = Path.cwd() / 'resources/screenshots'
     if not ss_path.exists():
         makedirs(ss_path, exist_ok=True)
-        log('Screenshots folder has been created at /resources/screenshots!', Ansi.GREEN)
 
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
