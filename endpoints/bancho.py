@@ -18,6 +18,7 @@ from packets import BanchoPacketReader, BanchoPacket, Packets
 
 bancho = Blueprint('bancho', __name__) # handler for webserver :D
 glob.packets = {}
+reader = database.Reader('ext/geoloc.mmdb')
 
 def packet(cls: BanchoPacket):
     glob.packets |= {cls.type: cls}
@@ -219,16 +220,10 @@ async def root_client():
         user['md5'] = pw # used for auth on /web/
         ip = headers['X-Forwarded-For']
 
-        # cache the reader goddamn | the speed gains on this are ungodly
-        if not glob.reader:
-            reader = database.Reader('ext/geoloc.mmdb')
-            glob.reader = reader
-        else:
-            reader = glob.reader
-
         # cache ip's geoloc | the speed gains too are ungodly
         if not glob.geoloc.get(ip):
             geoloc = reader.city(ip)
+            glob.geoloc[ip] = geoloc
         else:
             geoloc = glob.geoloc[ip]
 
