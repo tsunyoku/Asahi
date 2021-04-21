@@ -17,4 +17,3 @@ players_id = {} # playerid dict | player[id] = player
 geoloc = {} # geoloc dict | geoloc[ip] = geoloc
 
 bot: 'Player'
-reader = None
