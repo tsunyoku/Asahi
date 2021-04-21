@@ -272,7 +272,7 @@ async def root_client():
     # handle any packets the client has sent
     for packet in BanchoPacketReader(body, glob.packets):
         await packet.handle(p)
-        if glob.config.debug and packet.type != 18: # stop 18 from printing as it floods console
+        if glob.config.debug and packet.type != 18: # stop spectator frames from printing as it floods console
             log(f'Handled packet {packet.type!r}', Ansi.LBLUE)
  
     data = bytearray()
