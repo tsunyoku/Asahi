@@ -3,7 +3,6 @@ from quart import Quart, Response, request, make_response # web server :blobcowb
 from cmyui import AsyncSQLPool, Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from pathlib import Path
 from aiohttp import ClientSession
-from aiofile import AIOFile
 from os import makedirs
 import pyfiglet
 import pickle
