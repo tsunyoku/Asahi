@@ -3,8 +3,10 @@ from quart import Quart, Response, request, make_response # web server :blobcowb
 from cmyui import AsyncSQLPool, Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from pathlib import Path
 from aiohttp import ClientSession
+from aiofile import AIOFile
 from os import makedirs
 import pyfiglet
+import pickle
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
@@ -38,6 +40,33 @@ async def connect(): # ran before server startup, used to do things like connect
     if not ss_path.exists():
         makedirs(ss_path, exist_ok=True)
 
+    # this is my most cursed creation | speed gains but im going to hell for this
+    cache_path = Path.cwd() / 'resources/cache'
+    if not cache_path.exists():
+        makedirs(cache_path, exist_ok=True)
+        bcrypt_file = cache_path / 'bcrypt.json'
+        geoloc_file = cache_path / 'geoloc.json'
+        with open(bcrypt_file, 'wb') as f:
+            f.write("")
+            f.close()
+        with open(geoloc_file, 'wb') as f:
+            f.write("")
+            f.close()
+    else:
+        try:
+            with open(Path.cwd() / 'resources/cache/bcrypt.json', 'rb') as f:
+                glob.cache['bcrypt'] = pickle.loads(f.read())
+                f.close()
+        except EOFError:
+            pass
+
+        try:
+            with open(Path.cwd() / 'resources/cache/geoloc.json', 'rb') as f:
+                glob.geoloc = pickle.loads(f.read())
+                f.close()
+        except EOFError:
+            pass
+
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
     bot = Player(id=1, name=botinfo['name'], offset=1, is_bot=True, country_iso=botinfo['country'], country=country_codes[botinfo['country'].upper()])
@@ -52,6 +81,14 @@ async def connect(): # ran before server startup, used to do things like connect
 @app.after_serving
 async def disconnect():
     log(f'==== Asahi v{glob.version} stopping ====', Ansi.GREEN)
+
+    # this is my most cursed creation part 2 | speed gains but im going to hell for this part 2
+    with open(Path.cwd() / 'resources/cache/bcrypt.json', 'wb') as f:
+        pickle.dump(glob.cache['bcrypt'], f)
+        f.close()
+
+    with open(Path.cwd() / 'resources/cache/geoloc.json', 'wb') as f:
+        pickle.dump(glob.geoloc, f)
 
     await glob.web.close()
     if glob.config.debug:

@@ -217,18 +217,21 @@ async def root_client():
         user['token'] = str(token) # this may be useful in the future
         user['ltime'] = time.time() # useful for handling random logouts
         user['md5'] = pw # used for auth on /web/
-
-        # geoloc | SPEEED
         ip = headers['X-Forwarded-For']
 
-        # cache the reader goddamn
+        # cache the reader goddamn | the speed gains on this are ungodly
         if not glob.reader:
             reader = database.Reader('ext/geoloc.mmdb')
             glob.reader = reader
         else:
             reader = glob.reader
 
-        geoloc = reader.city(ip)
+        # cache ip's geoloc | the speed gains too are ungodly
+        if not glob.geoloc.get(ip):
+            geoloc = reader.city(ip)
+        else:
+            geoloc = glob.geoloc[ip]
+
         user['country_iso'], user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
         user['country'] = country_codes[user['country_iso']]
 
