@@ -9,7 +9,6 @@ import hashlib
 import bcrypt
 import time
 import orjson
-import aiohttp
 
 from objects import glob
 
@@ -19,9 +18,11 @@ web = Blueprint('web', __name__)
 def auth(name, md5):
     player = glob.players_name.get(name)
     if not player:
+        log(f'{name} failed authentication', Ansi.LRED)
         return False
 
     if player.pw != md5:
+        log(f'{name} failed authentication', Ansi.LRED)
         return False
 
     g.player = player.name
@@ -40,7 +41,12 @@ async def logRequest(resp):
     else:
         ret = ''
 
-    log(f'[{g.pop("req_method")}] {resp.status_code} {g.pop("req_url")}{ret} | Time Elapsed: {(time.time() - g.pop("start")) * 1000:.2f}ms', Ansi.LCYAN)
+    if resp.status_code != 200:
+        colourret = Ansi.LRED
+    else:
+        colourret = Ansi.LCYAN
+
+    log(f'[{g.pop("req_method")}] {resp.status_code} {g.pop("req_url")}{ret} | Time Elapsed: {(time.time() - g.pop("start")) * 1000:.2f}ms', colourret)
     return resp
 
 @web.route("/web/osu-screenshot.php", methods=['POST'])
@@ -99,11 +105,13 @@ async def osuSearch():
     for key, _ in request.args.items():
         direct_args[key] = request.args[key]
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get("https://tsuki.host/web/osu-search.php", params=direct_args) as resp:
-            direct_response = await resp.read()
+    async with glob.web.get("http://tsuki.host/web/osu-search.php", params=direct_args) as resp:
+        if resp.status != 200:
+            return Response(b'0', status=resp.status)
 
-    return Response(direct_response)
+        ret = await resp.read()
+
+    return Response(ret)
 
 @web.route("/web/osu-search-set.php")
 async def osuSearchSet():
@@ -115,11 +123,13 @@ async def osuSearchSet():
     for key, _ in request.args.items():
         direct_args[key] = request.args[key]
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get("https://tsuki.host/web/osu-search-set.php", params=direct_args) as resp:
-            direct_response = await resp.read()
+    async with glob.web.get("http://tsuki.host/web/osu-search-set.php", params=direct_args) as resp:
+        if resp.status != 200:
+            return Response(b'0', status=resp.status)
 
-    return Response(direct_response)
+        ret = await resp.read()
+
+    return Response(ret)
 
 @web.route("/users", methods=['POST'])
 async def ingameRegistration():
@@ -155,6 +165,6 @@ async def ingameRegistration():
         bc = bcrypt.hashpw(md5, bcrypt.gensalt()) # bcrypt i am begging pls make this faster some day i am actually crying
 
         await glob.db.execute('INSERT INTO users (name, email, pw) VALUES (%s, %s, %s)', [name, email, bc])
-        log(f'{name} successfully registered. | Time Elapsed: {time.time() - start}', Ansi.LBLUE)
+        log(f'{name} successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}.ms', Ansi.LBLUE)
     
     return b'ok'

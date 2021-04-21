@@ -2,6 +2,7 @@
 from quart import Quart, Response, request, make_response # web server :blobcowboi:
 from cmyui import AsyncSQLPool, Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from pathlib import Path
+from aiohttp import ClientSession
 from os import makedirs
 import pyfiglet
 
@@ -12,12 +13,15 @@ from constants.countries import country_codes
 
 app = Quart(__name__) # handler for webserver :D
 app.config['SERVER_NAME'] = glob.config.domain
-glob.db = AsyncSQLPool() # define db globally
 glob.version = Version(0, 1, 3) # set Asahi version, mainly for future updater but also for tracking
 
 @app.before_serving
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
     log(f'==== Asahi v{glob.version} starting ====', Ansi.GREEN)
+
+    glob.db = AsyncSQLPool() # define db globally
+    glob.web = ClientSession() # aiohttp session for external web requests
+
     try:
         await glob.db.connect(glob.config.mysql) # connect to db using config :p
         if glob.config.debug:
@@ -28,7 +32,7 @@ async def connect(): # ran before server startup, used to do things like connect
     ava_path = Path.cwd() / 'resources/avatars'
     if not ava_path.exists():
         makedirs(ava_path, exist_ok=True)
-        log('Avatars folder has been created, please set a default avatar by placing a file named "default.png" into resources/avatars!', Ansi.GREEN)
+        log('Avatars folder has been created, please set a default avatar by placing a file named "default.png" into resources/avatars!', Ansi.LRED)
     
     ss_path = Path.cwd() / 'resources/screenshots'
     if not ss_path.exists():
@@ -44,6 +48,20 @@ async def connect(): # ran before server startup, used to do things like connect
         log(f"==== Added bot {bot.name} to player list ====", Ansi.GREEN)
 
     log(f'==== Asahi v{glob.version} started ====', Ansi.GREEN)
+
+@app.after_serving
+async def disconnect():
+    log(f'==== Asahi v{glob.version} stopping ====', Ansi.GREEN)
+
+    await glob.web.close()
+    if glob.config.debug:
+        log('==== Closed webserver ====', Ansi.GREEN)
+
+    await glob.db.close()
+    if glob.config.debug:
+        log('==== Closed database connection ====', Ansi.GREEN)
+    
+    log(f'==== Asahi v{glob.version} stopped ====', Ansi.GREEN)
 
 from endpoints.bancho import bancho
 from endpoints.avatars import avatars
