@@ -220,7 +220,14 @@ async def root_client():
 
         # geoloc | SPEEED
         ip = headers['X-Forwarded-For']
-        reader = database.Reader('ext/geoloc.mmdb')
+
+        # cache the reader goddamn
+        if not glob.reader:
+            reader = database.Reader('ext/geoloc.mmdb')
+            glob.reader = reader
+        else:
+            reader = glob.reader
+
         geoloc = reader.city(ip)
         user['country_iso'], user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
         user['country'] = country_codes[user['country_iso']]
@@ -241,7 +248,6 @@ async def root_client():
         data += packets.protocolVersion(19) # no clue what this does
         data += packets.banchoPrivileges(p.client_priv | ClientPrivileges.Supporter) # force priv to developer for now
         data += (packets.userPresence(p) + packets.userStats(p)) # provide user & other user's presence/stats (for f9 + user stats)
-        data += packets.notification(f'Welcome to Asahi v{glob.version}') # send notification as indicator they've logged in i guess
         data += packets.channelInfoEnd() # no clue what this does either
         data += packets.menuIcon() # set main menu icon
         data += packets.friends(p.friends) # send user friend list
@@ -255,10 +261,13 @@ async def root_client():
             o.enqueue((packets.userPresence(p) + packets.userStats(p))) # enqueue this user to every other logged in user
             data += (packets.userPresence(o) + packets.userStats(o)) # enqueue every other logged in user to this user
 
+        elapsed = round((time.time() - start) * 1000, 2)
+        data += packets.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed}ms') # send notification as indicator they've logged in i guess
+        if glob.config.debug:
+            log(f'{p.name} successfully logged in. | Time Elapsed: {elapsed}ms', Ansi.LBLUE)
+
         resp = await make_response(bytes(data))
         resp.headers['cho-token'] = token
-        if glob.config.debug:
-            log(f'{p.name} successfully logged in. | Time Elapsed: {(time.time() - start) * 1000:.2f}ms', Ansi.LBLUE)
         return resp
     
     # if we have made it this far then it's a reconnect attempt with token already provided
