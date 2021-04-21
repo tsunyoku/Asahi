@@ -82,12 +82,8 @@ async def disconnect():
     log(f'==== Asahi v{glob.version} stopping ====', Ansi.GREEN)
 
     # this is my most cursed creation part 2 | speed gains but im going to hell for this part 2
-    with open(Path.cwd() / 'resources/cache/bcrypt.json', 'wb') as f:
-        pickle.dump(glob.cache['bcrypt'], f)
-        f.close()
-
-    with open(Path.cwd() / 'resources/cache/geoloc.json', 'wb') as f:
-        pickle.dump(glob.geoloc, f)
+    pickle.dump(glob.cache['bcrypt'], open(Path.cwd() / 'resources/cache/bcrypt.json', 'ab'))
+    pickle.dump(glob.geoloc, open(Path.cwd() / 'resources/cache/geoloc.json', 'ab'))
 
     await glob.web.close()
     if glob.config.debug:
