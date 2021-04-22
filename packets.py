@@ -444,7 +444,7 @@ def botPresence(player) -> bytes:
         (31, osuTypes.u8),
         (player.loc[0], osuTypes.f32), # long | off map cus bot
         (player.loc[1], osuTypes.f32), # lat | off map cus bot
-        (1, osuTypes.i32)
+        (0, osuTypes.i32)
     )
 
 def userPresence(player) -> bytes:
@@ -457,10 +457,10 @@ def userPresence(player) -> bytes:
         (player.name, osuTypes.string),
         (player.offset + 24, osuTypes.u8), # utc offset
         (player.country, osuTypes.u8),
-        ((1 << 0 | 1 << 2) | 0 << 5, osuTypes.u8),
+        (player.client_priv | (player.mode << 5), osuTypes.u8),
         (player.loc[0], osuTypes.f32), # long
         (player.loc[1], osuTypes.f32), # lat
-        (1, osuTypes.i32)
+        (player.current_stats.rank, osuTypes.i32)
     )
 
 def botStats() -> bytes:
@@ -494,12 +494,12 @@ def userStats(player) -> bytes:
         (player.mods, osuTypes.i32), # mods
         (player.mode, osuTypes.u8), # game mode
         (player.map_id, osuTypes.i32), # map id
-        (0, osuTypes.i64), # ranked score
-        (100.00, osuTypes.f32), # accuracy
-        (0, osuTypes.i32), # playcount
-        (0, osuTypes.i64), # total score
-        (0, osuTypes.i32), # rank
-        (0, osuTypes.i16) # pp
+        (player.current_stats.rscore, osuTypes.i64), # ranked score
+        (player.current_stats.acc, osuTypes.f32), # accuracy
+        (player.current_stats.pc, osuTypes.i32), # playcount
+        (player.current_stats.tscore, osuTypes.i64), # total score
+        (player.current_stats.rank, osuTypes.i32), # rank
+        (player.current_stats.pp, osuTypes.i16) # pp
     )
 
 def notification(msg: str) -> bytes:

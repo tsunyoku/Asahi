@@ -232,6 +232,7 @@ async def root_client():
 
         # set player object
         p = await Player.login(user)
+        await p.set_stats()
 
         if not p.priv & Privileges.Verified:
             if p.id == 3:
