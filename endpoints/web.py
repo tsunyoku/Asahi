@@ -120,8 +120,8 @@ async def osuSearchSet():
         return Response(b'', status=400)
 
     direct_args = {}
-    for key, _ in request.args.items():
-        direct_args[key] = request.args[key]
+    for key, _ in args.items():
+        direct_args[key] = args[key]
 
     async with glob.web.get("http://tsuki.host/web/osu-search-set.php", params=direct_args) as resp:
         if resp.status != 200:
