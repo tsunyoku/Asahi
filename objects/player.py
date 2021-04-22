@@ -1,9 +1,20 @@
 from objects import glob
 from constants.privs import Privileges, ClientPrivileges
+from constants.modes import osuModes
 from typing import Optional
+from dataclasses import dataclass
 from cmyui import log, Ansi
 import queue
 import packets
+
+@dataclass
+class Stats:
+    rscore: int
+    acc: float
+    pc: int
+    tscore: int
+    rank: int
+    pp: int
 
 class Player:
     def __init__(self, **uinfo):
@@ -26,6 +37,7 @@ class Player:
         self.mods = int = 0
         self.mode: int = 0
         self.map_id: int = 0
+        self.stats: dict[osuModes.value, Stats] = {}
 
         self.spectators: list[Player] = []
         self.spectating: Optional[Player] = None
@@ -48,6 +60,15 @@ class Player:
         p.friends = {row['user2'] async for row in glob.db.iterall('SELECT user2 FROM friends WHERE user1 = %s', [user['id']])} # select all friends from db
 
         return p
+
+    async def set_stats(self):
+        for mode in osuModes:
+            stat = await glob.db.fetch(f'SELECT rscore_{mode.name} rscore, acc_{mode.name} acc, pc_{mode.name} pc, tscore_{mode.name} tscore, rank_{mode.name} rank, pp_{mode.name} pp FROM stats WHERE id = %s', [self.id])
+            self.stats[mode.value] = Stats(**stat)
+
+    @property
+    def current_stats(self):
+        return self.stats[self.mode]
 
     @property
     def client_priv(self):

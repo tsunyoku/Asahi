@@ -164,7 +164,8 @@ async def ingameRegistration():
         md5 = hashlib.md5(pw.encode()).hexdigest().encode()
         bc = bcrypt.hashpw(md5, bcrypt.gensalt()) # bcrypt i am begging pls make this faster some day i am actually crying
 
-        await glob.db.execute('INSERT INTO users (name, email, pw) VALUES (%s, %s, %s)', [name, email, bc])
+        uid = await glob.db.execute('INSERT INTO users (name, email, pw) VALUES (%s, %s, %s)', [name, email, bc])
+        await glob.db.execute('INSERT INTO stats (id) VALUES (%s)', [uid])
         log(f'{name} successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}.ms', Ansi.LBLUE)
     
     return b'ok'
