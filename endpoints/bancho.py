@@ -14,6 +14,7 @@ from constants.countries import country_codes
 from constants.types import osuTypes
 from constants.privs import Privileges, ClientPrivileges
 from constants.mods import Mods
+from constants import commands
 import packets
 from packets import BanchoPacketReader, BanchoPacket, Packets
 
@@ -97,8 +98,14 @@ class sendPrivateMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
             log(f'{user.name} tried to send message to offline user {tarname}', Ansi.LRED)
             return
 
-        target.enqueue(packets.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
-        log(f'{user.name} sent message "{msg}" to {tarname}', Ansi.LCYAN)
+        if target.is_bot:
+            if msg.startswith('!'):
+                cmd = await commands.process(user, target, msg)
+                if cmd.get('text'):
+                    user.enqueue(packets.sendMessage(fromname = target.name, msg = cmd['text'], tarname = user.name, fromid = target.id))
+        else:
+            target.enqueue(packets.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
+            log(f'{user.name} sent message "{msg}" to {tarname}', Ansi.LCYAN)
 
 @packet
 class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
@@ -122,9 +129,6 @@ class joinChannel(BanchoPacket, type=Packets.OSU_CHANNEL_JOIN):
     name: osuTypes.string
 
     async def handle(self, user):
-        if self.name == '#highlight': # osu why!!!
-            return
-
         chan = glob.channels.get(self.name)
 
         if not chan:
@@ -141,6 +145,9 @@ class leaveChannel(BanchoPacket, type=Packets.OSU_CHANNEL_PART):
     name: osuTypes.string
 
     async def handle(self, user):
+        if self.name == '#highlight' or not self.name.startswith('#'): # osu why!!!
+            return
+
         chan = glob.channels.get(self.name)
 
         if not chan:
