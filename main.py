@@ -82,7 +82,7 @@ async def connect(): # ran before server startup, used to do things like connect
 
     # add all channels to cache
     async for chan in glob.db.iterall('SELECT * FROM channels'):
-        channel = Channel(name=chan['name'], desc=chan['descr'], auto=chan['auto'])
+        channel = Channel(name=chan['name'], desc=chan['descr'], auto=chan['auto'], un=False)
         glob.channels[channel.name] = channel
         log(f'==== Added channel {channel.name} to channel list ====')
 

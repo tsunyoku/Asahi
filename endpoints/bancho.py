@@ -115,7 +115,15 @@ class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
         msg = self.msg.msg
         chan = self.msg.tarname
 
-        if chan not in ['#spectator', '#multiplayer']: # not handling these for now
+        if chan == '#spectator':
+            if user.spectating:
+                sid = user.spectating.id
+            elif user.spectators:
+                sid = user.id
+            else:
+                return
+            c = glob.channels.get(f'#spec_{sid}')
+        if chan != '#multiplayer': # no mp stuff yet
             c = glob.channels.get(chan)
 
         if not c:
