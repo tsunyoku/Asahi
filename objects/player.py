@@ -131,10 +131,23 @@ class Player:
         self.channels.append(chan)
 
         self.enqueue(packets.channelJoin(chan.name))
-        for o in glob.players.values():
-            o.enqueue(packets.channelInfo(chan.name, chan.desc, chan.count))
+        for o in chan.players:
+            o.enqueue(packets.channelInfo(chan))
         
-        log(f'{self.name} joined channel {chan.name}')
+        log(f'{self.name} joined channel {chan.name}', Ansi.LBLUE)
+
+    def leave_chan(self, chan):
+        if self not in chan.players:
+            return
+
+        chan.remove_player(self)
+        self.channels.remove(chan)
+
+        self.enqueue(packets.channelKick(chan.name))
+        for o in chan.players:
+            o.enqueue(packets.channelInfo(chan))
+
+        log(f'{self.name} left channel {chan.name}', Ansi.LBLUE)
 
     def logout(self):
         glob.players.pop(self.token)
@@ -145,6 +158,9 @@ class Player:
 
         for o in glob.players.values():
             o.enqueue(packets.logout(self.id))
+
+        while self.channels:
+            self.leave_chan(self.channels[0])
 
     def enqueue(self, b: bytes):
         self.queue.put_nowait(b)

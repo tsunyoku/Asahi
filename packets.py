@@ -568,5 +568,8 @@ def spectateFrames(frames: bytes) -> bytes:
 def channelJoin(chan: str) -> bytes:
     return write(Packets.CHO_CHANNEL_JOIN_SUCCESS, (chan, osuTypes.string))
 
-def channelInfo(name: str, desc: str, players: int) -> bytes:
-    return write(Packets.CHO_CHANNEL_INFO, ((name, desc, players), osuTypes.channel))
+def channelInfo(chan) -> bytes:
+    return write(Packets.CHO_CHANNEL_INFO, ((chan.name, chan.desc, chan.count), osuTypes.channel))
+
+def channelKick(chan: str) -> bytes:
+    return write(Packets.CHO_CHANNEL_KICK, (chan, osuTypes.string))
