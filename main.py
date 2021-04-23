@@ -116,6 +116,3 @@ app.register_blueprint(bancho, subdomain='ce')
 app.register_blueprint(bancho, subdomain='c4')
 app.register_blueprint(avatars, subdomain='a')
 app.register_blueprint(web, subdomain='osu')
-
-if __name__ == '__main__':
-    app.run(port=9384)
