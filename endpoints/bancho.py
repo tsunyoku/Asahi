@@ -63,7 +63,7 @@ class addFriend(BanchoPacket, type=Packets.OSU_FRIEND_ADD):
         tar = self.uid
         user.friends.add(tar)
         await glob.db.execute('INSERT INTO friends (user1, user2) VALUES (%s, %s)', [req, tar])
-        log(f"{user.name} added UID {tar} into their friends list.", Ansi.LBLUE)
+        log(f"{user.name} added UID {tar} into their friends list.", Ansi.LCYAN)
 
 @packet
 class removeFriend(BanchoPacket, type=Packets.OSU_FRIEND_REMOVE):
@@ -74,7 +74,7 @@ class removeFriend(BanchoPacket, type=Packets.OSU_FRIEND_REMOVE):
         tar = self.uid
         user.friends.remove(tar)
         await glob.db.execute('DELETE FROM friends WHERE user1 = %s AND user2 = %s', [req, tar])
-        log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LBLUE)
+        log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LCYAN)
 
 @packet
 class Logout(BanchoPacket, type=Packets.OSU_LOGOUT):
@@ -98,7 +98,7 @@ class sendPrivateMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
             return
 
         target.enqueue(packets.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
-        log(f'{user.name} sent message "{msg}" to {tarname}')
+        log(f'{user.name} sent message "{msg}" to {tarname}', Ansi.LCYAN)
 
 @packet
 class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
@@ -116,7 +116,39 @@ class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
             return
 
         c.send(user, msg)
-        log(f'{user.name} sent message "{msg}" to {chan}')
+        log(f'{user.name} sent message "{msg}" to {chan}', Ansi.LCYAN)
+
+@packet
+class joinChannel(BanchoPacket, type=Packets.OSU_CHANNEL_JOIN):
+    name: osuTypes.string
+
+    async def handle(self, user):
+        chan = glob.channels.get(self.name)
+
+        if not chan:
+            log(f'{user.name} failed to join channel {self.name}', Ansi.LRED)
+        
+        user.join_chan(chan)
+        user.enqueue(packets.channelJoin(chan.name))
+        for o in chan.players:
+            o.enqueue(packets.channelInfo(chan))
+
+@packet
+class leaveChannel(BanchoPacket, type=Packets.OSU_CHANNEL_PART):
+    name: osuTypes.string
+
+    async def handle(self, user):
+        chan = glob.channels.get(self.name)
+
+        if not chan:
+            log(f'{user.name} failed to leave channel {self.name}', Ansi.LRED)
+
+        if user not in chan.players:
+            return
+
+        user.leave_chan(chan)
+        for o in chan.players:
+            o.enqueue(packets.channelInfo(chan))
 
 @packet
 class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
@@ -285,7 +317,7 @@ async def root_client():
                 p.join_chan(chan)
                 data += packets.channelJoin(chan.name) # only join user to channel if the channel is meant for purpose
 
-            data += packets.channelInfo(chan.name, chan.desc, chan.count) # regardless of whether the channel should be auto-joined we should make the client aware of it
+            data += packets.channelInfo(chan) # regardless of whether the channel should be auto-joined we should make the client aware of it
 
         # add user to cache?
         glob.players[p.token] = p
