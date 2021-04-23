@@ -15,7 +15,7 @@ from constants.countries import country_codes
 
 app = Quart(__name__) # handler for webserver :D
 app.config['SERVER_NAME'] = glob.config.domain
-glob.version = Version(0, 1, 4) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 1, 5) # set Asahi version, mainly for future updater but also for tracking
 
 @app.before_serving
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
