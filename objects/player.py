@@ -102,6 +102,14 @@ class Player:
 
     def add_spectator(self, user):
         joiner = packets.spectatorJoined(user.id)
+        sname = f'#spec_{self.id}'
+
+        if not (spec := glob.channels.get(sname)):
+            spec = Channel(name='#spectator', desc=f'Spectator chat for {self.name}', auto=False, un=True)
+            self.join_chan(spec)
+            glob.channels[spec.name] = spec
+        
+        user.join_chan(spec)
 
         for u in self.spectators:
             u.enqueue(joiner)
@@ -116,9 +124,17 @@ class Player:
         self.spectators.remove(user)
         user.spectating = None
 
-        if self.spectators:
+        spec = glob.channels.get(f'#spec_{self.id}')
+        user.leave_chan(spec)
+
+        if not self.spectators:
+            self.leave_chan(spec)
+        else:
+            cinfo = packets.channelInfo(spec)
             for u in self.spectators:
                 u.enqueue(packets.spectatorLeft(user.id))
+                u.enqueue(cinfo)
+            self.enqueue(cinfo)
         
         self.enqueue(packets.hostSpectatorLeft(user.id))
         log(f'{user.name} stopped spectating {self.name}.', Ansi.LBLUE)
