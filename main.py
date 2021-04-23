@@ -44,28 +44,31 @@ async def connect(): # ran before server startup, used to do things like connect
     cache_path = Path.cwd() / 'resources/cache'
     if not cache_path.exists():
         makedirs(cache_path, exist_ok=True)
-        bcrypt_file = cache_path / 'bcrypt.json'
-        geoloc_file = cache_path / 'geoloc.json'
+        geoloc_file = cache_path / 'geoloc.p'
+        with open(geoloc_file, 'wb') as f:
+            f.write("")
+            f.close()
+
+    # this is my most cursed creation | speed gains but im going to hell for this
+    cache_path = Path.cwd() / 'resources/cache'
+    if not cache_path.exists():
+        makedirs(cache_path, exist_ok=True)
+        bcrypt_file = cache_path / 'bcrypt.p'
+        geoloc_file = cache_path / 'geoloc.p'
         with open(bcrypt_file, 'wb') as f:
             f.write("")
             f.close()
         with open(geoloc_file, 'wb') as f:
             f.write("")
             f.close()
-    else:
-        try:
-            with open(Path.cwd() / 'resources/cache/bcrypt.json', 'rb') as f:
-                glob.cache['bcrypt'] = pickle.loads(f.read())
-                f.close()
-        except EOFError:
-            pass
 
-        try:
-            with open(Path.cwd() / 'resources/cache/geoloc.json', 'rb') as f:
-                glob.geoloc = pickle.loads(f.read())
-                f.close()
-        except EOFError:
-            pass
+    with open(Path.cwd() / 'resources/cache/bcrypt.p', 'rb') as f:
+        glob.cache['bcrypt'] = pickle.load(f)
+        f.close()
+
+    with open(Path.cwd() / 'resources/cache/geoloc.p', 'rb') as f:
+        glob.geoloc = pickle.load(f)
+        f.close()
 
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
@@ -90,8 +93,10 @@ async def disconnect():
     log(f'==== Asahi v{glob.version} stopping ====', Ansi.GREEN)
 
     # this is my most cursed creation part 2 | speed gains but im going to hell for this part 2
-    pickle.dump(glob.cache['bcrypt'], open(Path.cwd() / 'resources/cache/bcrypt.json', 'ab'))
-    pickle.dump(glob.geoloc, open(Path.cwd() / 'resources/cache/geoloc.json', 'ab'))
+    with open(Path.cwd() / 'resources/cache/geoloc.p', 'ab') as file:
+        pickle.dump(glob.geoloc, file, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(Path.cwd() / 'resources/cache/bcrypt.p', 'ab') as file:
+        pickle.dump(glob.cache['bcrypt'], file, protocol=pickle.HIGHEST_PROTOCOL)
 
     await glob.web.close()
     if glob.config.debug:
@@ -111,3 +116,6 @@ app.register_blueprint(bancho, subdomain='ce')
 app.register_blueprint(bancho, subdomain='c4')
 app.register_blueprint(avatars, subdomain='a')
 app.register_blueprint(web, subdomain='osu')
+
+if __name__ == '__main__':
+    app.run(port=9384)

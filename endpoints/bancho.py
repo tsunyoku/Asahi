@@ -123,10 +123,14 @@ class joinChannel(BanchoPacket, type=Packets.OSU_CHANNEL_JOIN):
     name: osuTypes.string
 
     async def handle(self, user):
+        if self.name == '#highlight': # osu why!!!
+            return
+
         chan = glob.channels.get(self.name)
 
         if not chan:
             log(f'{user.name} failed to join channel {self.name}', Ansi.LRED)
+            return
         
         user.join_chan(chan)
         user.enqueue(packets.channelJoin(chan.name))
