@@ -1,4 +1,5 @@
 from objects import glob
+from objects.channel import Channel
 from constants.privs import Privileges, ClientPrivileges
 from constants.modes import osuModes
 from typing import Optional
@@ -42,6 +43,7 @@ class Player:
 
         self.spectators: list[Player] = []
         self.spectating: Optional[Player] = None
+        self.channels: list[Channel] = []
 
     @classmethod
     async def login(self, user):
@@ -120,6 +122,19 @@ class Player:
         
         self.enqueue(packets.hostSpectatorLeft(user.id))
         log(f'{user.name} stopped spectating {self.name}.', Ansi.LBLUE)
+
+    def join_chan(self, chan):
+        if self in chan.players:
+            return
+        
+        chan.add_player(self)
+        self.channels.append(chan)
+
+        self.enqueue(packets.channelJoin(chan.name))
+        for o in glob.players.values():
+            o.enqueue(packets.channelInfo(chan.name, chan.desc, chan.count))
+        
+        log(f'{self.name} joined channel {chan.name}')
 
     def logout(self):
         glob.players.pop(self.token)

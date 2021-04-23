@@ -86,7 +86,7 @@ class Logout(BanchoPacket, type=Packets.OSU_LOGOUT):
         log(f"{user.name} logged out.", Ansi.LBLUE)
 
 @packet
-class sendMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
+class sendPrivateMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
     msg: osuTypes.message # i am so confused man wtf
 
     async def handle(self, user):
@@ -99,6 +99,24 @@ class sendMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
 
         target.enqueue(packets.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
         log(f'{user.name} sent message "{msg}" to {tarname}')
+
+@packet
+class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
+    msg: osuTypes.message
+
+    async def handle(self, user):
+        msg = self.msg.msg
+        chan = self.msg.tarname
+
+        if chan not in ['#spectator', '#multiplayer']: # not handling these for now
+            c = glob.channels.get(chan)
+
+        if not c:
+            log(f'{user.name} tried to send a message in non-existent channel {chan}', Ansi.LRED)
+            return
+
+        c.send(user, msg)
+        log(f'{user.name} sent message "{msg}" to {chan}')
 
 @packet
 class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
@@ -254,12 +272,20 @@ async def root_client():
 
         data = bytearray(packets.userID(p.id)) # initiate login by providing the user's id
         data += packets.protocolVersion(19) # no clue what this does
-        data += packets.banchoPrivileges(p.client_priv | ClientPrivileges.Supporter) # force priv to developer for now
+        data += packets.banchoPrivileges(p.client_priv | ClientPrivileges.Supporter)
         data += (packets.userPresence(p) + packets.userStats(p)) # provide user & other user's presence/stats (for f9 + user stats)
         data += packets.channelInfoEnd() # no clue what this does either
         data += packets.menuIcon() # set main menu icon
         data += packets.friends(p.friends) # send user friend list
         data += packets.silenceEnd(0) # force to 0 for now since silences arent a thing
+
+        # get channels from cache and send to user
+        for chan in glob.channels.values():
+            if chan.auto:
+                p.join_chan(chan)
+                data += packets.channelJoin(chan.name) # only join user to channel if the channel is meant for purpose
+
+            data += packets.channelInfo(chan.name, chan.desc, chan.count) # regardless of whether the channel should be auto-joined we should make the client aware of it
 
         # add user to cache?
         glob.players[p.token] = p

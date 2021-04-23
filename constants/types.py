@@ -16,6 +16,7 @@ class osuTypes(IntEnum):
 
     # osu
     message = 11
+    channel = 12
 
     # misc
     i32_list   = 17 # 2 bytes len

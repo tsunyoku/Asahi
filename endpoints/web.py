@@ -102,8 +102,8 @@ async def osuSearch():
         return Response(b'', status=400)
 
     direct_args = {}
-    for key, _ in request.args.items():
-        direct_args[key] = request.args[key]
+    for key, _ in args.items():
+        direct_args[key] = args[key]
 
     async with glob.web.get("http://tsuki.host/web/osu-search.php", params=direct_args) as resp:
         if resp.status != 200:
@@ -169,3 +169,19 @@ async def ingameRegistration():
         log(f'{name} successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}.ms', Ansi.LBLUE)
     
     return b'ok'
+
+@web.route("/web/check-updates.php")
+async def osuUpdates():
+    args = request.args
+
+    update_args = {}
+    for key, _ in args.items():
+        update_args[key] = args[key]
+
+    async with glob.web.get("https://old.ppy.sh/web/check-updates.php", params=update_args) as resp:
+        if resp.status != 200:
+            return Response(b'error checking for updates', status=resp.status)
+
+        ret = await resp.read()
+
+    return Response(ret)
