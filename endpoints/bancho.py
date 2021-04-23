@@ -180,7 +180,7 @@ class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
     async def handle(self, user):
         if self.actionid == 0 and self.mods & Mods.RELAX:
             self.info = 'on Relax'
-        elif self.actionid == 1 and self.mods & Mods.AUTOPILOT:
+        elif self.actionid == 0 and self.mods & Mods.AUTOPILOT:
             self.info = 'on Autopilot'
 
         user.action = self.actionid
