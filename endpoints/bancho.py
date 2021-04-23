@@ -116,7 +116,6 @@ class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
             return
 
         c.send(user, msg)
-        log(f'{user.name} sent message "{msg}" to {chan}', Ansi.LCYAN)
 
 @packet
 class joinChannel(BanchoPacket, type=Packets.OSU_CHANNEL_JOIN):
@@ -164,6 +163,11 @@ class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
     mid: osuTypes.i32
 
     async def handle(self, user):
+        if self.actionid == 0 and self.mods & Mods.RELAX:
+            self.info = 'on Relax'
+        elif self.actionid == 1 and self.mods & Mods.AUTOPILOT:
+            self.info = 'on Autopilot'
+
         user.action = self.actionid
         user.info = self.info
         user.map_md5 = self.md5
@@ -351,8 +355,6 @@ async def root_client():
     # handle any packets the client has sent
     for packet in BanchoPacketReader(body, glob.packets):
         await packet.handle(p)
-        if glob.config.debug and packet.type != 18: # stop spectator frames from printing as it floods console
-            log(f'Handled packet {packet.type!r}', Ansi.LBLUE)
  
     data = bytearray()
     while not p.queue_empty():
