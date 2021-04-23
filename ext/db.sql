@@ -114,7 +114,31 @@ CREATE TABLE `stats` (
   `rank_taiko` int(255) NOT NULL DEFAULT '0',
   `pp_taiko` int(255) NOT NULL DEFAULT '0',
   `pp_catch` int(255) NOT NULL DEFAULT '0',
-  `pp_mania` int(255) NOT NULL DEFAULT '0'
+  `pp_mania` int(255) NOT NULL DEFAULT '0',
+  `rscore_catch_rx` int(255) NOT NULL DEFAULT '0',
+  `acc_catch_rx` float(6,2) NOT NULL DEFAULT '0.00',
+  `pc_catch_rx` int(255) NOT NULL DEFAULT '0',
+  `tscore_catch_rx` int(255) NOT NULL DEFAULT '0',
+  `rank_catch_rx` int(255) NOT NULL DEFAULT '0',
+  `rscore_taiko_rx` int(255) NOT NULL DEFAULT '0',
+  `acc_taiko_rx` float(6,2) NOT NULL DEFAULT '0.00',
+  `pc_taiko_rx` int(255) NOT NULL DEFAULT '0',
+  `tscore_taiko_rx` int(255) NOT NULL DEFAULT '0',
+  `rank_taiko_rx` int(255) NOT NULL DEFAULT '0',
+  `rscore_std_ap` int(255) NOT NULL DEFAULT '0',
+  `acc_std_ap` float(6,2) NOT NULL DEFAULT '0.00',
+  `pc_std_ap` int(255) NOT NULL DEFAULT '0',
+  `tscore_std_ap` int(255) NOT NULL DEFAULT '0',
+  `rank_std_ap` int(255) NOT NULL DEFAULT '0',
+  `rscore_std_rx` int(255) NOT NULL DEFAULT '0',
+  `acc_std_rx` float(6,2) NOT NULL DEFAULT '0.00',
+  `pc_std_rx` int(255) NOT NULL DEFAULT '0',
+  `tscore_std_rx` int(255) NOT NULL DEFAULT '0',
+  `rank_std_rx` int(255) NOT NULL DEFAULT '0',
+  `pp_std_rx` int(255) NOT NULL DEFAULT '0',
+  `pp_std_ap` int(255) NOT NULL DEFAULT '0',
+  `pp_taiko_rx` int(255) NOT NULL DEFAULT '0',
+  `pp_catch_rx` int(255) NOT NULL DEFAULT '0'
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --

@@ -36,6 +36,7 @@ class Player:
         self.map_md5: str = ''
         self.mods = int = 0
         self.mode: int = 0
+        self.mode_vn: int = 0 
         self.map_id: int = 0
         self.stats: dict[osuModes.value, Stats] = {}
 

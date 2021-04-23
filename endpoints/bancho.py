@@ -13,6 +13,7 @@ from objects.player import Player # Player - player object to store stats, info 
 from constants.countries import country_codes
 from constants.types import osuTypes
 from constants.privs import Privileges, ClientPrivileges
+from constants.mods import Mods
 import packets
 from packets import BanchoPacketReader, BanchoPacket, Packets
 
@@ -113,6 +114,14 @@ class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
         user.info = self.info
         user.map_md5 = self.md5
         user.mods = self.mods
+
+        if user.mods & Mods.RELAX:
+            user.mode_vn = self.mode
+            self.mode += 4
+        elif user.mods & Mods.AUTOPILOT:
+            user.mode_vn = 0
+            self.mode = 7
+
         user.mode = self.mode
         user.map_id = self.mid
 
