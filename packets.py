@@ -457,7 +457,7 @@ def userPresence(player) -> bytes:
         (player.name, osuTypes.string),
         (player.offset + 24, osuTypes.u8), # utc offset
         (player.country, osuTypes.u8),
-        (player.client_priv | (player.mode << 5), osuTypes.u8),
+        (player.client_priv | (player.mode_vn << 5), osuTypes.u8),
         (player.loc[0], osuTypes.f32), # long
         (player.loc[1], osuTypes.f32), # lat
         (player.current_stats.rank, osuTypes.i32)
@@ -492,7 +492,7 @@ def userStats(player) -> bytes:
         (player.info, osuTypes.string), # info text
         (player.map_md5, osuTypes.string), # map md5
         (player.mods, osuTypes.i32), # mods
-        (player.mode, osuTypes.u8), # game mode
+        (player.mode_vn, osuTypes.u8), # game mode
         (player.map_id, osuTypes.i32), # map id
         (player.current_stats.rscore, osuTypes.i64), # ranked score
         (player.current_stats.acc, osuTypes.f32), # accuracy

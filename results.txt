@@ -1,0 +1,145 @@
+Timer unit: 1e-06 s
+
+Total time: 0.017934 s
+File: /home/iteki/Asahi/endpoints/bancho.py
+Function: root_client at line 158
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   158                                           @bancho.route("/", methods=['POST']) # only accept POST requests, we can assume it is for a login request but we can deny access if not
+   159                                           @profile
+   160                                           async def root_client():
+   161        11         76.0      6.9      0.4      start = time.time()
+   162        11        223.0     20.3      1.2      headers = request.headers # request headers, used for things such as user ip and agent
+   163                                           
+   164        11        273.0     24.8      1.5      if 'User-Agent' not in headers or headers['User-Agent'] != 'osu!':
+   165                                                   # request isn't sent from osu client, return html
+   166                                                   message = f"{pyfiglet.figlet_format(f'Asahi v{glob.version}')}\n\ntsunyoku attempts bancho v2, gone right :sunglasses:"
+   167                                                   return Response(message, mimetype='text/plain')
+   168                                           
+   169        11        134.0     12.2      0.7      if 'osu-token' not in headers: # sometimes a login request will be a re-connect attempt, in which case they will already have a token, if not: login the user
+   170         2        277.0    138.5      1.5          data = await request.data # request data, used to get info such as username to login the user
+   171         2         14.0      7.0      0.1          if len(info := data.decode().split('\n')[:-1]) != 3: # format data so we can use it easier & also ensure it is valid at the same time
+   172                                                       resp = await make_response(packets.userID(-2)) # -2 userid informs client it is too old | i assume that is the only valid reason for this to happen
+   173                                                       resp.headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
+   174                                                       return resp
+   175                                           
+   176         2          7.0      3.5      0.0          if len(cinfo := info[2].split('|')) != 5: # format client data (hash, utc etc.) & ensure it is valid
+   177                                                       resp = await make_response(packets.userID(-2)) # -2 userid informs client it is too old
+   178                                                       resp.headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
+   179                                                       return resp
+   180                                           
+   181         2          5.0      2.5      0.0          username = info[0]
+   182         2          6.0      3.0      0.0          pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later
+   183                                           
+   184         2        988.0    494.0      5.5          user = await glob.db.fetch('SELECT id, pw, country, name, priv FROM users WHERE name = %s', [username])
+   185         2          8.0      4.0      0.0          if not user: # ensure user actually exists before attempting to do anything else
+   186                                                       if glob.config.debug:
+   187                                                           log(f'User {username} does not exist.', Ansi.LRED)
+   188                                                       resp = await make_response(packets.userID(-1)) # -1 userid informs client of an auth error
+   189                                                       resp.headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
+   190                                                       return resp
+   191                                           
+   192         2          8.0      4.0      0.0          bcache = glob.cache['bcrypt'] # get our cached bcrypts to potentially enhance speed
+   193         2          7.0      3.5      0.0          pw_bcrypt = user['pw'].encode()
+   194         2          6.0      3.0      0.0          if pw_bcrypt in bcache:
+   195         2          6.0      3.0      0.0              if pw != bcache[pw_bcrypt]: # compare provided md5 with the stored (cached) bcrypt to ensure they have provided the correct password
+   196                                                           if glob.config.debug:
+   197                                                               log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
+   198                                                           resp = await make_response(packets.userID(-1))
+   199                                                           resp.headers['cho-token'] = 'no'
+   200                                                           return resp
+   201                                                   else:
+   202                                                       if not bcrypt.checkpw(pw, pw_bcrypt): # compare provided md5 with the stored bcrypt to ensure they have provided the correct password
+   203                                                           if glob.config.debug:
+   204                                                               log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
+   205                                                           resp = await make_response(packets.userID(-1))
+   206                                                           resp.headers['cho-token'] = 'no'
+   207                                                           return resp
+   208                                                       
+   209                                                       bcache[pw_bcrypt] = pw # cache pw for future
+   210                                           
+   211         2         37.0     18.5      0.2          if not user['priv'] & Privileges.Normal:
+   212                                                       resp = await make_response(packets.userID(-3)) # banned packet
+   213                                                       resp.headers['cho-token'] = 'no'
+   214                                                       return resp
+   215                                           
+   216         2         75.0     37.5      0.4          token = uuid.uuid4() # generate token for client to use as auth
+   217         2          9.0      4.5      0.1          user['offset'] = int(cinfo[1]) # utc offset for time
+   218         2          5.0      2.5      0.0          user['bot'] = False # used to specialise bot functions, kinda gay setup ngl
+   219         2         26.0     13.0      0.1          user['token'] = str(token) # this may be useful in the future
+   220         2         10.0      5.0      0.1          user['ltime'] = time.time() # useful for handling random logouts
+   221         2          4.0      2.0      0.0          user['md5'] = pw # used for auth on /web/
+   222         2         18.0      9.0      0.1          ip = headers['X-Forwarded-For']
+   223                                           
+   224                                                   # cache ip's geoloc | the speed gains too are ungodly
+   225         2          8.0      4.0      0.0          if not glob.geoloc.get(ip):
+   226         1       6527.0   6527.0     36.4              geoloc = reader.city(ip)
+   227         1          4.0      4.0      0.0              glob.geoloc[ip] = geoloc
+   228                                                   else:
+   229         1          3.0      3.0      0.0              geoloc = glob.geoloc[ip]
+   230                                           
+   231         2         10.0      5.0      0.1          user['country_iso'], user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
+   232         2          8.0      4.0      0.0          user['country'] = country_codes[user['country_iso']]
+   233                                           
+   234                                                   # set player object
+   235         2        738.0    369.0      4.1          p = await Player.login(user)
+   236         2        648.0    324.0      3.6          await p.set_stats()
+   237                                           
+   238         2         31.0     15.5      0.2          if not p.priv & Privileges.Verified:
+   239                                                       if p.id == 3:
+   240                                                           # first user & not verified, give all permissions
+   241                                                           await p.set_priv(Privileges.Master)
+   242                                           
+   243                                                       await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [user['country_iso'].lower(), user['id']]) # set country code in db
+   244                                                       await p.add_priv(Privileges.Verified) # verify user
+   245                                                       log(f'{p.name} has been successfully verified.', Ansi.LBLUE)
+   246                                           
+   247         2         32.0     16.0      0.2          data = bytearray(packets.userID(p.id)) # initiate login by providing the user's id
+   248         2         17.0      8.5      0.1          data += packets.protocolVersion(19) # no clue what this does
+   249         2        381.0    190.5      2.1          data += packets.banchoPrivileges(p.client_priv | ClientPrivileges.Supporter) # force priv to developer for now
+   250         2        345.0    172.5      1.9          data += (packets.userPresence(p) + packets.userStats(p)) # provide user & other user's presence/stats (for f9 + user stats)
+   251         2         14.0      7.0      0.1          data += packets.channelInfoEnd() # no clue what this does either
+   252         2         23.0     11.5      0.1          data += packets.menuIcon() # set main menu icon
+   253         2         39.0     19.5      0.2          data += packets.friends(p.friends) # send user friend list
+   254         2         22.0     11.0      0.1          data += packets.silenceEnd(0) # force to 0 for now since silences arent a thing
+   255                                           
+   256                                                   # add user to cache?
+   257         2          8.0      4.0      0.0          glob.players[p.token] = p
+   258         2          7.0      3.5      0.0          glob.players_name[p.name] = p
+   259         2          9.0      4.5      0.1          glob.players_id[p.id] = p
+   260         6         20.0      3.3      0.1          for o in glob.players.values(): # enqueue other users to client
+   261         4        541.0    135.2      3.0              o.enqueue((packets.userPresence(p) + packets.userStats(p))) # enqueue this user to every other logged in user
+   262         4        441.0    110.2      2.5              data += (packets.userPresence(o) + packets.userStats(o)) # enqueue every other logged in user to this user
+   263                                           
+   264         2         23.0     11.5      0.1          elapsed = round((time.time() - start) * 1000, 2)
+   265         2         68.0     34.0      0.4          data += packets.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed}ms') # send notification as indicator they've logged in i guess
+   266         2          6.0      3.0      0.0          if glob.config.debug:
+   267         2        903.0    451.5      5.0              log(f'{p.name} successfully logged in. | Time Elapsed: {elapsed}ms', Ansi.LBLUE)
+   268                                           
+   269         2        257.0    128.5      1.4          resp = await make_response(bytes(data))
+   270         2         51.0     25.5      0.3          resp.headers['cho-token'] = token
+   271         2          5.0      2.5      0.0          return resp
+   272                                               
+   273                                               # if we have made it this far then it's a reconnect attempt with token already provided
+   274         9        104.0     11.6      0.6      user_token = headers['osu-token'] # client-provided token
+   275         9         57.0      6.3      0.3      if not (p := glob.players.get(user_token)):
+   276                                                   # user is logged in but token is not found? most likely a restart so we force a reconnection
+   277                                                   return packets.restartServer(0)
+   278                                           
+   279         9        183.0     20.3      1.0      body = await request.body
+   280                                           
+   281                                               # handle any packets the client has sent
+   282        14        465.0     33.2      2.6      for packet in BanchoPacketReader(body, glob.packets):
+   283         5        703.0    140.6      3.9          await packet.handle(p)
+   284         5         24.0      4.8      0.1          if glob.config.debug and packet.type != 18: # stop spectator frames from printing as it floods console
+   285         5       1807.0    361.4     10.1              log(f'Handled packet {packet.type!r}', Ansi.LBLUE)
+   286                                            
+   287         9         37.0      4.1      0.2      data = bytearray()
+   288        14         74.0      5.3      0.4      while not p.queue_empty():
+   289         5         26.0      5.2      0.1          data += p.dequeue()
+   290                                           
+   291         9        861.0     95.7      4.8      resp = await make_response(bytes(data))
+   292         9        156.0     17.3      0.9      resp.headers['Content-Type'] = 'text/html; charset=UTF-8' # ?
+   293         9         26.0      2.9      0.1      return resp
+
