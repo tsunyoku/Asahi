@@ -123,7 +123,7 @@ class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
             else:
                 return
             c = glob.channels.get(f'#spec_{sid}')
-        if chan != '#multiplayer': # no mp stuff yet
+        elif chan != '#multiplayer': # no mp stuff yet
             c = glob.channels.get(chan)
 
         if not c:
