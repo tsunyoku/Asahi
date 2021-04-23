@@ -10,6 +10,7 @@ import pickle
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
 from objects.player import Player # Player - player object to store stats, info etc.
+from objects.channel import Channel # Channel - channel object to store name, desc etc.
 from constants.countries import country_codes
 
 app = Quart(__name__) # handler for webserver :D
@@ -70,10 +71,17 @@ async def connect(): # ran before server startup, used to do things like connect
     botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
     bot = Player(id=1, name=botinfo['name'], offset=1, is_bot=True, country_iso=botinfo['country'], country=country_codes[botinfo['country'].upper()])
     glob.players[''] = bot
-    glob.players_name[bot.name] = ''
+    glob.players_name[bot.name] = bot
+    glob.players_id[1] = bot
     glob.bot = bot # might be useful in the future?
     if glob.config.debug:
         log(f"==== Added bot {bot.name} to player list ====", Ansi.GREEN)
+
+    # add all channels to cache
+    async for chan in glob.db.iterall('SELECT * FROM channels'):
+        channel = Channel(name=chan['name'], desc=chan['descr'], auto=chan['auto'])
+        glob.channels[channel.name] = channel
+        log(f'==== Added channel {channel.name} to channel list ====')
 
     log(f'==== Asahi v{glob.version} started ====', Ansi.GREEN)
 

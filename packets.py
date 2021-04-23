@@ -21,6 +21,7 @@ _specifiers = (
 )
 
 Message = namedtuple('Message', ['fromname', 'msg', 'tarname', 'fromid'])
+Channel = namedtuple('Channel', ['name', 'desc', 'players'])
 
 @unique
 class Packets(IntEnum):
@@ -240,6 +241,8 @@ class BanchoPacketReader:
                 val = self.read_i32_list_i32l()
             elif arg_type == osuTypes.message:
                 val = self.read_message()
+            elif arg_type == osuTypes.channel:
+                val = self.read_channel()
 
             elif arg_type == osuTypes.raw:
                 # return all packet data raw.
@@ -346,6 +349,13 @@ class BanchoPacketReader:
             fromid = self.read_i32()
         )
 
+    def read_channel(self) -> Channel:
+        return Channel(
+            name = self.read_string(),
+            desc = self.read_string(),
+            players = self.read_i32()
+        )
+
 def write_uleb128(num: int) -> bytearray:
     """ Write `num` into an unsigned LEB128. """
     if num == 0:
@@ -393,12 +403,12 @@ def write_message(sender: str, msg: str, recipient: str,
     ret += sender_id.to_bytes(4, 'little', signed=True)
     return ret
 
-def write_channel(name: str, topic: str,
-                  count: int) -> bytearray:
+def write_channel(name: str, desc: str,
+                  players: int) -> bytearray:
     """ Write params into bytes (osu! channel). """
     ret = bytearray(write_string(name))
-    ret += write_string(topic)
-    ret += count.to_bytes(2, 'little')
+    ret += write_string(desc)
+    ret += players.to_bytes(2, 'little')
     return ret
 
 def write(packid: int, *args: tuple[Any, ...]) -> bytes:
@@ -414,6 +424,8 @@ def write(packid: int, *args: tuple[Any, ...]) -> bytes:
             ret += write_i32_list(p_args)
         elif p_type == osuTypes.message:
             ret += write_message(*p_args)
+        elif p_type == osuTypes.channel:
+            ret += write_channel(*p_args)
         else:
             # not a custom type, use struct to pack the data.
             ret += struct.pack(_specifiers[p_type], p_args)
@@ -552,3 +564,9 @@ def hostSpectatorLeft(uid: int) -> bytes:
 
 def spectateFrames(frames: bytes) -> bytes:
     return write(Packets.CHO_SPECTATE_FRAMES, (frames, osuTypes.raw))
+
+def channelJoin(chan: str) -> bytes:
+    return write(Packets.CHO_CHANNEL_JOIN_SUCCESS, (chan, osuTypes.string))
+
+def channelInfo(name: str, desc: str, players: int) -> bytes:
+    return write(Packets.CHO_CHANNEL_INFO, ((name, desc, players), osuTypes.channel))
