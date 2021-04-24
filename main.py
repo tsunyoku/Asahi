@@ -67,7 +67,7 @@ async def connect(): # ran before server startup, used to do things like connect
 
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
-    bot = Player(id=1, name=botinfo['name'], offset=1, is_bot=True, country_iso=botinfo['country'], country=country_codes[botinfo['country'].upper()])
+    bot = Player(id=1, name=botinfo['name'], offset=1, country_iso=botinfo['country'], country=country_codes[botinfo['country'].upper()])
     glob.players[''] = bot
     glob.players_name[bot.name] = bot
     glob.players_id[1] = bot
