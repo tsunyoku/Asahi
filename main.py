@@ -74,7 +74,7 @@ async def connect(): # ran before server startup, used to do things like connect
 
     # add all channels to cache
     async for chan in glob.db.iterall('SELECT * FROM channels'):
-        # "perm" may be confusing to some, i dont even really know how to explain it: 
+        # "perm" may be confusing to some, i dont even really know how to explain it:
         # if it's true, the channel won't delete after all it's users has left
         # if it's false, the channel is deleted after all active users in the channel have left the channel
         channel = Channel(name=chan['name'], desc=chan['descr'], auto=chan['auto'], perm=chan['perm'])
@@ -122,12 +122,11 @@ async def disconnect():
 
     log(f'==== Asahi v{glob.version} stopped ====', Ansi.GREEN)
 
-if __name__ == '__main__':
-    from endpoints.bancho import bancho
-    from endpoints.avatars import avatars
-    from endpoints.web import web
-    app.register_blueprint(bancho, subdomain='c')
-    app.register_blueprint(bancho, subdomain='ce')
-    app.register_blueprint(bancho, subdomain='c4')
-    app.register_blueprint(avatars, subdomain='a')
-    app.register_blueprint(web, subdomain='osu')
+from endpoints.bancho import bancho
+from endpoints.avatars import avatars
+from endpoints.web import web
+app.register_blueprint(bancho, subdomain='c')
+app.register_blueprint(bancho, subdomain='ce')
+app.register_blueprint(bancho, subdomain='c4')
+app.register_blueprint(avatars, subdomain='a')
+app.register_blueprint(web, subdomain='osu')
