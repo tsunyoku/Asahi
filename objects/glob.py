@@ -1,5 +1,15 @@
 import config # indirect use of config
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from aiohttp import ClientSession
+
+    from cmyui import AsyncSQLPool, Version
+
+    from packets import Packets, BanchoPacket
+    from objects.player import Player
+
 db: 'AsyncSQLPool' # type hinting
 version: 'Version' # once again, type hinting
 web: 'ClientSession'

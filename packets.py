@@ -1,12 +1,10 @@
 # reader/writer is taken from cmyui's gulag until i can write my own however the packet handlers are my own
 
 import struct
-import random
 from collections import namedtuple
 from enum import IntEnum
 from enum import unique
 from functools import cache
-from functools import lru_cache
 from functools import partialmethod
 from typing import Any, Optional
 
@@ -339,7 +337,7 @@ class BanchoPacketReader:
         val = self.view[:length].tobytes().decode() # copy
         self.view = self.view[length:]
         return val
-    
+
     def read_message(self) -> Message: # namedtuple
         """Read an osu! message from the internal buffer."""
         return Message(
