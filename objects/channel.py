@@ -6,7 +6,7 @@ class Channel:
         self.name = cinfo.get('name')
         self.desc = cinfo.get('desc')
         self.auto = cinfo.get('auto', False)
-        self.un = cinfo.get('un', False)
+        self.perm = cinfo.get('perm', False)
         self.players: list = []
 
     def send(self, f, msg):
@@ -18,7 +18,7 @@ class Channel:
     def remove_player(self, user):
         self.players.remove(user)
 
-        if len(self.players) == 0 and self.un:
+        if len(self.players) == 0 and not self.perm:
             glob.channels.remove(self)
 
     @property
