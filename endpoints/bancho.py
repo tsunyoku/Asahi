@@ -63,7 +63,7 @@ class addFriend(BanchoPacket, type=Packets.OSU_FRIEND_ADD):
         req = user.id
         tar = self.uid
         user.friends.add(tar)
-        await glob.db.execute('INSERT INTO friends (user1, user2) VALUES (%s, %s)', [req, tar])
+        await glob.db.execute(f'INSERT INTO friends (user1, user2) VALUES ({req, tar})')
         log(f"{user.name} added UID {tar} into their friends list.", Ansi.LCYAN)
 
 @packet
@@ -74,7 +74,7 @@ class removeFriend(BanchoPacket, type=Packets.OSU_FRIEND_REMOVE):
         req = user.id
         tar = self.uid
         user.friends.remove(tar)
-        await glob.db.execute('DELETE FROM friends WHERE user1 = %s AND user2 = %s', [req, tar])
+        await glob.db.execute(f'DELETE FROM friends WHERE user1 = {req} AND user2 = {tar}')
         log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LCYAN)
 
 @packet
@@ -261,7 +261,7 @@ async def root_client():
         username = info[0]
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later
 
-        user = await glob.db.fetch('SELECT id, pw, country, name, priv FROM users WHERE name = %s', [username])
+        user = await glob.db.fetchrow(f"SELECT id, pw, country, name, priv FROM users WHERE name = '{username}'")
         if not user: # ensure user actually exists before attempting to do anything else
             if glob.config.debug:
                 log(f'User {username} does not exist.', Ansi.LRED)
@@ -294,11 +294,12 @@ async def root_client():
             return resp
 
         token = uuid.uuid4() # generate token for client to use as auth
-        user['offset'] = int(cinfo[1]) # utc offset for time
-        user['bot'] = False # used to specialise bot functions, kinda gay setup ngl
-        user['token'] = str(token) # this may be useful in the future
-        user['ltime'] = time.time() # useful for handling random logouts
-        user['md5'] = pw # used for auth on /web/
+        user2 = dict(user)
+        user2['offset'] = int(cinfo[1]) # utc offset for time
+        user2['bot'] = False # used to specialise bot functions, kinda gay setup ngl
+        user2['token'] = str(token) # this may be useful in the future
+        user2['ltime'] = time.time() # useful for handling random logouts
+        user2['md5'] = pw # used for auth on /web/
         ip = headers['X-Forwarded-For']
 
         # cache ip's geoloc | the speed gains too are ungodly
@@ -308,11 +309,11 @@ async def root_client():
         else:
             geoloc = glob.geoloc[ip]
 
-        user['country_iso'], user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
-        user['country'] = country_codes[user['country_iso']]
+        user2['country_iso'], user2['lat'], user2['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
+        user2['country'] = country_codes[user2['country_iso']]
 
         # set player object
-        p = await Player.login(user)
+        p = await Player.login(user2)
         await p.set_stats()
 
         if not p.priv & Privileges.Verified:
@@ -320,7 +321,7 @@ async def root_client():
                 # first user & not verified, give all permissions
                 await p.set_priv(Privileges.Master)
 
-            await glob.db.execute('UPDATE users SET country = %s WHERE id = %s', [user['country_iso'].lower(), user['id']]) # set country code in db
+            await glob.db.execute(f"UPDATE users SET country = '{user2['country_iso'].lower()}' WHERE id = '{user['id']}'") # set country code in db
             await p.add_priv(Privileges.Verified) # verify user
             log(f'{p.name} has been successfully verified.', Ansi.LBLUE)
 

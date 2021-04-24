@@ -59,13 +59,16 @@ class Player:
             priv=Privileges(user['priv'])
         )
 
-        p.friends = {row['user2'] async for row in glob.db.iterall('SELECT user2 FROM friends WHERE user1 = %s', [user['id']])} # select all friends from db
+        p.friends = {}
+        async with glob.db.transaction():
+            async for user in glob.db.cursor(f"SELECT user2 FROM friends WHERE user1 = {user['id']}"):
+                p.friends |= user['row2']
 
         return p
 
     async def set_stats(self):
         for mode in osuModes:
-            stat = await glob.db.fetch(f'SELECT rscore_{mode.name} rscore, acc_{mode.name} acc, pc_{mode.name} pc, tscore_{mode.name} tscore, rank_{mode.name} rank, pp_{mode.name} pp FROM stats WHERE id = %s', [self.id])
+            stat = await glob.db.fetchrow(f'SELECT rscore_{mode.name} rscore, acc_{mode.name} acc, pc_{mode.name} pc, tscore_{mode.name} tscore, rank_{mode.name} rank, pp_{mode.name} pp FROM stats WHERE id = {self.id}')
             self.stats[mode.value] = Stats(**stat)
 
     @property
@@ -89,15 +92,15 @@ class Player:
 
     async def add_priv(self, priv):
         self.priv |= priv
-        await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
+        await glob.db.execute(f'UPDATE users SET priv = {int(self.priv)} WHERE id = {self.id}')
 
     async def remove_priv(self, priv):
         self.priv &= ~priv
-        await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
+        await glob.db.execute(f'UPDATE users SET priv = {int(self.priv)} WHERE id = {self.id}')
 
     async def set_priv(self, priv):
         self.priv = priv
-        await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
+        await glob.db.execute(f'UPDATE users SET priv = {int(self.priv)} WHERE id = {self.id}')
 
     def add_spectator(self, user):
         joiner = packets.spectatorJoined(user.id)

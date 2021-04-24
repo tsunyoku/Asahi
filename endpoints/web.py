@@ -147,13 +147,13 @@ async def ingameRegistration():
     if ' ' in name and '_' in name:
         errors['username'].append('Username cannot contain both "_" and " "')
 
-    if await glob.db.fetch('SELECT 1 FROM users WHERE name = %s', [name]):
+    if await glob.db.fetchrow(f"SELECT 1 FROM users WHERE name = '{name}'"):
         errors['username'].append('Username already taken!')
 
-    if await glob.db.fetch('SELECT 1 FROM users WHERE email = %s', [email]):
+    if await glob.db.fetchrow(f"SELECT 1 FROM users WHERE name = '{email}'"):
         errors['user_email'].append('Email already in use!')
 
-    if not len(pw) > 8:
+    if not len(pw) >= 8:
         errors['password'].append('Password must be 8+ characters!')
 
     if errors:
@@ -164,8 +164,10 @@ async def ingameRegistration():
         md5 = hashlib.md5(pw.encode()).hexdigest().encode()
         bc = bcrypt.hashpw(md5, bcrypt.gensalt()) # bcrypt i am begging pls make this faster some day i am actually crying
 
-        uid = await glob.db.execute('INSERT INTO users (name, email, pw) VALUES (%s, %s, %s)', [name, email, bc])
-        await glob.db.execute('INSERT INTO stats (id) VALUES (%s)', [uid])
+        await glob.db.execute(f"INSERT INTO users (name, email, pw) VALUES ('{name}', '{email}', '{bc}')")
+        u = await glob.db.fetchrow(f"SELECT id FROM users WHERE name = '{name}'")
+        uid = u['id']
+        await glob.db.execute(f'INSERT INTO stats (id) VALUES ({uid})')
         log(f'{name} successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}.ms', Ansi.LBLUE)
 
     return b'ok'
@@ -185,3 +187,13 @@ async def osuUpdates():
         ret = await resp.read()
 
     return Response(ret)
+
+# oo map info this is starting to get good
+@web.route("/web/osu-getbeatmapinfo.php", methods=['POST'])
+async def osuMapInfo():
+    args = request.args
+    if not auth(args['u'], args['h']):
+        return Response(b'', status=400)
+
+    data = await request.data
+    log(data)
