@@ -25,7 +25,6 @@ class Player:
         self.pw: str = uinfo.get('pw') # used for /web/ auth
         self.offset: int = uinfo.get('offset')
         self.login_time: int = uinfo.get('login_time')
-        self.is_bot: bool = uinfo.get('is_bot', False)
         self.priv = uinfo.get('priv', Privileges(0))
         self.country_iso: str = uinfo.get('country_iso')
         self.country: int = uinfo.get('country')
