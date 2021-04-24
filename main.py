@@ -77,7 +77,10 @@ async def connect(): # ran before server startup, used to do things like connect
 
     # add all channels to cache
     async for chan in glob.db.iterall('SELECT * FROM channels'):
-        channel = Channel(name=chan['name'], desc=chan['descr'], auto=chan['auto'], un=False)
+        # "un" may be confusing to some, i dont even really know how to explain it: 
+        # if it's true, the channel won't delete after all it's users has left
+        # if it's false, the channel is deleted after all active users have left the channel
+        channel = Channel(name=chan['name'], desc=chan['descr'], auto=chan['auto'], un=chan['perm'])
         glob.channels[channel.name] = channel
         if glob.config.debug:
             log(f'==== Added channel {channel.name} to channel list ====', Ansi.GREEN)
