@@ -98,11 +98,10 @@ class sendPrivateMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
             log(f'{user.name} tried to send message to offline user {tarname}', Ansi.LRED)
             return
 
-        if target.is_bot:
+        if target == glob.bot:
             if msg.startswith('!'):
                 cmd = await commands.process(user, target, msg)
-                if cmd.get('text'):
-                    user.enqueue(packets.sendMessage(fromname = target.name, msg = cmd['text'], tarname = user.name, fromid = target.id))
+                user.enqueue(packets.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
         else:
             target.enqueue(packets.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
             log(f'{user.name} sent message "{msg}" to {tarname}', Ansi.LCYAN)
