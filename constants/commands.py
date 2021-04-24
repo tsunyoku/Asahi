@@ -14,7 +14,7 @@ async def add_priv(user, msg):
     if len(msg) < 2:
         return f"You haven't provided a username and privileges!"
 
-    user = await glob.db.fetch('SELECT priv FROM users WHERE name = %s', [msg[1]])
+    user = await glob.db.fetchrow(f"SELECT priv FROM users WHERE name = '{msg[1]}'")
     priv = Privileges(user['priv'])
     new_privs = Privileges(0)
     for npriv in msg[2:]:
@@ -24,14 +24,14 @@ async def add_priv(user, msg):
         priv |= new_priv
         new_privs |= new_priv
 
-    await glob.db.execute('UPDATE users SET priv = %s WHERE name = %s', [int(priv), msg[1]])
+    await glob.db.execute(f"UPDATE users SET priv = {int(priv)} WHERE name = '{msg[1]}'")
     return f"Added privilege(s) {new_privs} to {msg[1]}."
 
 async def rm_priv(user, msg):
     if len(msg) < 2:
         return f"You haven't provided a username and privileges!"
 
-    user = await glob.db.fetch('SELECT priv FROM users WHERE name = %s', [msg[1]])
+    user = await glob.db.fetchrow(f"SELECT priv FROM users WHERE name = '{msg[1]}'")
     priv = Privileges(user['priv'])
     new_privs = Privileges(0)
     for npriv in msg[2:]:
@@ -41,7 +41,7 @@ async def rm_priv(user, msg):
         priv &= ~new_priv
         new_privs |= new_priv
 
-    await glob.db.execute('UPDATE users SET priv = %s WHERE name = %s', [int(priv), msg[1]])
+    await glob.db.execute(f"UPDATE users SET priv = {int(priv)} WHERE name = '{msg[1]}'")
     return f"Removed privilege(s) {new_privs} from {msg[1]}."
 
 privs = {
