@@ -153,6 +153,9 @@ class Player:
         log(f'{self.name} joined channel {chan.name}', Ansi.LBLUE)
 
     def leave_chan(self, chan):
+        if not glob.channels.get(chan.name):
+            return
+
         if self not in chan.players:
             return
 

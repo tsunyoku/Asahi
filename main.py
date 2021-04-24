@@ -44,31 +44,26 @@ async def connect(): # ran before server startup, used to do things like connect
     cache_path = Path.cwd() / 'resources/cache'
     if not cache_path.exists():
         makedirs(cache_path, exist_ok=True)
-        geoloc_file = cache_path / 'geoloc.p'
-        with open(geoloc_file, 'wb') as f:
-            f.write("")
-            f.close()
+    else:
+        bcrypt_path = cache_path / 'bcrypt.p'
+        geoloc_path = cache_path / 'geoloc.p'
+        if bcrypt_path.exists():
+            with open(Path.cwd() / 'resources/cache/bcrypt.p', 'rb') as f:
+                try:
+                    bc = pickle.load(f)
+                    for key, value in dict(bc).items():
+                        glob.cache['bcrypt'][key] = value
+                except EOFError:
+                    pass
 
-    # this is my most cursed creation | speed gains but im going to hell for this
-    cache_path = Path.cwd() / 'resources/cache'
-    if not cache_path.exists():
-        makedirs(cache_path, exist_ok=True)
-        bcrypt_file = cache_path / 'bcrypt.p'
-        geoloc_file = cache_path / 'geoloc.p'
-        with open(bcrypt_file, 'wb') as f:
-            f.write("")
-            f.close()
-        with open(geoloc_file, 'wb') as f:
-            f.write("")
-            f.close()
-
-    with open(Path.cwd() / 'resources/cache/bcrypt.p', 'rb') as f:
-        glob.cache['bcrypt'] = pickle.load(f)
-        f.close()
-
-    with open(Path.cwd() / 'resources/cache/geoloc.p', 'rb') as f:
-        glob.geoloc = pickle.load(f)
-        f.close()
+        if geoloc_path.exists():
+            with open(Path.cwd() / 'resources/cache/geoloc.p', 'rb') as f:
+                try:
+                    gl = pickle.load(f)
+                    for key, value in dict(gl).items():
+                        glob.geoloc[key] = value
+                except EOFError:
+                    pass
 
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
@@ -84,7 +79,8 @@ async def connect(): # ran before server startup, used to do things like connect
     async for chan in glob.db.iterall('SELECT * FROM channels'):
         channel = Channel(name=chan['name'], desc=chan['descr'], auto=chan['auto'], un=False)
         glob.channels[channel.name] = channel
-        log(f'==== Added channel {channel.name} to channel list ====')
+        if glob.config.debug:
+            log(f'==== Added channel {channel.name} to channel list ====', Ansi.GREEN)
 
     log(f'==== Asahi v{glob.version} started ====', Ansi.GREEN)
 
@@ -93,10 +89,39 @@ async def disconnect():
     log(f'==== Asahi v{glob.version} stopping ====', Ansi.GREEN)
 
     # this is my most cursed creation part 2 | speed gains but im going to hell for this part 2
-    with open(Path.cwd() / 'resources/cache/geoloc.p', 'ab') as file:
-        pickle.dump(glob.geoloc, file, protocol=pickle.HIGHEST_PROTOCOL)
-    with open(Path.cwd() / 'resources/cache/bcrypt.p', 'ab') as file:
-        pickle.dump(glob.cache['bcrypt'], file, protocol=pickle.HIGHEST_PROTOCOL)
+    geoloc_path = Path.cwd() / 'resources/cache/geoloc.p'
+    bcrypt_path = Path.cwd() / 'resources/cache/bcrypt.p'
+
+    if geoloc_path.exists():
+        try:
+            old_geoloc = pickle.load(open(geoloc_path, 'rb'))
+            new_geoloc = {}
+            for key, value in dict(old_geoloc).items():
+                new_geoloc[key] = value
+            for key, value in glob.geoloc.items():
+                new_geoloc[key] = value
+        except EOFError:
+            new_geoloc = glob.geoloc
+    else:
+        new_geoloc = glob.geoloc
+
+    if bcrypt_path.exists():
+        try:
+            old_bcrypt = pickle.load(open(bcrypt_path, 'rb'))
+            new_bcrypt = {}
+            for key, value in dict(old_bcrypt).items():
+                new_bcrypt[key] = value
+            for key, value in glob.cache['bcrypt'].items():
+                new_bcrypt[key] = value
+        except EOFError:
+            new_bcrypt = glob.cache['bcrypt']
+    else:
+        new_bcrypt = glob.cache['bcrypt']
+
+    with open(Path.cwd() / 'resources/cache/geoloc.p', 'wb') as file:
+        pickle.dump(new_geoloc, file, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(Path.cwd() / 'resources/cache/bcrypt.p', 'wb') as file:
+        pickle.dump(new_bcrypt, file, protocol=pickle.HIGHEST_PROTOCOL)
 
     await glob.web.close()
     if glob.config.debug:
