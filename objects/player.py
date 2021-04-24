@@ -25,7 +25,6 @@ class Player:
         self.pw: str = uinfo.get('pw') # used for /web/ auth
         self.offset: int = uinfo.get('offset')
         self.login_time: int = uinfo.get('login_time')
-        self.is_bot: bool = uinfo.get('is_bot', False)
         self.priv = uinfo.get('priv', Privileges(0))
         self.country_iso: str = uinfo.get('country_iso')
         self.country: int = uinfo.get('country')
@@ -105,7 +104,7 @@ class Player:
         sname = f'#spec_{self.id}'
 
         if not (spec := glob.channels.get(sname)):
-            spec = Channel(name='#spectator', desc=f'Spectator chat for {self.name}', auto=False, un=True)
+            spec = Channel(name='#spectator', desc=f'Spectator chat for {self.name}', auto=False, perm=False)
             self.join_chan(spec)
             glob.channels[spec.name] = spec
         

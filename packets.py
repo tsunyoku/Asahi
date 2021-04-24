@@ -458,7 +458,7 @@ def botPresence(player) -> bytes:
     )
 
 def userPresence(player) -> bytes:
-    if player.is_bot:
+    if player is glob.bot:
         return botPresence(player)
 
     return write(
@@ -492,7 +492,7 @@ def botStats() -> bytes:
     )
 
 def userStats(player) -> bytes:
-    if player.is_bot:
+    if player is glob.bot:
         return botStats()
 
     return write(

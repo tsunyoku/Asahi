@@ -64,7 +64,7 @@ async def connect(): # ran before server startup, used to do things like connect
 
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetch('SELECT name, pw, country, name FROM users WHERE id = 1')
-    bot = Player(id=1, name=botinfo['name'], offset=1, is_bot=True, country_iso=botinfo['country'], country=country_codes[botinfo['country'].upper()])
+    bot = Player(id=1, name=botinfo['name'], offset=1, country_iso=botinfo['country'], country=country_codes[botinfo['country'].upper()])
     glob.players[''] = bot
     glob.players_name[bot.name] = bot
     glob.players_id[1] = bot
@@ -74,7 +74,10 @@ async def connect(): # ran before server startup, used to do things like connect
 
     # add all channels to cache
     async for chan in glob.db.iterall('SELECT * FROM channels'):
-        channel = Channel(name=chan['name'], desc=chan['descr'], auto=chan['auto'], un=False)
+        # "perm" may be confusing to some, i dont even really know how to explain it: 
+        # if it's true, the channel won't delete after all it's users has left
+        # if it's false, the channel is deleted after all active users in the channel have left the channel
+        channel = Channel(name=chan['name'], desc=chan['descr'], auto=chan['auto'], perm=chan['perm'])
         glob.channels[channel.name] = channel
         if glob.config.debug:
             log(f'==== Added channel {channel.name} to channel list ====', Ansi.GREEN)
