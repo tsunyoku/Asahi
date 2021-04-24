@@ -104,7 +104,7 @@ class Player:
         sname = f'#spec_{self.id}'
 
         if not (spec := glob.channels.get(sname)):
-            spec = Channel(name='#spectator', desc=f'Spectator chat for {self.name}', auto=False, un=True)
+            spec = Channel(name='#spectator', desc=f'Spectator chat for {self.name}', auto=False, perm=False)
             self.join_chan(spec)
             glob.channels[spec.name] = spec
         
