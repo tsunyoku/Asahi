@@ -1,4 +1,3 @@
-from cmyui import log
 from objects import glob
 from constants.privs import Privileges
 
