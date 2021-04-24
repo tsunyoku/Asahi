@@ -87,7 +87,7 @@ async def getFriends():
     args = request.args
     if not auth(args['u'], args['h']):
         return Response(b'', status=400)
-    
+
     p = glob.players_name.get(args['u'])
     return '\n'.join(map(str, p.friends)).encode()
 
@@ -152,10 +152,10 @@ async def ingameRegistration():
 
     if await glob.db.fetch('SELECT 1 FROM users WHERE email = %s', [email]):
         errors['user_email'].append('Email already in use!')
-    
+
     if not len(pw) > 8:
         errors['password'].append('Password must be 8+ characters!')
-    
+
     if errors:
         ret = {'form_error': {'user': errors}}
         return Response(orjson.dumps(ret), mimetype='application/json', status=400)
@@ -167,7 +167,7 @@ async def ingameRegistration():
         uid = await glob.db.execute('INSERT INTO users (name, email, pw) VALUES (%s, %s, %s)', [name, email, bc])
         await glob.db.execute('INSERT INTO stats (id) VALUES (%s)', [uid])
         log(f'{name} successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}.ms', Ansi.LBLUE)
-    
+
     return b'ok'
 
 @web.route("/web/check-updates.php")

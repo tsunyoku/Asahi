@@ -1,6 +1,6 @@
 # external imports (some may require to be installed, install using ext/requirements.txt)
 from quart import Blueprint, Response, request, make_response # web server :blobcowboi:
-from cmyui import AsyncSQLPool, Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
+from cmyui import Ansi, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from geoip2 import database # for geoloc
 import pyfiglet
 import bcrypt
@@ -28,14 +28,14 @@ def packet(cls: BanchoPacket):
 
 @packet
 class updateStats(BanchoPacket, type=Packets.OSU_REQUEST_STATUS_UPDATE):
-    async def handle(self, user):
+    async def handle(self, user: Player):
         user.enqueue(packets.userStats(user))
 
 @packet
 class statsRequest(BanchoPacket, type=Packets.OSU_USER_STATS_REQUEST):
     uids: osuTypes.i32_list
 
-    async def handle(self, user):
+    async def handle(self, user: Player):
         for o in glob.players.values():
             if o.id != user.id and o.id in self.uids:
                 user.enqueue(packets.userStats(o))
@@ -44,13 +44,13 @@ class statsRequest(BanchoPacket, type=Packets.OSU_USER_STATS_REQUEST):
 class presenceRequest(BanchoPacket, type=Packets.OSU_USER_PRESENCE_REQUEST):
     uids: osuTypes.i32_list
 
-    async def handle(self, user):
+    async def handle(self, user: Player):
         for o in glob.players.values():
             user.enqueue(packets.userPresence(o))
 
 @packet
 class presenceRequestAll(BanchoPacket, type=Packets.OSU_USER_PRESENCE_REQUEST_ALL):
-    async def handle(self, user):
+    async def handle(self, user: Player):
         for o in glob.players.values():
             if o.id != user.id:
                 user.enqueue(packets.userPresence(o))
@@ -59,7 +59,7 @@ class presenceRequestAll(BanchoPacket, type=Packets.OSU_USER_PRESENCE_REQUEST_AL
 class addFriend(BanchoPacket, type=Packets.OSU_FRIEND_ADD):
     uid: osuTypes.i32
 
-    async def handle(self, user):
+    async def handle(self, user: Player):
         req = user.id
         tar = self.uid
         user.friends.add(tar)
@@ -70,7 +70,7 @@ class addFriend(BanchoPacket, type=Packets.OSU_FRIEND_ADD):
 class removeFriend(BanchoPacket, type=Packets.OSU_FRIEND_REMOVE):
     uid: osuTypes.i32
 
-    async def handle(self, user):
+    async def handle(self, user: Player):
         req = user.id
         tar = self.uid
         user.friends.remove(tar)
@@ -79,7 +79,7 @@ class removeFriend(BanchoPacket, type=Packets.OSU_FRIEND_REMOVE):
 
 @packet
 class Logout(BanchoPacket, type=Packets.OSU_LOGOUT):
-    async def handle(self, user):
+    async def handle(self, user: Player):
         if (time.time() - user.login_time) < 1:
             return # osu sends random logout packet token on login ?
 
@@ -90,7 +90,7 @@ class Logout(BanchoPacket, type=Packets.OSU_LOGOUT):
 class sendPrivateMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
     msg: osuTypes.message # i am so confused man wtf
 
-    async def handle(self, user):
+    async def handle(self, user: Player):
         msg = self.msg.msg
         tarname = self.msg.tarname
 
@@ -110,7 +110,7 @@ class sendPrivateMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
 class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
     msg: osuTypes.message
 
-    async def handle(self, user):
+    async def handle(self, user: Player):
         msg = self.msg.msg
         chan = self.msg.tarname
 
@@ -135,13 +135,13 @@ class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
 class joinChannel(BanchoPacket, type=Packets.OSU_CHANNEL_JOIN):
     name: osuTypes.string
 
-    async def handle(self, user):
+    async def handle(self, user: Player):
         chan = glob.channels.get(self.name)
 
         if not chan:
             log(f'{user.name} failed to join channel {self.name}', Ansi.LRED)
             return
-        
+
         user.join_chan(chan)
         user.enqueue(packets.channelJoin(chan.name))
         for o in chan.players:
@@ -151,7 +151,7 @@ class joinChannel(BanchoPacket, type=Packets.OSU_CHANNEL_JOIN):
 class leaveChannel(BanchoPacket, type=Packets.OSU_CHANNEL_PART):
     name: osuTypes.string
 
-    async def handle(self, user):
+    async def handle(self, user: Player):
         if self.name == '#highlight' or not self.name.startswith('#'): # osu why!!!
             return
 
@@ -176,7 +176,7 @@ class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
     mode: osuTypes.u8
     mid: osuTypes.i32
 
-    async def handle(self, user):
+    async def handle(self, user: Player):
         if self.actionid == 0 and self.mods & Mods.RELAX:
             self.info = 'on Relax'
         elif self.actionid == 0 and self.mods & Mods.AUTOPILOT:
@@ -204,7 +204,7 @@ class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
 class startSpec(BanchoPacket, type=Packets.OSU_START_SPECTATING):
     tid: osuTypes.i32
 
-    async def handle(self, user):
+    async def handle(self, user: Player):
         if self.tid == 1: # spectating bot is just gonna cause unnecessary errors
             return
 
@@ -213,21 +213,21 @@ class startSpec(BanchoPacket, type=Packets.OSU_START_SPECTATING):
             return
 
         target.add_spectator(user)
-        
+
 @packet
 class stopSpec(BanchoPacket, type=Packets.OSU_STOP_SPECTATING):
-    async def handle(self, user):
+    async def handle(self, user: Player):
         if not (host := user.spectating):
             log(f'{user.name} tried to stop spectating someone while not spectating anyone.', Ansi.LRED)
             return
-        
+
         host.remove_spectator(user)
 
 @packet
 class specFrames(BanchoPacket, type=Packets.OSU_SPECTATE_FRAMES):
     frames: osuTypes.raw
 
-    async def handle(self, user):
+    async def handle(self, user: Player):
         for u in user.spectators:
             u.enqueue(packets.spectateFrames(self.frames))
 
@@ -285,7 +285,7 @@ async def root_client():
                 resp = await make_response(packets.userID(-1))
                 resp.headers['cho-token'] = 'no'
                 return resp
-            
+
             bcache[pw_bcrypt] = pw # cache pw for future
 
         if not user['priv'] & Privileges.Normal:
@@ -357,7 +357,7 @@ async def root_client():
         resp = await make_response(bytes(data))
         resp.headers['cho-token'] = token
         return resp
-    
+
     # if we have made it this far then it's a reconnect attempt with token already provided
     user_token = headers['osu-token'] # client-provided token
     if not (p := glob.players.get(user_token)):
@@ -369,7 +369,7 @@ async def root_client():
     # handle any packets the client has sent
     for packet in BanchoPacketReader(body, glob.packets):
         await packet.handle(p)
- 
+
     data = bytearray()
     while not p.queue_empty():
         data += p.dequeue()
