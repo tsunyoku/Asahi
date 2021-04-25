@@ -162,12 +162,12 @@ async def ingameRegistration():
 
     if int(mpargs['check']) == 0:
         md5 = hashlib.md5(pw.encode()).hexdigest().encode()
-        bc = bcrypt.hashpw(md5, bcrypt.gensalt()) # bcrypt i am begging pls make this faster some day i am actually crying
+        bc = bcrypt.hashpw(md5, bcrypt.gensalt()).decode() # bcrypt i am begging pls make this faster some day i am actually crying
 
         await glob.db.execute("INSERT INTO users (name, email, pw) VALUES ($1, $2, $3)", name, email, bc)
         uid = await glob.db.fetchval("SELECT id FROM users WHERE name = $1", name)
         await glob.db.execute('INSERT INTO stats (id) VALUES ($1)', uid)
-        log(f'{name} (UID {uid}) successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}.ms', Ansi.LBLUE)
+        log(f'{name} successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}.ms', Ansi.LBLUE)
 
     return b'ok'
 
