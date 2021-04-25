@@ -147,10 +147,10 @@ async def ingameRegistration():
     if ' ' in name and '_' in name:
         errors['username'].append('Username cannot contain both "_" and " "')
 
-    if await glob.db.fetchrow(f"SELECT 1 FROM users WHERE name = '{name}'"):
+    if await glob.db.fetchrow("SELECT 1 FROM users WHERE name = $1", name):
         errors['username'].append('Username already taken!')
 
-    if await glob.db.fetchrow(f"SELECT 1 FROM users WHERE name = '{email}'"):
+    if await glob.db.fetchrow("SELECT 1 FROM users WHERE name = $1", email):
         errors['user_email'].append('Email already in use!')
 
     if not len(pw) >= 8:
@@ -164,11 +164,10 @@ async def ingameRegistration():
         md5 = hashlib.md5(pw.encode()).hexdigest().encode()
         bc = bcrypt.hashpw(md5, bcrypt.gensalt()) # bcrypt i am begging pls make this faster some day i am actually crying
 
-        await glob.db.execute(f"INSERT INTO users (name, email, pw) VALUES ('{name}', '{email}', '{bc}')")
-        u = await glob.db.fetchrow(f"SELECT id FROM users WHERE name = '{name}'")
-        uid = u['id']
-        await glob.db.execute(f'INSERT INTO stats (id) VALUES ({uid})')
-        log(f'{name} successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}.ms', Ansi.LBLUE)
+        await glob.db.execute("INSERT INTO users (name, email, pw) VALUES ($1, $2, $3)", name, email, bc)
+        uid = await glob.db.fetchval("SELECT id FROM users WHERE name = $1", name)
+        await glob.db.execute('INSERT INTO stats (id) VALUES ($1)', uid)
+        log(f'{name} (UID {uid}) successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}.ms', Ansi.LBLUE)
 
     return b'ok'
 

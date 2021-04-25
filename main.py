@@ -31,11 +31,11 @@ async def connect(): # ran before server startup, used to do things like connect
     glob.web = ClientSession() # aiohttp session for external web requests
 
     try:
-        glob.db = await asyncpg.connect(user=glob.config.mysql['user'], password=glob.config.mysql['password'], database=glob.config.mysql['db'], host=glob.config.mysql['host']) # connect to db using config :p
+        glob.db = await asyncpg.connect(user=glob.config.postgres['user'], password=glob.config.postgres['password'], database=glob.config.postgres['db'], host=glob.config.postgres['host']) # connect to db using config :p
         if glob.config.debug:
-            log('==== Asahi connected to MySQL ====', Ansi.GREEN)
+            log('==== Asahi connected to PostgreSQL ====', Ansi.GREEN)
     except Exception as error:
-        log(f'==== Asahi failed to connect to MySQL ====\n\n{error}', Ansi.LRED)
+        log(f'==== Asahi failed to connect to PostgreSQL ====\n\n{error}', Ansi.LRED)
 
     if not AVA_PATH.exists():
         AVA_PATH.mkdir(parents=True)
