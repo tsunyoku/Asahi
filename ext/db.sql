@@ -180,7 +180,8 @@ CREATE TABLE public.users (
     email character varying(254) DEFAULT ''::character varying NOT NULL,
     pw text NOT NULL,
     country character varying(2) DEFAULT 'xx'::character varying NOT NULL,
-    priv integer DEFAULT 1 NOT NULL
+    priv integer DEFAULT 1 NOT NULL,
+    safe_name character varying(16) NOT NULL
 );
 
 
@@ -258,8 +259,8 @@ COPY public.stats (id, rscore_std, acc_std, pc_std, tscore_std, rank_std, pp_std
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: tsunyoku
 --
 
-COPY public.users (id, name, email, pw, country, priv) FROM stdin;
-1	Asahi		epic_bcrypt_goes_here	gb	1
+COPY public.users (id, name, email, pw, country, priv, safe_name) FROM stdin;
+1	Asahi		epic_bcrypt_goes_here	gb	1	asahi
 \.
 
 
