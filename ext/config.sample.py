@@ -1,5 +1,5 @@
-# mysql auth info
-mysql = {
+# postgres auth info
+postgres = {
     'db': 'asahi',
     'host': 'localhost',
     'password': 'ape',
