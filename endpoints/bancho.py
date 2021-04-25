@@ -350,10 +350,10 @@ async def root_client():
             o.enqueue((packets.userPresence(p) + packets.userStats(p))) # enqueue this user to every other logged in user
             data += (packets.userPresence(o) + packets.userStats(o)) # enqueue every other logged in user to this user
 
-        elapsed = round((time.time() - start) * 1000, 2)
-        data += packets.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed}ms') # send notification as indicator they've logged in i guess
+        elapsed = (time.time() - start) * 1000
+        data += packets.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed:.2f}ms') # send notification as indicator they've logged in i guess
         if glob.config.debug:
-            log(f'{p.name} successfully logged in. | Time Elapsed: {elapsed}ms', Ansi.LBLUE)
+            log(f'{p.name} successfully logged in. | Time Elapsed: {elapsed:.2f}ms', Ansi.LBLUE)
 
         resp = await make_response(bytes(data))
         resp.headers['cho-token'] = token

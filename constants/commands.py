@@ -1,6 +1,8 @@
 from objects import glob
 from constants.privs import Privileges
 
+import time
+
 async def help(user, msg):
     allowed_cmds = []
     for cmd, req_priv in cmd_privs.items():
@@ -72,12 +74,19 @@ cmd_privs = {
 }
 
 async def process(user, target, msg):
+    start = time.time()
     args = msg.split()
     c = args[0]
     if c in cmds.keys():
         if user.priv & cmd_privs[c]:
             cmd = cmds[c]
-            return await cmd(user, args)
+
+            if c != '!help':
+                elapsed = f'| Time Elapsed: {(time.time() - start) * 1000:.2f}ms'
+            else:
+                elapsed = ''
+
+            return f'{await cmd(user, args)} {elapsed}'
         else:
             return f'You have insufficient permissions to perform this command!'
     else:

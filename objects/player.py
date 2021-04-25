@@ -76,6 +76,10 @@ class Player:
         return self.stats[self.mode]
 
     @property
+    def safe_name(self):
+        return self.name.lower().replace(' ', '_')
+
+    @property
     def client_priv(self):
         priv = ClientPrivileges(0)
 
