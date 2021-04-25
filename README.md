@@ -13,13 +13,14 @@ First install any requirements:
 ```bash
 sudo add-apt-repository ppa:deadsnakes/ppa # for python 3.9
 sudo apt update
-sudo apt install python3.9 python3.9-dev python3.9-distutils nginx build-essential certbot mysql-server
+sudo apt install python3.9 python3.9-dev python3.9-distutils nginx build-essential certbot postgresql postgresql-contrib
 python3.9 -m pip install -r ext/requirements.txt
 wget https://bootstrap.pypa.io/get-pip.py
 python3.9 get-pip.py && rm get-pip.py
 ```
 
-You can find the database structure in ext/db.sql, you may want to import that before you advance.
+You can find the database structure in ext/db.sql, you may want to import that before you advance. (Note: we use postgresql not mysql! You will also need to edit the sql file for use with your postgre user)
+I will sadly not provide support with postgre setup as I still don't even understand it myself, lol.
 
 Now, edit your nginx config (found in ext/nginx.conf), here we will generate the certificate for your nginx config and reload:
 ```bash
