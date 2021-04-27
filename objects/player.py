@@ -34,7 +34,7 @@ class Player:
         self.action: int = 0
         self.info: str = ''
         self.map_md5: str = ''
-        self.mods = int = 0
+        self.mods: int = 0
         self.mode: int = 0
         self.mode_vn: int = 0 
         self.map_id: int = 0
@@ -68,7 +68,7 @@ class Player:
 
     async def set_stats(self):
         for mode in osuModes:
-            stat = await glob.db.fetchrow(f'SELECT rscore_{mode.name} rscore, acc_{mode.name} acc, pc_{mode.name} pc, tscore_{mode.name} tscore, rank_{mode.name} rank, pp_{mode.name} pp FROM stats WHERE id = $1', self.id)
+            stat = await glob.db.fetchrow('SELECT rscore_{0} rscore, acc_{0} acc, pc_{0} pc, tscore_{0} tscore, rank_{0} rank, pp_{0} pp FROM stats WHERE id = $1'.format(mode.name), self.id)
             self.stats[mode.value] = Stats(**stat)
 
     @property
