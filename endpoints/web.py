@@ -1,6 +1,7 @@
 from quart import Blueprint, request, Response, send_file, g, redirect
 from cmyui import log, Ansi
 from collections import defaultdict
+from urllib.parse import unquote
 
 import string
 import random
@@ -9,8 +10,14 @@ import hashlib
 import bcrypt
 import time
 import orjson
+import re
 
 from objects import glob
+from objects.beatmap import Beatmap
+from constants.modes import lbModes
+from constants.statuses import mapStatuses
+
+import packets
 
 ss_path = os.path.join(os.getcwd(), 'resources/screenshots')
 web = Blueprint('web', __name__)
@@ -25,7 +32,7 @@ def auth(name, md5):
         log(f'{name} failed authentication', Ansi.LRED)
         return False
 
-    g.player = player.name
+    g.player = player
     return True
 
 @web.before_request
@@ -37,7 +44,7 @@ async def bRequest():
 @web.after_request
 async def logRequest(resp):
     if g.get('player'):
-        ret = f' | Request by {g.pop("player")}'
+        ret = f' | Request by {g.pop("player").name}'
     else:
         ret = ''
 
@@ -188,7 +195,7 @@ async def osuUpdates():
     return Response(ret)
 
 # oo map info this is starting to get good
-@web.route("/web/osu-getbeatmapinfo.php", methods=['POST'])
+@web.route("/web/osu-getbeatmapinfo.php")
 async def osuMapInfo():
     args = request.args
     if not auth(args['u'], args['h']):
@@ -196,3 +203,53 @@ async def osuMapInfo():
 
     data = await request.data
     log(data)
+
+@web.route("/web/osu-osz2-getscores.php")
+async def getMapScores():
+    args = request.args
+    if not auth(args['us'], args['ha']):
+        return Response(b'', status=400)
+
+    if (md5 := args['c']) in glob.cache['unsub']:
+        return Response(b'-1|false') # tell client map is unsub xd
+
+    mods = int(args['mods'])
+    mode = lbModes(int(args['m']), mods)
+    sid = int(args['i'])
+
+    player = g.pop("player")
+
+    if mode != player.mode or mods != player.mods:
+        player.mode = mode.value
+        player.mods = mods
+        for o in glob.players.values():
+            o.enqueue(packets.userStats(player))
+
+    if not (bmap := Beatmap.md5_cache(md5)):
+        if not (bmap := await Beatmap.md5_sql(md5)):
+            if sid != -1:
+                await Beatmap.cache(sid)
+                bmap = Beatmap.md5_cache(md5)
+            else:
+                bmap = await Beatmap.md5_api(md5)
+
+        if not bmap:
+            file = args['f'].replace('+', '')
+            reg = re.compile(r'^(?P<artist>.+) - (?P<title>.+) \((?P<mapper>.+)\) \[(?P<diff>.+)\]\.osu$') # fuck sake osu why do this to me
+            if not (info := reg.match(unquote(file))): # once again osu why
+                # invalid file? idfk
+                glob.cache['unsub'].append(md5)
+                return Response(b'-1|false')
+
+            exists = await glob.db.fetchval('SELECT 1 FROM maps WHERE artist = $1 AND title = $2 AND diff = $3 AND mapper = $4', info['artist'], info['title'], info['diff'], info['mapper'])
+
+            if exists:
+                return Response(b'1|false') # bmap submitted but not up to date, send update available
+            else:
+                glob.cache['unsub'].append(md5)
+                return Response(b'-1|false') # bmap or other version of bmap cannot be found, must be unsubmitted
+
+    if bmap.status < mapStatuses.Ranked:
+        return Response(f'{bmap.status}|false'.encode()) # map is unranked, unsubmitted etc. then we return status with no scores or anything
+
+    return Response(f'{bmap.status}|false'.encode()) # temp until scores exist xd

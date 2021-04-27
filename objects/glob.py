@@ -18,7 +18,9 @@ packets: dict['Packets', 'BanchoPacket']
 
 # cache some things like bcrypt for speeeeeeeeeeeeeeeeeed hours
 cache = {
-    'bcrypt': {} # store bcrypt pws for speed hours
+    'bcrypt': {}, # store bcrypt pws for speed hours
+    'maps': {}, # map cache cus xd
+    'unsub': [] # unsubmitted maps xd
 }
 
 players = {} # player dict | player[token] = player
