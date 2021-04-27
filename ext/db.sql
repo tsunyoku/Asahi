@@ -323,6 +323,37 @@ ALTER TABLE ONLY public.stats
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
 
+--
+-- Name: maps; Type: TABLE; Schema: public; Owner: tsunyoku
+--
+
+CREATE TABLE public.maps (
+    id integer NOT NULL,
+    sid integer NOT NULL,
+    md5 text NOT NULL,
+    bpm double precision NOT NULL,
+    cs double precision NOT NULL,
+    ar double precision NOT NULL,
+    od double precision NOT NULL,
+    hp double precision NOT NULL,
+    sr double precision NOT NULL,
+    mode integer NOT NULL,
+    artist text NOT NULL,
+    title text NOT NULL,
+    diff text NOT NULL,
+    mapper text NOT NULL,
+    status integer NOT NULL
+);
+
+
+ALTER TABLE public.maps OWNER TO tsunyoku;
+
+--
+-- Name: maps maps_md5_key; Type: CONSTRAINT; Schema: public; Owner: tsunyoku
+--
+
+ALTER TABLE ONLY public.maps
+    ADD CONSTRAINT maps_md5_key UNIQUE (md5);
 
 --
 -- PostgreSQL database dump complete
