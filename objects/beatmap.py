@@ -27,6 +27,10 @@ class Beatmap:
 
         self.status = mapStatuses(minfo.get('status', 0))
 
+    @property
+    def name(self):
+        return f'{self.artist} - {self.title} [{self.diff}]'
+
     @staticmethod
     def md5_cache(md5: str):
         if (bmap := glob.cache['maps'].get(md5)):
