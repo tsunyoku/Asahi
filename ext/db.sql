@@ -356,6 +356,147 @@ ALTER TABLE ONLY public.maps
     ADD CONSTRAINT maps_md5_key UNIQUE (md5);
 
 --
+-- Name: scores; Type: TABLE; Schema: public; Owner: tsunyoku
+--
+
+CREATE SEQUENCE public.scores_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.scores_id_seq OWNER TO tsunyoku;
+
+CREATE TABLE public.scores (
+    id integer DEFAULT nextval('public.scores_id_seq'::regclass) NOT NULL,
+    md5 text NOT NULL,
+    score bigint NOT NULL,
+    acc double precision NOT NULL,
+    pp double precision NOT NULL,
+    combo integer NOT NULL,
+    mods integer NOT NULL,
+    "300" integer NOT NULL,
+    geki integer NOT NULL,
+    "100" integer NOT NULL,
+    katu integer NOT NULL,
+    "50" integer NOT NULL,
+    miss integer NOT NULL,
+    grade text DEFAULT 'F'::text NOT NULL,
+    status integer DEFAULT 0 NOT NULL,
+    mode integer NOT NULL,
+    "time" bigint NOT NULL,
+    uid integer NOT NULL,
+    readable_mods text NOT NULL,
+    fc integer NOT NULL
+);
+
+
+ALTER TABLE public.scores OWNER TO tsunyoku;
+
+--
+-- Name: scores scores_pkey; Type: CONSTRAINT; Schema: public; Owner: tsunyoku
+--
+
+ALTER TABLE ONLY public.scores
+    ADD CONSTRAINT scores_pkey PRIMARY KEY (id);
+
+--
+-- Name: scores_rx; Type: TABLE; Schema: public; Owner: tsunyoku
+--
+
+CREATE SEQUENCE public.scores_rx_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.scores_rx_id_seq OWNER TO tsunyoku;
+
+CREATE TABLE public.scores_rx (
+    id integer DEFAULT nextval('public.scores_rx_id_seq'::regclass) NOT NULL,
+    md5 text NOT NULL,
+    score bigint NOT NULL,
+    acc double precision NOT NULL,
+    pp double precision NOT NULL,
+    combo integer NOT NULL,
+    mods integer NOT NULL,
+    "300" integer NOT NULL,
+    geki integer NOT NULL,
+    "100" integer NOT NULL,
+    katu integer NOT NULL,
+    "50" integer NOT NULL,
+    miss integer NOT NULL,
+    grade text DEFAULT 'F'::text NOT NULL,
+    status integer DEFAULT 0 NOT NULL,
+    mode integer NOT NULL,
+    "time" bigint NOT NULL,
+    uid integer NOT NULL,
+    readable_mods text NOT NULL,
+    fc integer NOT NULL
+);
+
+
+ALTER TABLE public.scores_rx OWNER TO tsunyoku;
+
+--
+-- Name: scores_rx scores_rx_pkey; Type: CONSTRAINT; Schema: public; Owner: tsunyoku
+--
+
+ALTER TABLE ONLY public.scores_rx
+    ADD CONSTRAINT scores_rx_pkey PRIMARY KEY (id);
+
+--
+-- Name: scores_ap; Type: TABLE; Schema: public; Owner: tsunyoku
+--
+
+CREATE SEQUENCE public.scores_ap_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.scores_ap_id_seq OWNER TO tsunyoku;
+
+CREATE TABLE public.scores_ap (
+    id integer DEFAULT nextval('public.scores_ap_id_seq'::regclass) NOT NULL,
+    md5 text NOT NULL,
+    score bigint NOT NULL,
+    acc double precision NOT NULL,
+    pp double precision NOT NULL,
+    combo integer NOT NULL,
+    mods integer NOT NULL,
+    "300" integer NOT NULL,
+    geki integer NOT NULL,
+    "100" integer NOT NULL,
+    katu integer NOT NULL,
+    "50" integer NOT NULL,
+    miss integer NOT NULL,
+    grade text DEFAULT 'F'::text NOT NULL,
+    status integer DEFAULT 0 NOT NULL,
+    mode integer NOT NULL,
+    "time" bigint NOT NULL,
+    uid integer NOT NULL,
+    readable_mods text NOT NULL,
+    fc integer NOT NULL
+);
+
+
+ALTER TABLE public.scores_ap OWNER TO tsunyoku;
+
+--
+-- Name: scores_ap scores_ap_pkey; Type: CONSTRAINT; Schema: public; Owner: tsunyoku
+--
+
+ALTER TABLE ONLY public.scores_ap
+    ADD CONSTRAINT scores_ap_pkey PRIMARY KEY (id);
+
+--
 -- PostgreSQL database dump complete
 --
 
