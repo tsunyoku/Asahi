@@ -16,6 +16,7 @@ from objects import glob
 from objects.beatmap import Beatmap
 from constants.modes import lbModes
 from constants.statuses import mapStatuses
+from constants.mods import Mods
 
 import packets
 
@@ -70,7 +71,6 @@ async def uploadScreenshot():
     name = f"{''.join(random.choices(string.ascii_uppercase + string.digits, k=8))}.png"
     ss = os.path.join(ss_path, name)
     screenshot.save(ss)
-    log(f'Screenshot {name} saved to disk')
     return name.encode()
 
 @web.route("/ss/<string:scr>")
@@ -118,7 +118,7 @@ async def osuSearch():
 
         ret = await resp.read()
 
-    return Response(ret)
+    return ret
 
 @web.route("/web/osu-search-set.php")
 async def osuSearchSet():
@@ -136,7 +136,7 @@ async def osuSearchSet():
 
         ret = await resp.read()
 
-    return Response(ret)
+    return ret
 
 @web.route("/users", methods=['POST'])
 async def ingameRegistration():
@@ -192,7 +192,7 @@ async def osuUpdates():
 
         ret = await resp.read()
 
-    return Response(ret)
+    return ret
 
 # oo map info this is starting to get good
 @web.route("/web/osu-getbeatmapinfo.php")
@@ -211,7 +211,7 @@ async def getMapScores():
         return Response(b'', status=400)
 
     if (md5 := args['c']) in glob.cache['unsub']:
-        return Response(b'-1|false') # tell client map is unsub xd
+        return b'-1|false' # tell client map is unsub xd
 
     mods = int(args['mods'])
     mode = lbModes(int(args['m']), mods)
@@ -239,17 +239,45 @@ async def getMapScores():
             if not (info := reg.match(unquote(file))): # once again osu why
                 # invalid file? idfk
                 glob.cache['unsub'].append(md5)
-                return Response(b'-1|false')
+                return b'-1|false'
 
             exists = await glob.db.fetchval('SELECT 1 FROM maps WHERE artist = $1 AND title = $2 AND diff = $3 AND mapper = $4', info['artist'], info['title'], info['diff'], info['mapper'])
 
             if exists:
-                return Response(b'1|false') # bmap submitted but not up to date, send update available
+                return b'1|false' # bmap submitted but not up to date, send update available
             else:
                 glob.cache['unsub'].append(md5)
-                return Response(b'-1|false') # bmap or other version of bmap cannot be found, must be unsubmitted
+                return b'-1|false' # bmap or other version of bmap cannot be found, must be unsubmitted
 
     if bmap.status < mapStatuses.Ranked:
-        return Response(f'{bmap.status}|false'.encode()) # map is unranked, unsubmitted etc. then we return status with no scores or anything
+        return f'{bmap.status}|false'.encode() # map is unranked, unsubmitted etc. then we return status with no scores or anything
 
-    return Response(f'{bmap.status}|false'.encode()) # temp until scores exist xd
+    if mods & Mods.RELAX:
+        table = 'scores_rx'
+        sort = 'pp'
+    elif mods & Mods.AUTOPILOT:
+        table = 'scores_ap'
+        sort = 'pp'
+    else:
+        table = 'scores'
+        sort = 'score'
+
+    scores = await glob.db.fetch(f'SELECT {table}.*, users.name FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.status = 2 AND mode = $2 ORDER BY {table}.{sort} DESC LIMIT 100', md5, int(args['m']))
+
+    resp = []
+
+    resp.append(f'{bmap.status}|false|{bmap.id}|{bmap.sid}|{len(scores)}')
+    resp.append(f'0\n{bmap.name}\n10.0') # why osu using \n :( | force 10.0 rating cus no ratings rn, 0 is map offset (probably wont ever be used)
+    if not scores:
+        return '\n'.join(resp).encode()
+
+    best = await glob.db.fetchrow(f'SELECT {table}.* FROM {table} WHERE md5 = $1 AND mode = $2 AND uid = $3 AND status = 2 ORDER BY {table}.{sort} DESC LIMIT 1', md5, int(args['m']), player.id)
+    if best:
+        b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {table} WHERE md5 = $1 AND mode = $2 AND status = 2 AND {table}.{sort} > $3', md5, int(args['m']), best[sort])
+        rank = b_rank['rank'] + 1
+
+        resp.append(f'{best["id"]}|{player.name}|{best[sort]}|{best["combo"]}|{best["50"]}|{best["100"]}|{best["300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
+
+    resp.extend([(f'{s["id"]}|{s["name"]}|{s[sort]}|{s["combo"]}|{s["50"]}|{s["100"]}|{s["300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"') for rank, s in enumerate(scores)])
+    
+    return '\n'.join(resp).encode()
