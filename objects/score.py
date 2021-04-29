@@ -84,7 +84,7 @@ class Score:
         else:
             self.mode_vn = self.mode
 
-        s.acc, s.pp, s.sr, s.rank, s.status = s.calc_info()
+        await s.calc_info()
 
         return s
 
@@ -149,6 +149,3 @@ class Score:
                 self.status = scoreStatuses.Submitted # not best submitted score
         else:
             self.status = scoreStatuses.Best # no previous scores on the map
-
-
-
