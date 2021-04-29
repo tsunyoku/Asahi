@@ -2,6 +2,7 @@ from quart import Blueprint, request, Response, send_file, g, redirect
 from cmyui import log, Ansi
 from collections import defaultdict
 from urllib.parse import unquote
+from pathlib import Path
 
 import string
 import random
@@ -11,16 +12,22 @@ import bcrypt
 import time
 import orjson
 import re
+import copy
 
 from objects import glob
 from objects.beatmap import Beatmap
+from objects.score import Score
 from constants.modes import lbModes
-from constants.statuses import mapStatuses
+from constants.statuses import mapStatuses, scoreStatuses
 from constants.mods import Mods
 
 import packets
 
 ss_path = os.path.join(os.getcwd(), 'resources/screenshots')
+vn_path = Path.cwd() / 'resources/replays'
+rx_path = Path.cwd() / 'resources/replays_rx'
+ap_path = Path.cwd() / 'resources/replays_ap'
+
 web = Blueprint('web', __name__)
 
 def auth(name, md5):
@@ -174,7 +181,7 @@ async def ingameRegistration():
         await glob.db.execute("INSERT INTO users (name, email, pw, safe_name) VALUES ($1, $2, $3, $4)", name, email, bc, name.lower().replace(' ', '_'))
         uid = await glob.db.fetchval("SELECT id FROM users WHERE name = $1", name)
         await glob.db.execute('INSERT INTO stats (id) VALUES ($1)', uid)
-        log(f'{name} successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}.ms', Ansi.LBLUE)
+        log(f'{name} successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}ms', Ansi.LBLUE)
 
     return b'ok'
 
@@ -194,7 +201,6 @@ async def osuUpdates():
 
     return ret
 
-# oo map info this is starting to get good
 @web.route("/web/osu-getbeatmapinfo.php")
 async def osuMapInfo():
     args = request.args
@@ -262,7 +268,7 @@ async def getMapScores():
         table = 'scores'
         sort = 'score'
 
-    scores = await glob.db.fetch(f'SELECT {table}.*, users.name FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.status = 2 AND mode = $2 AND users.priv & 1 ORDER BY {table}.{sort} DESC LIMIT 100', md5, int(args['m']))
+    scores = await glob.db.fetch(f'SELECT {table}.*, users.name FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.status = 2 AND mode = $2 AND users.priv & 1 > 0 ORDER BY {table}.{sort} DESC LIMIT 100', md5, int(args['m']))
 
     resp = []
 
@@ -273,7 +279,7 @@ async def getMapScores():
 
     best = await glob.db.fetchrow(f'SELECT {table}.* FROM {table} WHERE md5 = $1 AND mode = $2 AND uid = $3 AND status = 2 ORDER BY {table}.{sort} DESC LIMIT 1', md5, int(args['m']), player.id)
     if best:
-        b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 AND {table}.{sort} > $3', md5, int(args['m']), best[sort])
+        b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 AND {table}.{sort} > $3', md5, int(args['m']), best[sort])
         rank = b_rank['rank'] + 1
 
         resp.append(f'{best["id"]}|{player.name}|{best[sort]}|{best["combo"]}|{best["50"]}|{best["100"]}|{best["300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
@@ -281,3 +287,133 @@ async def getMapScores():
     resp.extend([(f'{s["id"]}|{s["name"]}|{s[sort]}|{s["combo"]}|{s["50"]}|{s["100"]}|{s["300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"') for rank, s in enumerate(scores)])
     
     return '\n'.join(resp).encode()
+
+# POGGG
+@web.route("/web/osu-submit-modular-selector.php", methods=['POST'])
+async def scoreSubmit():
+    mpargs = await request.form
+
+    s = await Score.submission(mpargs['score'], mpargs['iv'], mpargs['pass'], mpargs['osuver'])
+
+    if not s:
+        return b'error: no'
+    elif not s.user:
+        return # player not online, make client make resubmit attempts
+    elif not s.map:
+        return b'error: no' # map unsubmitted
+    elif s.map.status == mapStatuses.Pending:
+        return b'error: no' # i will handle this like bancho soon enough
+
+    if s.mode != s.user.mode or s.mods != s.user.mods:
+        s.user.mode = s.mode.value
+        s.user.mods = s.mods
+        for o in glob.players.values():
+            o.enqueue(packets.userStats(s.user))
+
+    if s.mods & Mods.RELAX:
+        table = 'scores_rx'
+    elif s.mods & Mods.AUTOPILOT:
+        table = 'scores_ap'
+    else:
+        table = 'scores'
+
+    # submit score and get id xd
+    await glob.db.execute(f'INSERT INTO {table} (md5, score, acc, pp, combo, mods, 300, geki, 100, katu, 50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)', s.map.md5, s.score, s.acc, s.pp, s.combo, s.mods, s.n300, s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status, s.mode, s.time, s.uid, s.readable_mods, s.fc)
+    s.id = await glob.db.fetchval(f'SELECT id FROM {table} WHERE md5 = $1 AND uid = $2 AND time = $3', s.map.md5, s.user.id, s.time)
+    
+    if s.status == scoreStatuses.Best:
+        # set any other best scores to submitted ones as they've been overwritten
+        await glob.db.execute(f'UPDATE {table} SET status = 1 WHERE status = 2 AND uid = $1 AND md5 = $2 AND mode = $3', s.user.id, s.map.md5, s.mode_vn)
+
+    # save replay if not a failed score
+    if s.status != scoreStatuses.Failed:
+        replay = await request.files.get('score')
+
+        # i will make this auto-parse the replays one day when im not lazy
+        if s.mods & Mods.RELAX:
+            f = rx_path / f'{s.id}.osr'
+        elif s.mods & Mods.AUTOPILOT:
+            f = ap_path / f'{s.id}.osr'
+        else:
+            f = vn_path / f'{s.id}.osr'
+
+        f.write_bytes(replay)
+
+    # update stats EEEEEEE
+    stats = s.user.current_stats
+    old = copy.copy(stats) # we need a copy of the old stats for submission chart
+
+    stats.pc += 1
+
+    if s.status == scoreStatuses.Best:
+        stats.rscore += s.score
+
+    await s.user.update_stats(s.mode, table)
+
+    # sub charts bruh
+    if s.mods & Mods.RELAX or s.mods & Mods.AUTOPILOT or s.status == scoreStatuses.failed:
+        log(f'[{s.mode}] {s.user.name} submitted a score on {s.map.name} ({s.status})', Ansi.LBLUE)
+        return b'error: no' # not actually erroring, score is already submitted we just want client to stop request as we cannot provide chart
+
+    charts = []
+
+    # could be done better
+    def chart_format(name, b, a):
+        return f'{name}Before:{b or ""}|{name}After:{a}' # osu makes this so ugly man.
+
+    # map info
+    charts.append(
+        f'beatmapId:{s.map.id}|'
+        f'beatmapSetId:{s.map.sid}|'
+        # temp hardcode these values below because yea xd
+        'beatmapPlaycount:0|'
+        'beatmapPasscount:0|'
+        'approvedDate:0'
+    )
+
+    # map-specific ranking
+    charts.append('|'.join((
+        'chartId:beatmap',
+        f'chartUrl:https://osu.ppy.sh/b/{s.map.id}',
+        'chartName:Beatmap Ranking', # not sure if this is allowed to be customised ??
+
+        *(( # wtaf | no previous stats for now
+            chart_format('rank', None, s.rank),
+            chart_format('rankedScore', None, s.score),
+            chart_format('totalScore', None, s.score),
+            chart_format('maxCombo', None, s.combo),
+            chart_format('accuracy', None, round(s.acc, 2)),
+            chart_format('pp', None, s.pp)
+        )),
+
+        f'onlineScoreId:{s.id}'
+    )))
+
+    # overall user stats
+    charts.append('|'.join((
+        'chartId:overall',
+        f'chartUrl:https://{glob.config.domain}/u/{s.user.id}',
+        'chartName:Overall Ranking',
+
+        *((
+            chart_format('rank', old.rank, stats.rank),
+            chart_format('rankedScore', old.rscore, stats.rscore),
+            chart_format('totalScore', old.tscore, stats.tscore),
+            chart_format('maxCombo', None, None), # no max combo shit yet
+            chart_format('accuracy', round(old.acc, 2), round(stats.acc, 2)),
+            chart_format('pp', old.pp, stats.pp)
+        ) if old else (
+            chart_format('rank', None, stats.rank),
+            chart_format('rankedScore', None, stats.rscore),
+            chart_format('totalScore', None, stats.tscore),
+            chart_format('maxCombo', None, None), # no max combo shit yet
+            chart_format('accuracy', None, round(stats.acc, 2)),
+            chart_format('pp', None, stats.pp)
+        ))
+    )))
+
+    log(f'[{s.mode}] {s.user.name} submitted a score on {s.map.name} ({s.status})', Ansi.LBLUE)
+    return '\n'.join(charts).encode() # thank u osu
+
+
+        

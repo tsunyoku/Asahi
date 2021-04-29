@@ -33,3 +33,24 @@ class Mods(IntFlag):
     KEY2        = 1 << 28
     SCOREV2     = 1 << 29
     MIRROR      = 1 << 30
+
+def convert(m: int):
+    if not m:
+        return 'NM'
+
+    r = []
+
+    if m & Mods.NOFAIL:      r.append('NF')
+    if m & Mods.EASY:        r.append('EZ')
+    if m & Mods.HIDDEN:      r.append('HD')
+    if m & Mods.NIGHTCORE:   r.append('NC')
+    elif m & Mods.DOUBLETIME:  r.append('DT')
+    if m & Mods.HARDROCK:    r.append('HR')
+    if m & Mods.HALFTIME:    r.append('HT')
+    if m & Mods.FLASHLIGHT:  r.append('FL')
+    if m & Mods.SPUNOUT:     r.append('SO')
+    if m & Mods.RELAX:       r.append('RX')
+    if m & Mods.AUTOPILOT:       r.append('AP')
+    if m & Mods.TOUCHSCREEN: r.append('TD')
+    if m & Mods.SCOREV2:     r.append('V2')
+    return ''.join(r)
