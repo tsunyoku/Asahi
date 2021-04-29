@@ -282,9 +282,9 @@ async def getMapScores():
         b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 AND {table}.{sort} > $3', md5, int(args['m']), best[sort])
         rank = b_rank['rank'] + 1
 
-        resp.append(f'{best["id"]}|{player.name}|{best[sort]}|{best["combo"]}|{best["50"]}|{best["100"]}|{best["300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
+        resp.append(f'{best["id"]}|{player.name}|{best[sort]}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
 
-    resp.extend([(f'{s["id"]}|{s["name"]}|{s[sort]}|{s["combo"]}|{s["50"]}|{s["100"]}|{s["300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"') for rank, s in enumerate(scores)])
+    resp.extend([(f'{s["id"]}|{s["name"]}|{s[sort]}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"') for rank, s in enumerate(scores)])
     
     return '\n'.join(resp).encode()
 
@@ -298,7 +298,7 @@ async def scoreSubmit():
     if not s:
         return b'error: no'
     elif not s.user:
-        return # player not online, make client make resubmit attempts
+        return b'' # player not online, make client make resubmit attempts
     elif not s.map:
         return b'error: no' # map unsubmitted
     elif s.map.status == mapStatuses.Pending:
@@ -318,16 +318,17 @@ async def scoreSubmit():
         table = 'scores'
 
     # submit score and get id xd
-    await glob.db.execute(f'INSERT INTO {table} (md5, score, acc, pp, combo, mods, 300, geki, 100, katu, 50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)', s.map.md5, s.score, s.acc, s.pp, s.combo, s.mods, s.n300, s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status, s.mode, s.time, s.uid, s.readable_mods, s.fc)
+    await glob.db.execute(f'INSERT INTO {table} (md5, score, acc, pp, combo, mods, n300, geki, n100, katu, n50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)', s.map.md5, s.score, s.acc, s.pp, s.combo, s.mods, s.n300, s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status.value, s.mode_vn, s.time, s.user.id, s.readable_mods, s.fc)
     s.id = await glob.db.fetchval(f'SELECT id FROM {table} WHERE md5 = $1 AND uid = $2 AND time = $3', s.map.md5, s.user.id, s.time)
     
     if s.status == scoreStatuses.Best:
         # set any other best scores to submitted ones as they've been overwritten
-        await glob.db.execute(f'UPDATE {table} SET status = 1 WHERE status = 2 AND uid = $1 AND md5 = $2 AND mode = $3', s.user.id, s.map.md5, s.mode_vn)
+        await glob.db.execute(f'UPDATE {table} SET status = 1 WHERE status = 2 AND uid = $1 AND md5 = $2 AND mode = $3 AND id != $4', s.user.id, s.map.md5, s.mode_vn, s.id)
 
     # save replay if not a failed score
     if s.status != scoreStatuses.Failed:
-        replay = await request.files.get('score')
+        files = await request.files
+        replay = files.get('score')
 
         # i will make this auto-parse the replays one day when im not lazy
         if s.mods & Mods.RELAX:
@@ -337,7 +338,7 @@ async def scoreSubmit():
         else:
             f = vn_path / f'{s.id}.osr'
 
-        f.write_bytes(replay)
+        replay.save(str(f))
 
     # update stats EEEEEEE
     stats = s.user.current_stats
@@ -346,13 +347,18 @@ async def scoreSubmit():
     stats.pc += 1
 
     if s.status == scoreStatuses.Best:
-        stats.rscore += s.score
+        add = s.score
+
+        if s.old_best:
+            add -= s.old_best.score
+        
+        stats.rscore += add
 
     await s.user.update_stats(s.mode, table)
 
     # sub charts bruh
-    if s.mods & Mods.RELAX or s.mods & Mods.AUTOPILOT or s.status == scoreStatuses.failed:
-        log(f'[{s.mode}] {s.user.name} submitted a score on {s.map.name} ({s.status})', Ansi.LBLUE)
+    if s.mods & Mods.RELAX or s.mods & Mods.AUTOPILOT or s.status == scoreStatuses.Failed:
+        log(f'[{s.mode.name}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
         return b'error: no' # not actually erroring, score is already submitted we just want client to stop request as we cannot provide chart
 
     charts = []
@@ -378,6 +384,13 @@ async def scoreSubmit():
         'chartName:Beatmap Ranking', # not sure if this is allowed to be customised ??
 
         *(( # wtaf | no previous stats for now
+            chart_format('rank', s.old_best.rank, s.rank),
+            chart_format('rankedScore', s.old_best.score, s.score),
+            chart_format('totalScore', s.old_best.score, s.score),
+            chart_format('maxCombo', s.old_best.combo, s.combo),
+            chart_format('accuracy', round(s.old_best.acc, 2), round(s.acc, 2)),
+            chart_format('pp', s.old_best.pp, s.pp)
+        ) if s.old_best else (
             chart_format('rank', None, s.rank),
             chart_format('rankedScore', None, s.score),
             chart_format('totalScore', None, s.score),
@@ -412,7 +425,7 @@ async def scoreSubmit():
         ))
     )))
 
-    log(f'[{s.mode}] {s.user.name} submitted a score on {s.map.name} ({s.status})', Ansi.LBLUE)
+    log(f'[{s.mode.name}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
     return '\n'.join(charts).encode() # thank u osu
 
 

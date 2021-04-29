@@ -84,9 +84,9 @@ class Player:
 
         await glob.db.execute('UPDATE stats SET rscore_{0} = $1, acc_{0} = $2, pc_{0} = $3, tscore_{0} = $4, pp_{0} = $5 WHERE id = $6'.format(mode.name), stats.rscore, stats.acc, stats.pc, stats.tscore, stats.pp, self.id)
 
-        rank = await glob.db.fetchval('SELECT COUNT(*) AS r FROM stats LEFT OUTER JOIN users ON u.id = stats.id WHERE stats.pp_{0} > $1 AND users.priv & 1 > 0'.format(mode.name), stats.pp)
-        stats.rank = rank
-        await glob.db.execute('UPDATE stats SET rank_{0} = $1 WHERE id = $2'.format(mode.name), rank, self.id)
+        rank = await glob.db.fetchrow('SELECT COUNT(*) AS r FROM stats LEFT OUTER JOIN users ON users.id = stats.id WHERE stats.pp_{0} > $1 AND users.priv & 1 > 0'.format(mode.name), stats.pp)
+        stats.rank = rank['r'] + 1
+        await glob.db.execute('UPDATE stats SET rank_{0} = $1 WHERE id = $2'.format(mode.name), stats.rank, self.id)
 
         self.enqueue(packets.userStats(self))
         for o in glob.players.values():
