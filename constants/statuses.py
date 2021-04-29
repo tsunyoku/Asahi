@@ -1,4 +1,4 @@
-from enum import IntEnum
+from enum import IntEnum, Enum
 
 class mapStatuses(IntEnum):
     NotSubmitted = -1
@@ -22,3 +22,8 @@ def apiStatuses(status: int):
         ns = 5
 
     return ns
+
+class scoreStatuses(Enum):
+    Failed = 0
+    Submitted = 1
+    Best = 2
