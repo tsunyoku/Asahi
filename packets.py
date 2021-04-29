@@ -505,7 +505,7 @@ def userStats(player) -> bytes:
         (player.mode_vn, osuTypes.u8), # game mode
         (player.map_id, osuTypes.i32), # map id
         (player.current_stats.rscore, osuTypes.i64), # ranked score
-        (player.current_stats.acc, osuTypes.f32), # accuracy
+        (player.current_stats.acc / 100.0, osuTypes.f32), # accuracy
         (player.current_stats.pc, osuTypes.i32), # playcount
         (player.current_stats.tscore, osuTypes.i64), # total score
         (player.current_stats.rank, osuTypes.i32), # rank

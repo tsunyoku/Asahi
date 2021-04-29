@@ -4,10 +4,11 @@ from constants.mods import Mods, convert
 from constants.modes import osuModes, lbModes
 from constants.statuses import scoreStatuses
 from constants.grades import Grade
-from objects import glob
+from objects import glob, pp
 
 from base64 import b64decode
 from py3rijndael import RijndaelCbc, ZeroPadding
+from pathlib import Path
 
 import time
 
@@ -38,6 +39,55 @@ class Score:
         self.status: scoreStatuses = None
         self.time: int = None
 
+        self.old_best: Score = None
+
+    @classmethod
+    async def sql(self, sid: int, table: str, sort: str, t: int):
+        score = await glob.db.fetchrow(f'SELECT * FROM {table} WHERE id = $1', sid)
+
+        if not score:
+            return
+        
+        s = self()
+
+        s.id = sid
+
+        if not Beatmap.md5_cache(score['md5']): # it should have the map in cache already for global lbs, but if not we can just grab from sql
+            s.map = await Beatmap.md5_sql(score['md5'])
+        else:
+            s.map = Beatmap.md5_cache(score['md5'])
+
+        s.user = glob.players_id[score['uid']]
+
+        if not s.user:
+            return s # even if user isnt found, may be related to connection and we want to tell the client to retry
+
+        if not s.map:
+            return # ??
+
+        s.pp = score['pp']
+        s.score = score['score']
+        s.combo = score['combo']
+        s.mods = Mods(score['mods'])
+        s.acc = score['acc']
+        s.n300 = score['n300']
+        s.n100 = score['n100']
+        s.n50 = score['n50']
+        s.miss = score['miss']
+        s.geki = score['geki']
+        s.katu = score['katu']
+        s.grade = score['grade']
+        s.fc = score['fc']
+        s.status = scoreStatuses(score['status'])
+        s.mode_vn = score['mode']
+        s.mode = lbModes(s.mode_vn, s.mods)
+
+        s.time = score['time']
+        s.passed = s.status.value != 0
+        s.rank = await s.calc_lb(table, sort, t)
+
+        return s
+
     @classmethod
     async def submission(self, base: str, iv: str, pw: str, ver: str):
         iv = b64decode(iv).decode('latin_1')
@@ -66,16 +116,16 @@ class Score:
             return # ??
 
         # i wanted to make everything be set in the same order as init but some require all score info to exist first so sadly not :c
-        s.score = data[9]
-        s.n300 = data[3]
-        s.n100 = data[4]
-        s.n50 = data[5]
-        s.miss = data[8]
-        s.geki = data[6]
-        s.katu = data[7]
+        s.score = int(data[9])
+        s.n300 = int(data[3])
+        s.n100 = int(data[4])
+        s.n50 = int(data[5])
+        s.miss = int(data[8])
+        s.geki = int(data[6])
+        s.katu = int(data[7])
         s.mods = Mods(int(data[13]))
         s.readable_mods = convert(int(data[13]))
-        s.combo = data[10]
+        s.combo = int(data[10])
         s.mode = lbModes(int(data[15]), s.mods)
 
         s.fc = data[11] == 'True' # WHY IS OSU GIVING STRING FOR BOOL!!!!!!
@@ -85,15 +135,48 @@ class Score:
         s.grade = data[12] if s.passed else 'F'
 
         if s.mods & Mods.RELAX:
-            s.mode_vn = s.mode - 4
+            s.mode_vn = s.mode.value - 4
         elif s.mods & Mods.AUTOPILOT:
             s.mode_vn = 0
         else:
-            s.mode_vn = s.mode
+            s.mode_vn = s.mode.value
 
+        s.pp, s.sr = await s.calc_pp()
         await s.calc_info()
 
         return s
+
+    async def calc_lb(self, table, sort, value):
+        # we will force score sort regardless of rx/ap for now until we have pp calc
+        lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.mode = $2 AND {table}.status = 2 AND users.priv & 1 > 0 AND {table}.{sort} > $3', self.map.md5, self.mode.value, value)
+        self.rank = lb['r'] + 1 if lb else 1
+
+    async def calc_pp(self):
+        if self.mode_vn == 0:
+            p = pp.parser()
+            bmap = pp.beatmap()
+            stars = pp.diff_calc()
+
+            path = Path.cwd() / f'resources/maps/{self.map.id}.osu'
+            if not path.exists():
+                url = f'https://old.ppy.sh/osu/{self.map.id}'
+
+                async with glob.web.get(url) as resp:
+                    if not resp or resp.status != 200:
+                        return 0.0, 0.0
+
+                    m = await resp.read()
+                    path.write_bytes(m)
+
+            with open(path, 'r') as f:
+                p.map(f, bmap=bmap)
+
+            stars.calc(bmap, self.mods)
+            ppv, _, _, _, _ = pp.ppv2(stars.aim, stars.speed, bmap=bmap, mods=self.mods, n300=self.n300, n100=self.n100, n50=self.n50, nmiss=self.miss, combo=self.combo)
+
+            return ppv, stars.total
+        else:
+            return 0.0, 0.0
 
     async def calc_info(self):
         mode = self.mode_vn
@@ -127,32 +210,33 @@ class Score:
             else:
                 self.acc = 100.0 * ((self.n50 * 50.0) + (self.n100 * 100.0) + (self.katu * 200.0) + ((self.n300 + self.geki) * 300.0)) / (hits * 300.0)
 
-        self.pp = 0 # until we have calculator xd
-        self.sr = 0.0 # same reason xd
-
         if self.mods & Mods.RELAX:
             table = 'scores_rx'
             sort = 'pp'
+            t = self.pp
         elif self.mods & Mods.AUTOPILOT:
             table = 'scores_ap'
             sort = 'pp'
+            t = self.pp
         else:
             table = 'scores'
             sort = 'score'
+            t = self.score
 
-        # we will force score sort regardless of rx/ap for now until we have pp calc
-        lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.mode = $2 AND {table}.status = 2 AND users.priv & 1 AND {table}.score > $3', self.map.md5, mode, self.score)
-        self.rank = lb['c'] + 1 if lb else 1
+        lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.mode = $2 AND {table}.status = 2 AND users.priv & 1 > 0 AND {table}.{sort} > $3', self.map.md5, mode, t)
+        self.rank = lb['r'] + 1 if lb else 1
 
-        if not self.passed:
-            self.status = scoreStatuses.Failed
-
-        score = await glob.db.fetchrow(f'SELECT id, score FROM {table} WHERE uid = $1 AND md5 = $2 AND mode = $3 AND status = 2', self.user.id, self.map.md5, mode)
+        score = await glob.db.fetchrow(f'SELECT id, pp FROM {table} WHERE uid = $1 AND md5 = $2 AND mode = $3 AND status = 2', self.user.id, self.map.md5, mode)
         if score: # they already have a (best) submitted score
-            if self.score > score['score']: # once again score-based overwrite til i add working pp system
+            self.old_best = await Score.sql(score['id'], table, sort, t)
+
+            if self.pp > score['pp']:
                 self.status = scoreStatuses.Best
-                await glob.db.execute(f'UPDATE {table} SET status = $1 WHERE id = $2', scoreStatuses.Submitted.value, score['id'])
+                self.old_best.status = scoreStatuses.Submitted
             else:
                 self.status = scoreStatuses.Submitted # not best submitted score
         else:
             self.status = scoreStatuses.Best # no previous scores on the map
+        
+        if not self.passed:
+            self.status = scoreStatuses.Failed

@@ -15,7 +15,7 @@ from constants.countries import country_codes
 
 app = Quart(__name__) # handler for webserver :D
 app.config['SERVER_NAME'] = glob.config.domain
-glob.version = Version(0, 1, 6) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 1, 7) # set Asahi version, mainly for future updater but also for tracking
 
 CACHE_PATH = Path.cwd() / 'resources/cache'
 BCRYPT_CACHE_FILE = CACHE_PATH / 'bcrypt.p'
@@ -23,6 +23,12 @@ GEOLOC_CACHE_FILE = CACHE_PATH / 'geoloc.p'
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
+
+R_PATH = Path.cwd() / 'resources/replays'
+RRX_PATH = Path.cwd() / 'resources/replays_rx'
+RAP_PATH = Path.cwd() / 'resources/replays_ap'
+
+MAPS_PATH = Path.cwd() / 'resources/maps'
 
 @app.before_serving
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
@@ -43,6 +49,18 @@ async def connect(): # ran before server startup, used to do things like connect
 
     if not SS_PATH.exists():
         SS_PATH.mkdir(parents=True)
+
+    if not R_PATH.exists():
+        R_PATH.mkdir(parents=True)
+
+    if not RRX_PATH.exists():
+        RRX_PATH.mkdir(parents=True)
+    
+    if not RAP_PATH.exists():
+        RAP_PATH.mkdir(parents=True)
+
+    if not MAPS_PATH.exists():
+        MAPS_PATH.mkdir(parents=True)
 
     # this is my most cursed creation | speed gains but im going to hell for this
     if not CACHE_PATH.exists():
