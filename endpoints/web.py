@@ -262,7 +262,7 @@ async def getMapScores():
         table = 'scores'
         sort = 'score'
 
-    scores = await glob.db.fetch(f'SELECT {table}.*, users.name FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.status = 2 AND mode = $2 ORDER BY {table}.{sort} DESC LIMIT 100', md5, int(args['m']))
+    scores = await glob.db.fetch(f'SELECT {table}.*, users.name FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.status = 2 AND mode = $2 AND users.priv & 1 ORDER BY {table}.{sort} DESC LIMIT 100', md5, int(args['m']))
 
     resp = []
 
@@ -273,7 +273,7 @@ async def getMapScores():
 
     best = await glob.db.fetchrow(f'SELECT {table}.* FROM {table} WHERE md5 = $1 AND mode = $2 AND uid = $3 AND status = 2 ORDER BY {table}.{sort} DESC LIMIT 1', md5, int(args['m']), player.id)
     if best:
-        b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {table} WHERE md5 = $1 AND mode = $2 AND status = 2 AND {table}.{sort} > $3', md5, int(args['m']), best[sort])
+        b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 AND {table}.{sort} > $3', md5, int(args['m']), best[sort])
         rank = b_rank['rank'] + 1
 
         resp.append(f'{best["id"]}|{player.name}|{best[sort]}|{best["combo"]}|{best["50"]}|{best["100"]}|{best["300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
