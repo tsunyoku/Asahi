@@ -20,6 +20,7 @@ glob.version = Version(0, 1, 7) # set Asahi version, mainly for future updater b
 CACHE_PATH = Path.cwd() / 'resources/cache'
 BCRYPT_CACHE_FILE = CACHE_PATH / 'bcrypt.p'
 GEOLOC_CACHE_FILE = CACHE_PATH / 'geoloc.p'
+MAPS_CACHE_FILE = CACHE_PATH / 'maps.p'
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
@@ -80,6 +81,13 @@ async def connect(): # ran before server startup, used to do things like connect
                 except EOFError:
                     pass
 
+        if MAPS_CACHE_FILE.exists():
+            with open(MAPS_CACHE_FILE, 'rb') as f:
+                try:
+                    glob.cache['maps'] |= dict(pickle.load(f))
+                except EOFError:
+                    pass
+
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetchrow('SELECT name, pw, country, name FROM users WHERE id = 1')
     bot = Player(id=1, name=botinfo['name'], offset=1, country_iso=botinfo['country'], country=country_codes[botinfo['country'].upper()])
@@ -130,6 +138,17 @@ async def disconnect():
 
     with open(GEOLOC_CACHE_FILE, 'wb') as file:
         pickle.dump(new_geoloc, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    new_maps = glob.cache['maps']
+    if MAPS_CACHE_FILE.exists():
+        try:
+            with open(MAPS_CACHE_FILE, 'rb') as file:
+                new_maps |= dict(pickle.load(file))
+        except EOFError:
+            pass
+
+    with open(MAPS_CACHE_FILE, 'wb') as file:
+        pickle.dump(new_maps, file, protocol=pickle.HIGHEST_PROTOCOL)
 
     await glob.web.close()
     if glob.config.debug:
