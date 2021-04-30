@@ -6,8 +6,6 @@ from aiohttp import ClientSession
 import pyfiglet
 import pickle
 import asyncpg
-import asyncio
-import uvloop
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
