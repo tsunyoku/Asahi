@@ -255,8 +255,12 @@ async def getMapScores():
                 glob.cache['unsub'].append(md5)
                 return b'-1|false' # bmap or other version of bmap cannot be found, must be unsubmitted
 
+    if not bmap.frozen:
+        await bmap.check_status()
+
     if bmap.status < mapStatuses.Ranked:
         return f'{bmap.status}|false'.encode() # map is unranked, unsubmitted etc. then we return status with no scores or anything
+
 
     if mods & Mods.RELAX:
         table = 'scores_rx'
@@ -282,9 +286,9 @@ async def getMapScores():
         b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 AND {table}.{sort} > $3', md5, int(args['m']), best[sort])
         rank = b_rank['rank'] + 1
 
-        resp.append(f'{best["id"]}|{player.name}|{best[sort]}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
+        resp.append(f'{best["id"]}|{player.name}|{int(best[sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
 
-    resp.extend([(f'{s["id"]}|{s["name"]}|{s[sort]}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"') for rank, s in enumerate(scores)])
+    resp.extend([(f'{s["id"]}|{s["name"]}|{int(s[sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"') for rank, s in enumerate(scores)])
     
     return '\n'.join(resp).encode()
 
