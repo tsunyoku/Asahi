@@ -261,7 +261,6 @@ async def getMapScores():
     if bmap.status < mapStatuses.Ranked:
         return f'{bmap.status}|false'.encode() # map is unranked, unsubmitted etc. then we return status with no scores or anything
 
-
     if mods & Mods.RELAX:
         table = 'scores_rx'
         sort = 'pp'

@@ -6,6 +6,8 @@ from aiohttp import ClientSession
 import pyfiglet
 import pickle
 import asyncpg
+import asyncio
+import uvloop
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
@@ -149,3 +151,4 @@ app.register_blueprint(bancho, subdomain='ce')
 app.register_blueprint(bancho, subdomain='c4')
 app.register_blueprint(avatars, subdomain='a')
 app.register_blueprint(web, subdomain='osu')
+
