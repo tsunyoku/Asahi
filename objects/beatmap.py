@@ -47,7 +47,10 @@ class Beatmap:
         if not bmap:
             return
 
-        return self(**bmap)
+        m = self(**bmap)
+        glob.cache['maps'][bmap['md5']] = m
+
+        return m
 
     @classmethod
     async def md5_api(self, md5: str):
@@ -127,6 +130,7 @@ class Beatmap:
 
         for m in data:
             mid = int(m['beatmap_id'])
+            m['last_update'] = dt.strptime(m['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
             if mid in exist:
                 if m['last_update'] > exist[mid]['update']:
                     status = apiStatuses(int(m['approved']))
@@ -163,7 +167,7 @@ class Beatmap:
 
             b.status = m['approved']
             b.frozen = m['frozen']
-            b.update = dt.strptime(m['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
+            b.update = m['last_update']
 
             glob.cache['maps'][b.md5] = b
 
