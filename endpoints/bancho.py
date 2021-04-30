@@ -13,8 +13,9 @@ from objects.player import Player # Player - player object to store stats, info 
 from constants.countries import country_codes
 from constants.types import osuTypes
 from constants.privs import Privileges, ClientPrivileges
-from constants.mods import Mods
+from constants.mods import Mods, convert
 from constants import commands
+
 import packets
 from packets import BanchoPacketReader, BanchoPacket, Packets
 
@@ -196,6 +197,9 @@ class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
 
         user.mode = self.mode
         user.map_id = self.mid
+
+        if self.actionid == 2:
+            user.info = f'{self.info} +{convert(self.mods)}'
 
         for o in glob.players.values():
             o.enqueue(packets.userStats(user))

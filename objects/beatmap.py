@@ -5,6 +5,7 @@ from objects import glob
 from cmyui import log, Ansi
 
 import time
+from datetime import datetime as dt
 
 class Beatmap:
     def __init__(self, **minfo):
@@ -26,6 +27,8 @@ class Beatmap:
         self.mapper = minfo.get('mapper', '')
 
         self.status = mapStatuses(minfo.get('status', 0))
+        self.frozen = minfo.get('frozen', 'False') == 1
+        self.update = minfo.get('update', 0)
 
     @property
     def name(self):
@@ -62,8 +65,8 @@ class Beatmap:
             bmap = data[0] # i hate this idea but o well
         
         b = self()
-        b.id = int(bmap['beatbmap_id'])
-        b.sid = int(bmap['beatbmapset_id'])
+        b.id = int(bmap['beatmap_id'])
+        b.sid = int(bmap['beatmapset_id'])
         b.md5 = md5
 
         b.bpm = float(bmap['bpm'])
@@ -80,9 +83,21 @@ class Beatmap:
         b.bmapper = bmap['creator']
 
         b.status = int(apiStatuses(int(bmap['approved'])))
+        b.update = dt.strptime(bmap['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
 
-        await b.save()
-        log(b.status)
+        e = await glob.db.fetchrow('SELECT frozen, status, update FROM maps WHERE id = $1', b.id)
+
+        if e:
+            if b.update > e['update']:
+                if e['frozen'] and b.status != e['status']:
+                    b.status = e['status']
+                    b.frozen = e['frozen'] == 1
+
+                await b.save()
+            else:
+                pass
+        else:
+            await b.save()
 
         log(f'Retrieved Set ID {b.sid} from osu!api', Ansi.LCYAN)
         return b
@@ -100,19 +115,33 @@ class Beatmap:
             if not data:
                 return
 
-        bmap = await glob.db.fetch('SELECT id, status FROM maps WHERE sid = $1', sid)
+        bmap = await glob.db.fetchrow('SELECT id, status, frozen, update FROM maps WHERE sid = $1', sid)
 
-        exist = {m['id']: {v: m[v] for v in set(m) - {'id'}} for m in bmap}
+        exist = {}
+        try:
+            exist[bmap['id']] = {}
+            for k, v in bmap.items():
+                exist[bmap['id']][k] = v
+        except (AttributeError, TypeError): # incase map aint in db, we dont wanna stop it from loading
+            pass
 
         for m in data:
             mid = int(m['beatmap_id'])
             if mid in exist:
-                status = apiStatuses(int(m['approved']))
+                if m['last_update'] > exist[mid]['update']:
+                    status = apiStatuses(int(m['approved']))
 
-                if status != exist[mid]['status']:
-                    m['approved'] = status
+                    if exist[mid]['frozen'] and status != exist[mid]['status']:
+                        m['approved'] = exist[mid]['status']
+                        m['frozen'] = True
+                    else:
+                        m['approved'] = status
+                        m['frozen'] = False
+                else:
+                    continue
             else:
                 m['approved'] = apiStatuses(int(m['approved']))
+                m['frozen'] = False
 
             b = self()
             b.id = mid
@@ -133,12 +162,52 @@ class Beatmap:
             b.mper = m['creator']
 
             b.status = m['approved']
+            b.frozen = m['frozen']
+            b.update = dt.strptime(m['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
 
             glob.cache['maps'][b.md5] = b
 
             await b.save()
 
-        log(f'Retrieved Set ID {b.sid} from osu!api', Ansi.LCYAN)
+        log(f'Cached Set ID {b.sid} from osu!api', Ansi.LCYAN)
+
+    async def check_status(self):
+        api = 'https://old.ppy.sh/api/get_beatmaps'
+        params = {'k': glob.config.api_key, 's': self.sid}
+
+        async with glob.web.get(api, params=params) as resp:
+            if resp.status != 200 or not resp:
+                return # request failed, map prob doesnt exist
+            
+            data = await resp.json()
+            if not data:
+                return
+
+        bmap = await glob.db.fetchrow('SELECT id, status, frozen, update FROM maps WHERE id = $1', self.id)
+
+        exist = {}
+        try:
+            exist[bmap['id']] = {}
+            for k, v in bmap.items():
+                exist[bmap['id']][k] = v
+        except (AttributeError, TypeError):
+            pass
+
+        for m in data:
+            mid = int(m['beatmap_id'])
+            if mid in exist:
+                current = exist[mid]['status']
+                api = apiStatuses(int(m['approved']))
+
+                if current != api:
+                    md5 = m['file_md5']
+                
+                    if md5 == self.md5:
+                        self.status = api
+
+                        await glob.db.execute('UPDATE maps SET status = $1 WHERE md5 = $2', self.status, self.md5)
+                        if (cached := glob.cache['maps'].get(self.md5)):
+                            cached.status = self.status
 
     async def save(self):
-        await glob.db.execute('INSERT INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)', self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, self.artist, self.title, self.diff, self.mapper, self.status)
+        await glob.db.execute('INSERT INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, update) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)', self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update)
