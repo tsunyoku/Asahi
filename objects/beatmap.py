@@ -1,11 +1,13 @@
 from constants.modes import osuModes
 from constants.statuses import mapStatuses, apiStatuses
-from objects import glob
+from objects import glob, pp
 
 from cmyui import log, Ansi
+from pathlib import Path
 
 import time
 from datetime import datetime as dt
+from typing import Optional
 
 class Beatmap:
     def __init__(self, **minfo):
@@ -30,9 +32,33 @@ class Beatmap:
         self.frozen = minfo.get('frozen', 'False') == 1
         self.update = minfo.get('update', 0)
 
+        self.nc = minfo.get('nc', 0) # nc = next check (for status update)
+        self.pp_cache = minfo.get('pp_cache', {})
+
     @property
     def name(self):
         return f'{self.artist} - {self.title} [{self.diff}]'
+
+    @property
+    def url(self):
+        return f'https://osu.{glob.config.domain}/b/{self.id}'
+
+    @property
+    def embed(self):
+        return f'[{self.url} {self.name}]'
+
+    @classmethod
+    async def bid_fetch(self, bid: int):
+        for c in glob.cache['maps'].values():
+            if bid == c.id:
+                return c
+
+        bmap = await glob.db.fetchrow('SELECT * FROM maps WHERE id = $1', bid)
+        if not bmap:
+            return
+
+        m = self(**bmap)
+        return m
 
     @staticmethod
     def md5_cache(md5: str):
@@ -41,6 +67,51 @@ class Beatmap:
 
         return # not in cache, return nothing so we know to get from sql/api
 
+    @property
+    async def np_msg(self):
+        if not (n99 := self.pp_cache.get(99)):
+            n99 = await self.calc_acc(99)
+        if not (n98 := self.pp_cache.get(98)):
+            n98 = await self.calc_acc(98)
+        if not (n95 := self.pp_cache.get(95)):
+            n95 = await self.calc_acc(95)
+        if not (n100 := self.pp_cache.get(100)):
+            n100 = await self.calc_acc(100)
+
+        return f'{self.embed}  // 95%: {n95}pp | 98%: {n98}pp | 99%: {n99}pp | 100%: {n100}pp // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od}'
+
+    async def calc_acc(self, acc: float):
+        p = pp.parser()
+        bmap = pp.beatmap()
+        stars = pp.diff_calc()
+
+        path = Path.cwd() / f'resources/maps/{self.id}.osu'
+        if not path.exists():
+            url = f'https://old.ppy.sh/osu/{self.id}'
+
+            async with glob.web.get(url) as resp:
+                if not resp or resp.status != 200:
+                    ppv = 0
+                else:
+                    m = await resp.read()
+                    path.write_bytes(m)
+                    with open(path, 'r') as f:
+                        p.map(f, bmap=bmap)
+
+                    stars.calc(bmap, 0)
+                    ppv, _, _, _, _ = pp.ppv2(stars.aim, stars.speed, bmap=bmap, mods=0, acc=acc)
+        else:
+            with open(path, 'r') as f:
+                p.map(f, bmap=bmap)
+
+            stars.calc(bmap, 0)
+            ppv, _, _, _, _ = pp.ppv2(stars.aim, stars.speed, bmap=bmap, mods=0, acc=acc)
+
+        ppv = round(ppv)
+        self.pp_cache[acc] = ppv
+        await glob.db.execute('UPDATE maps SET pp_cache = $1 WHERE md5 = $2', str(self.pp_cache), self.md5)
+        return ppv
+
     @classmethod
     async def md5_sql(self, md5: str):
         bmap = await glob.db.fetchrow('SELECT * FROM maps WHERE md5 = $1', md5)
@@ -48,6 +119,11 @@ class Beatmap:
             return
 
         m = self(**bmap)
+        try:
+            m.pp_cache = dict(bmap['pp_cache'])
+        except ValueError:
+            m.pp_cache = {}
+
         glob.cache['maps'][bmap['md5']] = m
 
         return m
@@ -88,6 +164,7 @@ class Beatmap:
         b.status = int(apiStatuses(int(bmap['approved'])))
         b.update = dt.strptime(bmap['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
 
+        b.nc = time.time()
         e = await glob.db.fetchrow('SELECT frozen, status, update FROM maps WHERE id = $1', b.id)
 
         if e:
@@ -118,7 +195,7 @@ class Beatmap:
             if not data:
                 return
 
-        bmap = await glob.db.fetchrow('SELECT id, status, frozen, update FROM maps WHERE sid = $1', sid)
+        bmap = await glob.db.fetchrow('SELECT id, status, frozen, update, pp_cache FROM maps WHERE sid = $1', sid)
 
         exist = {}
         try:
@@ -132,6 +209,11 @@ class Beatmap:
             mid = int(m['beatmap_id'])
             m['last_update'] = dt.strptime(m['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
             if mid in exist:
+                try:
+                    m['pp_cache'] = dict(exist[mid]['pp_cache'])
+                except ValueError:
+                    m['pp_cache'] = {}
+
                 if m['last_update'] > exist[mid]['update']:
                     status = apiStatuses(int(m['approved']))
 
@@ -146,6 +228,7 @@ class Beatmap:
             else:
                 m['approved'] = apiStatuses(int(m['approved']))
                 m['frozen'] = False
+                m['pp_cache'] = {}
 
             b = self()
             b.id = mid
@@ -168,6 +251,9 @@ class Beatmap:
             b.status = m['approved']
             b.frozen = m['frozen']
             b.update = m['last_update']
+
+            b.nc = time.time()
+            b.pp_cache = m['pp_cache']
 
             glob.cache['maps'][b.md5] = b
 
@@ -209,9 +295,12 @@ class Beatmap:
                     if md5 == self.md5:
                         self.status = api
 
-                        await glob.db.execute('UPDATE maps SET status = $1 WHERE md5 = $2', self.status, self.md5)
+                        self.nc = time.time() + 3600
+
+                        await glob.db.execute('UPDATE maps SET status = $1, nc = $2 WHERE md5 = $3', self.status, self.nc, self.md5)
                         if (cached := glob.cache['maps'].get(self.md5)):
                             cached.status = self.status
+                            cached.nc = self.nc
 
     async def save(self):
-        await glob.db.execute('INSERT INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, update) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)', self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update)
+        await glob.db.execute('INSERT INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, update, nc, pp_cache) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)', self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc, str(self.pp_cache))

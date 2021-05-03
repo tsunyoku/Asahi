@@ -14,8 +14,11 @@ class Channel:
         self.perm = cinfo.get('perm', False)
         self.players: list = []
 
-    def send(self, f: 'Player', msg: str):
-        self.enqueue(packets.sendMessage(f.name, msg, self.name, f.id), f.id)
+    def send(self, f: 'Player', msg: str, send_self: bool):
+        if not send_self:
+            self.enqueue(packets.sendMessage(f.name, msg, self.name, f.id), f.id)
+        else:
+            self.enqueue(packets.sendMessage(f.name, msg, self.name, f.id))
 
     def add_player(self, user: 'Player'):
         self.players.append(user)
@@ -30,7 +33,7 @@ class Channel:
     def count(self):
         return len(self.players)
 
-    def enqueue(self, b: bytes, ignore: int):
+    def enqueue(self, b: bytes, ignore: int = 0):
         for o in glob.players.values():
             if o.id != ignore:
                 o.enqueue(b)

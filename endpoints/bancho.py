@@ -2,6 +2,7 @@
 from quart import Blueprint, Response, request, make_response # web server :blobcowboi:
 from cmyui import Ansi, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from geoip2 import database # for geoloc
+from re import compile
 import pyfiglet
 import bcrypt
 import uuid
@@ -10,6 +11,7 @@ import time
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
 from objects.player import Player # Player - player object to store stats, info etc.
+from objects.beatmap import Beatmap # Beatmap - object to score map info etc.
 from constants.countries import country_codes
 from constants.types import osuTypes
 from constants.privs import Privileges, ClientPrivileges
@@ -100,9 +102,22 @@ class sendPrivateMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
             return
 
         if target is glob.bot:
+
+            regex_domain = glob.config.domain.replace('.', r'\.')
+            npr = compile( # yikes
+                r"^\x01ACTION is (?:playing|editing|watching|listening to) "
+                rf"\[https://osu\.(?:{regex_domain}|ppy\.sh)/beatmapsets/(?P<sid>\d{{1,10}})#(?P<bid>\d{{1,10}}) .+\]" 
+                r"(?: <(?P<mode>Taiko|CatchTheBeat|osu!mania)>)?"
+                r"(?P<mods>(?: (?:-|\+|~|\|)\w+(?:~|\|)?)+)?\x01$"
+            )
+
             if msg.startswith('!'):
                 cmd = await commands.process(user, target, msg)
                 user.enqueue(packets.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
+            elif m := npr.match(msg):
+                user.np = await Beatmap.bid_fetch(int(m['bid']))
+                np = await user.np.np_msg
+                user.enqueue(packets.sendMessage(fromname = target.name, msg = np, tarname = user.name, fromid = target.id))
         else:
             target.enqueue(packets.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
             log(f'{user.name} sent message "{msg}" to {tarname}', Ansi.LCYAN)
@@ -123,14 +138,13 @@ class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
             else:
                 return
             c = glob.channels.get(f'#spec_{sid}')
-        elif chan != '#multiplayer': # no mp stuff yet
+        elif chan not in ['#multiplayer', '#highlight', '#userlog']: # no mp stuff yet
             c = glob.channels.get(chan)
 
         if not c:
-            log(f'{user.name} tried to send a message in non-existent channel {chan}', Ansi.LRED)
             return
 
-        c.send(user, msg)
+        c.send(user, msg, False)
 
 @packet
 class joinChannel(BanchoPacket, type=Packets.OSU_CHANNEL_JOIN):
@@ -140,7 +154,6 @@ class joinChannel(BanchoPacket, type=Packets.OSU_CHANNEL_JOIN):
         chan = glob.channels.get(self.name)
 
         if not chan:
-            log(f'{user.name} failed to join channel {self.name}', Ansi.LRED)
             return
 
         user.join_chan(chan)
@@ -153,13 +166,13 @@ class leaveChannel(BanchoPacket, type=Packets.OSU_CHANNEL_PART):
     name: osuTypes.string
 
     async def handle(self, user: Player):
-        if self.name == '#highlight' or not self.name.startswith('#'): # osu why!!!
+        if self.name in ['#highlight', '#userlog', '#multiplayer'] or not self.name.startswith('#'): # osu why!!!
             return
 
         chan = glob.channels.get(self.name)
 
         if not chan:
-            log(f'{user.name} failed to leave channel {self.name}', Ansi.LRED)
+            return
 
         if user not in chan.players:
             return
@@ -213,7 +226,6 @@ class startSpec(BanchoPacket, type=Packets.OSU_START_SPECTATING):
             return
 
         if not (target := glob.players_id.get(self.tid)):
-            log(f'{user.name} tried to spectate offline UID {self.tid}', Ansi.LRED)
             return
 
         target.add_spectator(user)
@@ -222,7 +234,6 @@ class startSpec(BanchoPacket, type=Packets.OSU_START_SPECTATING):
 class stopSpec(BanchoPacket, type=Packets.OSU_STOP_SPECTATING):
     async def handle(self, user: Player):
         if not (host := user.spectating):
-            log(f'{user.name} tried to stop spectating someone while not spectating anyone.', Ansi.LRED)
             return
 
         host.remove_spectator(user)
@@ -247,8 +258,7 @@ async def root_client():
 
     if 'User-Agent' not in headers or headers['User-Agent'] != 'osu!':
         # request isn't sent from osu client, return html
-        message = f"{pyfiglet.figlet_format(f'Asahi v{glob.version}')}\n\ntsunyoku attempts bancho v2, gone right :sunglasses:"
-        return Response(message, mimetype='text/plain')
+        return b''
 
     if 'osu-token' not in headers: # sometimes a login request will be a re-connect attempt, in which case they will already have a token, if not: login the user
         data = await request.data # request data, used to get info such as username to login the user
@@ -356,8 +366,7 @@ async def root_client():
 
         elapsed = (time.time() - start) * 1000
         data += packets.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed:.2f}ms') # send notification as indicator they've logged in i guess
-        if glob.config.debug:
-            log(f'{p.name} successfully logged in. | Time Elapsed: {elapsed:.2f}ms', Ansi.LBLUE)
+        log(f'{p.name} successfully logged in.', Ansi.LBLUE)
 
         resp = await make_response(bytes(data))
         resp.headers['cho-token'] = token
