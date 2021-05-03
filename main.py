@@ -15,7 +15,7 @@ from constants.countries import country_codes
 
 app = Quart(__name__) # handler for webserver :D
 app.config['SERVER_NAME'] = glob.config.domain
-glob.version = Version(0, 1, 7) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 1, 8) # set Asahi version, mainly for future updater but also for tracking
 
 CACHE_PATH = Path.cwd() / 'resources/cache'
 BCRYPT_CACHE_FILE = CACHE_PATH / 'bcrypt.p'
@@ -108,6 +108,10 @@ async def connect(): # ran before server startup, used to do things like connect
             glob.channels[channel.name] = channel
             if glob.config.debug:
                 log(f'==== Added channel {channel.name} to channel list ====', Ansi.GREEN)
+    
+    # add announce channel to cache
+    announce = Channel(name='#announce', desc='#1 scores and public announcements will be posted here', auto=True, perm=True)
+    glob.channels[announce.name] = announce
 
     log(f'==== Asahi v{glob.version} started ====', Ansi.GREEN)
 

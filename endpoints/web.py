@@ -45,12 +45,16 @@ def auth(name, md5):
 
 @web.before_request
 async def bRequest():
-    g.req_url = request.base_url
-    g.req_method = request.method
-    g.start = time.time()
+    if glob.config.debug:
+        g.req_url = request.base_url
+        g.req_method = request.method
+        g.start = time.time()
 
 @web.after_request
 async def logRequest(resp):
+    if not glob.config.debug:
+        return resp
+
     if g.get('player'):
         ret = f' | Request by {g.pop("player").name}'
     else:
@@ -255,7 +259,7 @@ async def getMapScores():
                 glob.cache['unsub'].append(md5)
                 return b'-1|false' # bmap or other version of bmap cannot be found, must be unsubmitted
 
-    if not bmap.frozen:
+    if not bmap.frozen and bmap.nc < time.time():
         await bmap.check_status()
 
     if bmap.status < mapStatuses.Ranked:
@@ -286,8 +290,11 @@ async def getMapScores():
         rank = b_rank['rank'] + 1
 
         resp.append(f'{best["id"]}|{player.name}|{int(best[sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
+    else:
+        resp.append('')
 
-    resp.extend([(f'{s["id"]}|{s["name"]}|{int(s[sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"') for rank, s in enumerate(scores)])
+    for rank, s in enumerate(scores):
+        resp.append(f'{s["id"]}|{s["name"]}|{int(s[sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"')
     
     return '\n'.join(resp).encode()
 
@@ -304,8 +311,6 @@ async def scoreSubmit():
         return b'' # player not online, make client make resubmit attempts
     elif not s.map:
         return b'error: no' # map unsubmitted
-    elif s.map.status == mapStatuses.Pending:
-        return b'error: no' # i will handle this like bancho soon enough
 
     if s.mode != s.user.mode or s.mods != s.user.mods:
         s.user.mode = s.mode.value
@@ -315,10 +320,13 @@ async def scoreSubmit():
 
     if s.mods & Mods.RELAX:
         table = 'scores_rx'
+        sort = 'pp'
     elif s.mods & Mods.AUTOPILOT:
         table = 'scores_ap'
+        sort = 'pp'
     else:
         table = 'scores'
+        sort = 'score'
 
     # submit score and get id xd
     await glob.db.execute(f'INSERT INTO {table} (md5, score, acc, pp, combo, mods, n300, geki, n100, katu, n50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)', s.map.md5, s.score, s.acc, s.pp, s.combo, s.mods, s.n300, s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status.value, s.mode_vn, s.time, s.user.id, s.readable_mods, s.fc)
@@ -349,13 +357,15 @@ async def scoreSubmit():
 
     stats.pc += 1
 
-    if s.status == scoreStatuses.Best:
+    if s.status == scoreStatuses.Best and s.map.status >= mapStatuses.Ranked:
         add = s.score
 
         if s.old_best:
             add -= s.old_best.score
         
         stats.rscore += add
+
+    stats.tscore += s.score
 
     await s.user.update_stats(s.mode, table)
 
@@ -381,35 +391,36 @@ async def scoreSubmit():
     )
 
     # map-specific ranking
-    charts.append('|'.join((
-        'chartId:beatmap',
-        f'chartUrl:https://osu.ppy.sh/b/{s.map.id}',
-        'chartName:Beatmap Ranking', # not sure if this is allowed to be customised ??
+    if s.map.status >= mapStatuses.Ranked:
+        charts.append('|'.join((
+            'chartId:beatmap',
+            f'chartUrl:https://osu.ppy.sh/b/{s.map.id}',
+            'chartName:Current Score', # not sure if this is allowed to be customised ??
 
-        *(( # wtaf | no previous stats for now
-            chart_format('rank', s.old_best.rank, s.rank),
-            chart_format('rankedScore', s.old_best.score, s.score),
-            chart_format('totalScore', s.old_best.score, s.score),
-            chart_format('maxCombo', s.old_best.combo, s.combo),
-            chart_format('accuracy', round(s.old_best.acc, 2), round(s.acc, 2)),
-            chart_format('pp', s.old_best.pp, s.pp)
-        ) if s.old_best else (
-            chart_format('rank', None, s.rank),
-            chart_format('rankedScore', None, s.score),
-            chart_format('totalScore', None, s.score),
-            chart_format('maxCombo', None, s.combo),
-            chart_format('accuracy', None, round(s.acc, 2)),
-            chart_format('pp', None, s.pp)
-        )),
+            *(( # wtaf | no previous stats for now
+                chart_format('rank', s.old_best.rank, s.rank),
+                chart_format('rankedScore', s.old_best.score, s.score),
+                chart_format('totalScore', s.old_best.score, s.score),
+                chart_format('maxCombo', s.old_best.combo, s.combo),
+                chart_format('accuracy', round(s.old_best.acc, 2), round(s.acc, 2)),
+                chart_format('pp', s.old_best.pp, s.pp)
+            ) if s.old_best else (
+                chart_format('rank', None, s.rank),
+                chart_format('rankedScore', None, s.score),
+                chart_format('totalScore', None, s.score),
+                chart_format('maxCombo', None, s.combo),
+                chart_format('accuracy', None, round(s.acc, 2)),
+                chart_format('pp', None, s.pp)
+            )),
 
-        f'onlineScoreId:{s.id}'
-    )))
+            f'onlineScoreId:{s.id}'
+        )))
 
     # overall user stats
     charts.append('|'.join((
         'chartId:overall',
         f'chartUrl:https://{glob.config.domain}/u/{s.user.id}',
-        'chartName:Overall Ranking',
+        'chartName:Global Stats',
 
         *((
             chart_format('rank', old.rank, stats.rank),
@@ -427,6 +438,25 @@ async def scoreSubmit():
             chart_format('pp', None, stats.pp)
         ))
     )))
+
+    if s.status == scoreStatuses.Best and s.rank == 1 and s.map.status >= mapStatuses.Ranked:
+        # announce #1 to announce channel cus they achieved #1
+        if s.map.status == mapStatuses.Loved:
+            perf = ''
+        else:
+            perf = f' worth {round(s.pp):,}pp'
+
+        prev1 = await glob.db.fetchrow(f'SELECT users.name FROM users LEFT OUTER JOIN {table} ON {table}.uid = users.id WHERE {table}.md5 = $1 AND {table}.mode = $2 AND {table}.status = 2 AND users.priv & 1 > 0 AND {table}.uid != $3 AND {table}.id != $4 ORDER BY {table}.{sort} DESC LIMIT 1', s.map.md5, s.mode_vn, s.user.id, s.id)
+
+        if prev1:
+            prev = f' (Previous #1: [https://{glob.config.domain}/u/{prev1["name"]} {prev1["name"]}])'
+        else:
+            prev = ''
+
+        msg = f'{s.user.embed} achieved #1 on {s.map.embed} +{s.readable_mods}{perf}{prev}'
+        chan = glob.channels['#announce']
+        chan.send(glob.bot, msg, True)
+        
 
     log(f'[{s.mode.name}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
     return '\n'.join(charts).encode() # thank u osu

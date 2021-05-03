@@ -36,6 +36,7 @@ __version__ = "2.2.0"
 
 import sys
 import math
+from decimal import Decimal
 #from numba import jit
 
 if sys.version_info[0] < 3:
@@ -1145,7 +1146,7 @@ def ppv2(
     aim_stars=None, speed_stars=None, max_combo=None,
     nsliders=None, ncircles=None, nobjects=None, base_ar=5.0,
     base_od=5.0, mode=MODE_STD, mods=MODS_NOMOD, combo=None,
-    n300=None, n100=0, n50=0, nmiss=0, score_version=1, bmap=None
+    n300=None, n100=0, n50=0, nmiss=0, score_version=1, bmap=None, acc=None
 ):
     """
     calculates ppv2
@@ -1200,6 +1201,13 @@ def ppv2(
         info("W: max_combo <= 0, changing to 1\n")
         max_combo = 1
 
+    if acc is not None: # acc is provided, given because of /np request
+        n300 = nobjects * acc / 100 # object count * acc (as decimal) = amount of perfect (300 hits)
+        n100 = nobjects - n300 # we assume the remaining non-perfect hits are 100s
+        n50 = 0 # no 50s for above reason
+        nmiss = 0 # 0 miss because we want fc pp (/np request)
+        combo = max_combo # max combo because we want fc pp (/np request)
+
     if combo == None:
         combo = max_combo - nmiss
 
@@ -1207,6 +1215,7 @@ def ppv2(
         n300 = nobjects - n100 - n50 - nmiss
 
     # accuracy ----------------------------------------------------
+
     accuracy = acc_calc(n300, n100, n50, nmiss)
     real_acc = accuracy
     nspinners = nobjects - nsliders - ncircles

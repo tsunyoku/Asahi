@@ -1,5 +1,6 @@
 from objects import glob
 from objects.channel import Channel
+from objects.beatmap import Beatmap
 from constants.privs import Privileges, ClientPrivileges
 from constants.modes import osuModes
 from typing import Optional
@@ -44,6 +45,8 @@ class Player:
         self.spectating: Optional[Player] = None
         self.channels: list[Channel] = []
 
+        self.np: Optional[Beatmap] = None
+
     @classmethod
     async def login(self, user):
         p = self(
@@ -75,13 +78,16 @@ class Player:
         stats = self.stats[mode.value]
         mode_name = mode.name
 
-        s = await glob.db.fetch(f'SELECT {table}.acc, {table}.pp FROM {table} LEFT OUTER JOIN maps ON maps.md5 = {table}.md5 WHERE {table}.uid = $1 AND {table}.mode = $2 AND {table}.status = 2 AND maps.status IN (1, 2) ORDER BY {table}.pp DESC LIMIT 100', self.id, self.mode_vn)
+        t100 = await glob.db.fetch(f'SELECT {table}.acc, {table}.pp FROM {table} LEFT OUTER JOIN maps ON maps.md5 = {table}.md5 WHERE {table}.uid = $1 AND {table}.mode = $2 AND {table}.status = 2 AND maps.status IN (1, 2) ORDER BY {table}.pp DESC LIMIT 100', self.id, self.mode_vn)
+        s = await glob.db.fetch(f'SELECT {table}.acc, {table}.pp FROM {table} LEFT OUTER JOIN maps ON maps.md5 = {table}.md5 WHERE {table}.uid = $1 AND {table}.mode = $2 AND {table}.status = 2 AND maps.status IN (1, 2) ORDER BY {table}.pp DESC', self.id, self.mode_vn)
 
-        if not s:
+        if not t100:
             return # no scores xd
 
-        stats.acc = sum([row['acc'] for row in s[:50]]) / min(50, len(s))
-        stats.pp = round(sum([row['pp'] * 0.95 ** i for i, row in enumerate(s)]))
+        stats.acc = sum([row['acc'] for row in s[:50]]) / min(50, len(t100))
+        weighted = sum([row['pp'] * 0.95 ** i for i, row in enumerate(t100)])
+        bonus = 416.6667 * (1 - 0.9994 ** len(s))
+        stats.pp = round(weighted + bonus)
 
         await glob.db.execute('UPDATE stats SET rscore_{0} = $1, acc_{0} = $2, pc_{0} = $3, tscore_{0} = $4, pp_{0} = $5 WHERE id = $6'.format(mode_name), stats.rscore, stats.acc, stats.pc, stats.tscore, stats.pp, self.id)
 
@@ -100,6 +106,14 @@ class Player:
     @property
     def safe_name(self):
         return self.name.lower().replace(' ', '_')
+
+    @property
+    def url(self):
+        return f'https://{glob.config.domain}/u/{self.id}'
+
+    @property
+    def embed(self):
+        return f'[{self.url} {self.name}]'
 
     @property
     def client_priv(self):
