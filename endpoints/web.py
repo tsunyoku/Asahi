@@ -371,7 +371,7 @@ async def scoreSubmit():
 
     # sub charts bruh
     if s.mods & Mods.RELAX or s.mods & Mods.AUTOPILOT or s.status == scoreStatuses.Failed:
-        log(f'[{s.mode.name}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
+        log(f'[{s.mode!r}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
         return b'error: no' # not actually erroring, score is already submitted we just want client to stop request as we cannot provide chart
 
     charts = []
@@ -453,7 +453,7 @@ async def scoreSubmit():
         else:
             prev = ''
 
-        msg = f'{s.user.embed} achieved #1 on {s.map.embed} +{s.readable_mods}{perf}{prev}'
+        msg = f'[{s.mode!r}] {s.user.embed} achieved #1 on {s.map.embed} +{s.readable_mods}{perf}{prev}'
         chan = glob.channels['#announce']
         chan.send(glob.bot, msg, True)
         
