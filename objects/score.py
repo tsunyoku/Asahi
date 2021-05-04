@@ -9,8 +9,11 @@ from objects import glob, pp
 from base64 import b64decode
 from py3rijndael import RijndaelCbc, ZeroPadding
 from pathlib import Path
+from cmyui import log
 
 import time
+import re
+import asyncio
 
 class Score:
     def __init__(self):
@@ -141,7 +144,7 @@ class Score:
         else:
             s.mode_vn = s.mode.value
 
-        s.pp, s.sr = await s.calc_pp()
+        s.pp = await s.calc_pp()
         await s.calc_info()
 
         return s
@@ -152,21 +155,21 @@ class Score:
         self.rank = lb['r'] + 1 if lb else 1
 
     async def calc_pp(self):
-        if self.mode_vn == 0:
+        path = Path.cwd() / f'resources/maps/{self.map.id}.osu'
+        if not path.exists():
+            url = f'https://old.ppy.sh/osu/{self.map.id}'
+
+            async with glob.web.get(url) as resp:
+                if not resp or resp.status != 200:
+                    return 0.0
+
+                m = await resp.read()
+                path.write_bytes(m)
+
+        if self.mode.value in [4, 7]:
             p = pp.parser()
             bmap = pp.beatmap()
             stars = pp.diff_calc()
-
-            path = Path.cwd() / f'resources/maps/{self.map.id}.osu'
-            if not path.exists():
-                url = f'https://old.ppy.sh/osu/{self.map.id}'
-
-                async with glob.web.get(url) as resp:
-                    if not resp or resp.status != 200:
-                        return 0.0, 0.0
-
-                    m = await resp.read()
-                    path.write_bytes(m)
 
             with open(path, 'r') as f:
                 p.map(f, bmap=bmap)
@@ -174,9 +177,46 @@ class Score:
             stars.calc(bmap, self.mods)
             ppv, _, _, _, _ = pp.ppv2(stars.aim, stars.speed, bmap=bmap, mods=self.mods, n300=self.n300, n100=self.n100, n50=self.n50, nmiss=self.miss, combo=self.combo)
 
-            return ppv, stars.total
+            return ppv
         else:
-            return 0.0, 0.0
+            if self.mode.name == 'std':
+                nm = 'osu' # fucking osu-tools why
+            else:
+                nm = self.mode.name
+
+            cmd = [f'./osu-tools/compiled/PerformanceCalculator simulate {nm} {str(path)}']
+            if self.mode.value == 0:
+                cmd.append(f'-M {self.n50}') # 50s
+            
+            if self.mode.value == 3:
+                cmd.append(f'-s {self.score}') # mania = score game xd
+            else:
+                cmd.append(f'-c {self.combo}') # max combo
+                cmd.append(f'-X {self.miss}') # miss count
+
+            if self.mode.value == 2:
+                cmd.append(f'-D {self.n50}') # 50s equivalent for catch?
+            else:
+                cmd.append(f'-G {self.n100}') # 100s
+
+            for mod in re.findall('.{1,2}', self.readable_mods):
+                if mod != 'NM': # will confuse osu-tools xd
+                    cmd.append(f'-m {mod}') # osu tool expects 1 arg per mod so we have to do this gay regex
+
+            p = asyncio.subprocess.PIPE
+            comp = ' '.join(cmd)
+            pr = await asyncio.create_subprocess_shell(comp, stdout=p, stderr=p)
+            ot, _ = await pr.communicate()
+            for line in ot.decode('utf-8').splitlines():
+                if 'pp             :' in line:
+                    # temp pp system idea for rx
+                    if not s.mods & Mods.RELAX:
+                        ppv = float(re.sub('[^\d.]+', '', line))
+                    else:
+                        ppv = float(re.sub('[^\d.]+', '', line)) * 0.5
+                    break
+            
+            return ppv
 
     async def calc_info(self):
         mode = self.mode_vn

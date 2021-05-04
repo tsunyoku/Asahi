@@ -352,7 +352,7 @@ async def scoreSubmit():
         replay.save(str(f))
 
     # update stats EEEEEEE
-    stats = s.user.current_stats
+    stats = s.user.stats[s.mode.value]
     old = copy.copy(stats) # we need a copy of the old stats for submission chart
 
     stats.pc += 1
@@ -367,7 +367,7 @@ async def scoreSubmit():
 
     stats.tscore += s.score
 
-    await s.user.update_stats(s.mode, table)
+    await s.user.update_stats(s.mode, table, s.mode_vn)
 
     # sub charts bruh
     if s.mods & Mods.RELAX or s.mods & Mods.AUTOPILOT or s.status == scoreStatuses.Failed:
