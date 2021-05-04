@@ -34,6 +34,12 @@ Now, copy the config file and edit the config:
 cp ext/config.sample.py config.py
 ```
 
+We also want to compile the pp system:
+```bash
+chmod +x osu-tools.sh
+./osu-tools.sh
+```
+
 Finally, startup Asahi using hypercorn:
 ```bash
 hypercorn main.py -b 127.0.0.1:9384 --reload --log-level error
