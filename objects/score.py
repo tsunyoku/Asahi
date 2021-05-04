@@ -209,8 +209,8 @@ class Score:
             ot, _ = await pr.communicate()
             for line in ot.decode('utf-8').splitlines():
                 if 'pp             :' in line:
-                    # temp pp system idea for rx
-                    if not s.mods & Mods.RELAX:
+                    # temp pp system idea for rx (half pp value cus less aim value innit)
+                    if not self.mods & Mods.RELAX:
                         ppv = float(re.sub('[^\d.]+', '', line))
                     else:
                         ppv = float(re.sub('[^\d.]+', '', line)) * 0.5
