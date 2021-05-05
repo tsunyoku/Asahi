@@ -248,7 +248,8 @@ class specFrames(BanchoPacket, type=Packets.OSU_SPECTATE_FRAMES):
 
 @bancho.route("/", methods=['GET']) # only accept GET requests as POST is for login method, see login method below
 async def root_http():
-    message = f"{pyfiglet.figlet_format(f'Asahi v{glob.version}')}\n\ntsunyoku attempts bancho v2, gone right :sunglasses:"
+    pl = '\n'.join(p.name for p in glob.players.values())
+    message = f"{pyfiglet.figlet_format(f'Asahi v{glob.version}')}\n\ntsunyoku attempts bancho v2, gone right :sunglasses:\n\nOnline Players:\n{pl}"
     return Response(message, mimetype='text/plain')
 
 @bancho.route("/", methods=['POST']) # only accept POST requests, we can assume it is for a login request but we can deny access if not
