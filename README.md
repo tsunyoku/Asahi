@@ -36,8 +36,8 @@ cp ext/config.sample.py config.py
 
 We also want to compile the pp system:
 ```bash
-chmod +x osu-tools.sh
-./osu-tools.sh
+chmod +x ext/osu-tools.sh
+./ext/osu-tools.sh
 ```
 
 Finally, startup Asahi using hypercorn:

@@ -229,7 +229,7 @@ async def getMapScores():
 
     player = g.pop("player")
 
-    if mode != player.mode or mods != player.mods:
+    if mode.value != player.mode or mods != player.mods:
         player.mode = mode.value
         player.mods = mods
         for o in glob.players.values():
@@ -265,37 +265,34 @@ async def getMapScores():
     if bmap.status < mapStatuses.Ranked:
         return f'{bmap.status}|false'.encode() # map is unranked, unsubmitted etc. then we return status with no scores or anything
 
-    if mods & Mods.RELAX:
-        table = 'scores_rx'
-        sort = 'pp'
-    elif mods & Mods.AUTOPILOT:
-        table = 'scores_ap'
-        sort = 'pp'
-    else:
-        table = 'scores'
-        sort = 'score'
-
-    scores = await glob.db.fetch(f'SELECT {table}.*, users.name FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.status = 2 AND mode = $2 AND users.priv & 1 > 0 ORDER BY {table}.{sort} DESC LIMIT 100', md5, int(args['m']))
+    scores = await glob.db.fetch(f'SELECT t.*, users.name FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = $1 AND t.status = 2 AND mode = $2 AND users.priv & 1 > 0 ORDER BY t.{mode.sort} DESC LIMIT 100', md5, int(args['m']))
 
     resp = []
 
-    resp.append(f'{bmap.status}|false|{bmap.id}|{bmap.sid}|{len(scores)}')
-    resp.append(f'0\n{bmap.name}\n10.0') # why osu using \n :( | force 10.0 rating cus no ratings rn, 0 is map offset (probably wont ever be used)
+    if bmap.lb_cache.get(mode):
+        resp = bmap.lb_cache[mode]
+
+    if not bmap.lb_cache.get(mode):
+        resp.append(f'{bmap.status}|false|{bmap.id}|{bmap.sid}|{len(scores)}')
+        resp.append(f'0\n{bmap.name}\n10.0') # why osu using \n :( | force 10.0 rating cus no ratings rn, 0 is map offset (probably wont ever be used)
     if not scores:
+        bmap.lb_cache[mode] = resp
         return '\n'.join(resp).encode()
 
-    best = await glob.db.fetchrow(f'SELECT {table}.* FROM {table} WHERE md5 = $1 AND mode = $2 AND uid = $3 AND status = 2 ORDER BY {table}.{sort} DESC LIMIT 1', md5, int(args['m']), player.id)
+    best = await glob.db.fetchrow(f'SELECT t.* FROM {mode.table} t WHERE md5 = $1 AND mode = $2 AND uid = $3 AND status = 2 ORDER BY t.{mode.sort} DESC LIMIT 1', md5, int(args['m']), player.id)
     if best:
-        b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 AND {table}.{sort} > $3', md5, int(args['m']), best[sort])
+        b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 AND t.{mode.sort} > $3', md5, int(args['m']), best[mode.sort])
         rank = b_rank['rank'] + 1
 
-        resp.append(f'{best["id"]}|{player.name}|{int(best[sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
+        resp.insert(3, f'{best["id"]}|{player.name}|{int(best[mode.sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
     else:
-        resp.append('')
+        resp.insert(3, '')
 
-    for rank, s in enumerate(scores):
-        resp.append(f'{s["id"]}|{s["name"]}|{int(s[sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"')
+    if not bmap.lb_cache.get(mode):
+        for rank, s in enumerate(scores):
+            resp.append(f'{s["id"]}|{s["name"]}|{int(s[mode.sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"')
     
+    bmap.lb_cache[mode] = resp[:2] + resp[3:] # remove 3rd entry (personal best) from cache as it will differ per player
     return '\n'.join(resp).encode()
 
 # POGGG
@@ -318,23 +315,13 @@ async def scoreSubmit():
         for o in glob.players.values():
             o.enqueue(packets.userStats(s.user))
 
-    if s.mods & Mods.RELAX:
-        table = 'scores_rx'
-        sort = 'pp'
-    elif s.mods & Mods.AUTOPILOT:
-        table = 'scores_ap'
-        sort = 'pp'
-    else:
-        table = 'scores'
-        sort = 'score'
-
     # submit score and get id xd
-    await glob.db.execute(f'INSERT INTO {table} (md5, score, acc, pp, combo, mods, n300, geki, n100, katu, n50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)', s.map.md5, s.score, s.acc, s.pp, s.combo, s.mods, s.n300, s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status.value, s.mode_vn, s.time, s.user.id, s.readable_mods, s.fc)
-    s.id = await glob.db.fetchval(f'SELECT id FROM {table} WHERE md5 = $1 AND uid = $2 AND time = $3', s.map.md5, s.user.id, s.time)
+    await glob.db.execute(f'INSERT INTO {s.mode.table} (md5, score, acc, pp, combo, mods, n300, geki, n100, katu, n50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)', s.map.md5, s.score, s.acc, s.pp, s.combo, s.mods, s.n300, s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status.value, s.mode_vn, s.time, s.user.id, s.readable_mods, s.fc)
+    s.id = await glob.db.fetchval(f'SELECT id FROM {s.mode.table} WHERE md5 = $1 AND uid = $2 AND time = $3', s.map.md5, s.user.id, s.time)
     
     if s.status == scoreStatuses.Best:
         # set any other best scores to submitted ones as they've been overwritten
-        await glob.db.execute(f'UPDATE {table} SET status = 1 WHERE status = 2 AND uid = $1 AND md5 = $2 AND mode = $3 AND id != $4', s.user.id, s.map.md5, s.mode_vn, s.id)
+        await glob.db.execute(f'UPDATE {s.mode.table} SET status = 1 WHERE status = 2 AND uid = $1 AND md5 = $2 AND mode = $3 AND id != $4', s.user.id, s.map.md5, s.mode_vn, s.id)
 
     # save replay if not a failed score
     if s.status != scoreStatuses.Failed:
@@ -367,7 +354,7 @@ async def scoreSubmit():
 
     stats.tscore += s.score
 
-    await s.user.update_stats(s.mode, table, s.mode_vn)
+    await s.user.update_stats(s.mode, s.mode.table, s.mode_vn)
 
     # sub charts bruh
     if s.mods & Mods.RELAX or s.mods & Mods.AUTOPILOT or s.status == scoreStatuses.Failed:
@@ -446,7 +433,7 @@ async def scoreSubmit():
         else:
             perf = f' worth {round(s.pp):,}pp'
 
-        prev1 = await glob.db.fetchrow(f'SELECT users.name FROM users LEFT OUTER JOIN {table} ON {table}.uid = users.id WHERE {table}.md5 = $1 AND {table}.mode = $2 AND {table}.status = 2 AND users.priv & 1 > 0 AND {table}.uid != $3 AND {table}.id != $4 ORDER BY {table}.{sort} DESC LIMIT 1', s.map.md5, s.mode_vn, s.user.id, s.id)
+        prev1 = await glob.db.fetchrow(f'SELECT users.name FROM users LEFT OUTER JOIN {s.mode.table} t ON t.uid = users.id WHERE t.md5 = $1 AND t.mode = $2 AND t.status = 2 AND users.priv & 1 > 0 AND t.uid != $3 AND t.id != $4 ORDER BY t.{s.mode.sort} DESC LIMIT 1', s.map.md5, s.mode_vn, s.user.id, s.id)
 
         if prev1:
             prev = f' (Previous #1: [https://{glob.config.domain}/u/{prev1["name"]} {prev1["name"]}])'
@@ -457,6 +444,14 @@ async def scoreSubmit():
         chan = glob.channels['#announce']
         chan.send(glob.bot, msg, True)
         
+    if s.status == scoreStatuses.Best and s.map.status >= mapStatuses.Ranked:
+        # add score to lb cache xd
+        if s.mode.sort == 'pp':
+            st = s.pp
+        else:
+            st = s.score
+
+        s.map.lb_cache[s.mode].append(f'{s.id}|{s.user.name}|{st}|{s.combo}|{s.n50}|{s.n100}|{s.n300}|{s.miss}|{s.katu}|{s.geki}|{s.fc}|{s.mods}|{s.user.id}|{s.rank}|{s.time}|"1"')
 
     log(f'[{s.mode.name}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
     return '\n'.join(charts).encode() # thank u osu

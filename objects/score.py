@@ -14,6 +14,7 @@ from cmyui import log
 import time
 import re
 import asyncio
+import orjson
 
 class Score:
     def __init__(self):
@@ -203,20 +204,14 @@ class Score:
                 if mod != 'NM': # will confuse osu-tools xd
                     cmd.append(f'-m {mod}') # osu tool expects 1 arg per mod so we have to do this gay regex
 
+            cmd.append('-j') # json formatting is godsend thank u peppy
+
             p = asyncio.subprocess.PIPE
             comp = ' '.join(cmd)
             pr = await asyncio.create_subprocess_shell(comp, stdout=p, stderr=p)
             ot, _ = await pr.communicate()
-            for line in ot.decode('utf-8').splitlines():
-                if 'pp             :' in line:
-                    # temp pp system idea for rx (half pp value cus less aim value innit)
-                    if not self.mods & Mods.RELAX:
-                        ppv = float(re.sub('[^\d.]+', '', line))
-                    else:
-                        ppv = float(re.sub('[^\d.]+', '', line)) * 0.5
-                    break
-            
-            return ppv
+            o = orjson.loads(ot.decode('utf-8'))
+            return o['pp']
 
     async def calc_info(self):
         mode = self.mode_vn
@@ -251,24 +246,18 @@ class Score:
                 self.acc = 100.0 * ((self.n50 * 50.0) + (self.n100 * 100.0) + (self.katu * 200.0) + ((self.n300 + self.geki) * 300.0)) / (hits * 300.0)
 
         if self.mods & Mods.RELAX:
-            table = 'scores_rx'
-            sort = 'pp'
             t = self.pp
         elif self.mods & Mods.AUTOPILOT:
-            table = 'scores_ap'
-            sort = 'pp'
             t = self.pp
         else:
-            table = 'scores'
-            sort = 'score'
             t = self.score
 
-        lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.mode = $2 AND {table}.status = 2 AND users.priv & 1 > 0 AND {table}.{sort} > $3', self.map.md5, mode, t)
+        lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = $1 AND t.mode = $2 AND t.status = 2 AND users.priv & 1 > 0 AND t.{self.mode.sort} > $3', self.map.md5, mode, t)
         self.rank = lb['r'] + 1 if lb else 1
 
-        score = await glob.db.fetchrow(f'SELECT id, pp FROM {table} WHERE uid = $1 AND md5 = $2 AND mode = $3 AND status = 2', self.user.id, self.map.md5, mode)
+        score = await glob.db.fetchrow(f'SELECT id, pp FROM {self.mode.table} WHERE uid = $1 AND md5 = $2 AND mode = $3 AND status = 2', self.user.id, self.map.md5, mode)
         if score: # they already have a (best) submitted score
-            self.old_best = await Score.sql(score['id'], table, sort, t)
+            self.old_best = await Score.sql(score['id'], self.mode.table, self.mode.sort, t)
 
             if self.pp > score['pp']:
                 self.status = scoreStatuses.Best

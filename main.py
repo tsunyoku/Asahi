@@ -15,7 +15,7 @@ from constants.countries import country_codes
 
 app = Quart(__name__) # handler for webserver :D
 app.config['SERVER_NAME'] = glob.config.domain
-glob.version = Version(0, 1, 8) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 1, 9) # set Asahi version, mainly for future updater but also for tracking
 
 CACHE_PATH = Path.cwd() / 'resources/cache'
 BCRYPT_CACHE_FILE = CACHE_PATH / 'bcrypt.p'
@@ -172,4 +172,3 @@ app.register_blueprint(bancho, subdomain='ce')
 app.register_blueprint(bancho, subdomain='c4')
 app.register_blueprint(avatars, subdomain='a')
 app.register_blueprint(web, subdomain='osu')
-
