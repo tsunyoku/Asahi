@@ -1,5 +1,6 @@
 from enum import Enum
 from constants.mods import Mods
+from functools import cache
 
 m_str = (
     'osu!std',
@@ -26,6 +27,24 @@ class osuModes(Enum):
 
     def __repr__(self):
         return m_str[self.value]
+
+    @property
+    @cache
+    def table(self):
+        if self.value in [4, 5, 6]:
+            return 'scores_rx'
+        elif self.value in [0, 1, 2, 3]:
+            return 'scores'
+        else:
+            return 'scores_ap'
+    
+    @property
+    @cache
+    def sort(self):
+        if self.value > 3:
+            return 'pp'
+        else:
+            return 'score'
 
 def lbModes(mode: int, mods: int):
     if mods & Mods.RELAX:
