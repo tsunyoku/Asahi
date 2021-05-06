@@ -268,14 +268,14 @@ async def getMapScores():
     resp = []
 
     if bmap.lb_cache.get(mode):
-        resp = bmap.lb_cache[mode]
+        resp = bmap.lb_cache[mode][:]
 
     if not bmap.lb_cache.get(mode):
         scores = await glob.db.fetch(f'SELECT t.*, users.name FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = $1 AND t.status = 2 AND mode = $2 AND users.priv & 1 > 0 ORDER BY t.{mode.sort} DESC LIMIT 100', md5, int(args['m']))
         resp.append(f'{bmap.status}|false|{bmap.id}|{bmap.sid}|{len(scores)}')
         resp.append(f'0\n{bmap.name}\n10.0') # why osu using \n :( | force 10.0 rating cus no ratings rn, 0 is map offset (probably wont ever be used)
         if not scores:
-            bmap.lb_cache[mode] = resp
+            bmap.lb_cache[mode] = resp[:]
             return '\n'.join(resp).encode()
 
     best = await glob.db.fetchrow(f'SELECT t.* FROM {mode.table} t WHERE md5 = $1 AND mode = $2 AND uid = $3 AND status = 2 ORDER BY t.{mode.sort} DESC LIMIT 1', md5, int(args['m']), player.id)
@@ -292,8 +292,8 @@ async def getMapScores():
             resp.append(f'{s["id"]}|{s["name"]}|{int(s[mode.sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"')
     
     if not bmap.lb_cache.get(mode):
-        bmap.lb_cache[mode] = resp[:1] + resp[2:] # remove 3rd entry (personal best) from cache as it will differ per player
-        bmap.lb_cache[mode].insert(2, '') # add blank entry so osu doesn't shit itself
+        bmap.lb_cache[mode] = resp[:] # set cache to current lb
+        bmap.lb_cache[mode].remove(bmap.lb_cache[mode][2]) # remove personal best since it will differ per user
 
     return '\n'.join(resp).encode()
 
