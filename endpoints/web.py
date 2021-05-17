@@ -288,13 +288,13 @@ async def getMapScores():
             b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 AND t.{mode.sort} > $3', md5, int(args['m']), best[mode.sort])
             rank = b_rank['rank'] + 1
 
-            resp.insert(2, f'{best["id"]}|{player.name}|{int(best[mode.sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
+            resp.insert(2, f'{best["id"]}|{player.name}|{int(best[mode.sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|1')
         else:
             resp.insert(2, '')
 
         if not base or not mods in base:
             for rank, s in enumerate(scores):
-                resp.append(f'{s["id"]}|{s["name"]}|{int(s[mode.sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"')
+                resp.append(f'{s["id"]}|{s["name"]}|{int(s[mode.sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|1')
 
         if not base or not mods in base:
             bmap.mod_cache[mode][mods] = resp.copy() # set cache to current lb
@@ -318,13 +318,13 @@ async def getMapScores():
             b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 AND t.{mode.sort} > $3', md5, int(args['m']), best[mode.sort])
             rank = b_rank['rank'] + 1
 
-            resp.insert(2, f'{best["id"]}|{player.name}|{int(best[mode.sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
+            resp.insert(2, f'{best["id"]}|{player.name}|{int(best[mode.sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|1')
         else:
             resp.insert(2, '')
 
         if not bmap.lb_cache.get(mode):
             for rank, s in enumerate(scores):
-                resp.append(f'{s["id"]}|{s["name"]}|{int(s[mode.sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"')
+                resp.append(f'{s["id"]}|{s["name"]}|{int(s[mode.sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|1')
         
         if not bmap.lb_cache.get(mode):
             bmap.lb_cache[mode] = resp.copy() # set cache to current lb
@@ -498,6 +498,27 @@ async def scoreSubmit():
 
     log(f'[{s.mode.name}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
     return '\n'.join(charts).encode() # thank u osu
+
+@web.route("/web/osu-getreplay.php")
+async def getReplay():
+    args = request.args
+    if not auth(args['u'], args['h']):
+        return Response(b'', status=400)
+
+    player = g.pop("player")
+    sid = args['c']
+
+    if player.mods & Mods.RELAX:
+        f = rx_path / f'{sid}.osr'
+    elif player.mods & Mods.AUTOPILOT:
+        f = ap_path / f'{sid}.osr'
+    else:
+        f = vn_path / f'{sid}.osr'
+
+    if f.exists():
+        return f.read_bytes()
+    
+
 
 
         
