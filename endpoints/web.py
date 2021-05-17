@@ -226,6 +226,7 @@ async def getMapScores():
     mods = int(args['mods'])
     mode = lbModes(int(args['m']), mods)
     sid = int(args['i'])
+    lb = int(args['v'])
 
     player = g.pop("player")
 
@@ -267,35 +268,69 @@ async def getMapScores():
 
     resp = []
 
-    if bmap.lb_cache.get(mode):
-        resp = bmap.lb_cache[mode][:]
+    if lb == 2: # mod-specific lb
+        if base := bmap.mod_cache.get(mode):
+            if mods in base:
+                resp = base[mods].copy() # no better conditional way to do this with a list(?)
+        else:
+            bmap.mod_cache[mode] = {}
+        
+        if not base or not mods in base:
+            scores = await glob.db.fetch(f'SELECT t.*, users.name FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = $1 AND t.status = 2 AND mode = $2 AND users.priv & 1 > 0 AND t.mods = $3 ORDER BY t.{mode.sort} DESC LIMIT 100', md5, int(args['m']), mods)
+            resp.append(f'{bmap.status}|false|{bmap.id}|{bmap.sid}|{len(scores)}')
+            resp.append(f'0\n{bmap.name}\n10.0') # why osu using \n :( | force 10.0 rating cus no ratings rn, 0 is map offset (probably wont ever be used)
+            if not scores:
+                bmap.mod_cache[mode][mods] = resp.copy()
+                return '\n'.join(resp).encode()
 
-    if not bmap.lb_cache.get(mode):
-        scores = await glob.db.fetch(f'SELECT t.*, users.name FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = $1 AND t.status = 2 AND mode = $2 AND users.priv & 1 > 0 ORDER BY t.{mode.sort} DESC LIMIT 100', md5, int(args['m']))
-        resp.append(f'{bmap.status}|false|{bmap.id}|{bmap.sid}|{len(scores)}')
-        resp.append(f'0\n{bmap.name}\n10.0') # why osu using \n :( | force 10.0 rating cus no ratings rn, 0 is map offset (probably wont ever be used)
-        if not scores:
-            bmap.lb_cache[mode] = resp[:]
-            return '\n'.join(resp).encode()
+        best = await glob.db.fetchrow(f'SELECT t.* FROM {mode.table} t WHERE md5 = $1 AND mode = $2 AND uid = $3 AND status = 2 AND mods = $4 ORDER BY t.{mode.sort} DESC LIMIT 1', md5, int(args['m']), player.id, mods)
+        if best:
+            b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 AND t.{mode.sort} > $3', md5, int(args['m']), best[mode.sort])
+            rank = b_rank['rank'] + 1
 
-    best = await glob.db.fetchrow(f'SELECT t.* FROM {mode.table} t WHERE md5 = $1 AND mode = $2 AND uid = $3 AND status = 2 ORDER BY t.{mode.sort} DESC LIMIT 1', md5, int(args['m']), player.id)
-    if best:
-        b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 AND t.{mode.sort} > $3', md5, int(args['m']), best[mode.sort])
-        rank = b_rank['rank'] + 1
+            resp.insert(2, f'{best["id"]}|{player.name}|{int(best[mode.sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
+        else:
+            resp.insert(2, '')
 
-        resp.insert(2, f'{best["id"]}|{player.name}|{int(best[mode.sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
+        if not base or not mods in base:
+            for rank, s in enumerate(scores):
+                resp.append(f'{s["id"]}|{s["name"]}|{int(s[mode.sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"')
+
+        if not base or not mods in base:
+            bmap.mod_cache[mode][mods] = resp.copy() # set cache to current lb
+            bmap.mod_cache[mode][mods].remove(bmap.mod_cache[mode][mods][2]) # remove personal best since it will differ per user
+
+        return '\n'.join(resp).encode()
     else:
-        resp.insert(2, '')
+        if bmap.lb_cache.get(mode):
+            resp = bmap.lb_cache[mode].copy()
 
-    if not bmap.lb_cache.get(mode):
-        for rank, s in enumerate(scores):
-            resp.append(f'{s["id"]}|{s["name"]}|{int(s[mode.sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"')
-    
-    if not bmap.lb_cache.get(mode):
-        bmap.lb_cache[mode] = resp[:] # set cache to current lb
-        bmap.lb_cache[mode].remove(bmap.lb_cache[mode][2]) # remove personal best since it will differ per user
+        if not bmap.lb_cache.get(mode):
+            scores = await glob.db.fetch(f'SELECT t.*, users.name FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = $1 AND t.status = 2 AND mode = $2 AND users.priv & 1 > 0 ORDER BY t.{mode.sort} DESC LIMIT 100', md5, int(args['m']))
+            resp.append(f'{bmap.status}|false|{bmap.id}|{bmap.sid}|{len(scores)}')
+            resp.append(f'0\n{bmap.name}\n10.0') # why osu using \n :( | force 10.0 rating cus no ratings rn, 0 is map offset (probably wont ever be used)
+            if not scores:
+                bmap.lb_cache[mode] = resp.copy()
+                return '\n'.join(resp).encode()
 
-    return '\n'.join(resp).encode()
+        best = await glob.db.fetchrow(f'SELECT t.* FROM {mode.table} t WHERE md5 = $1 AND mode = $2 AND uid = $3 AND status = 2 ORDER BY t.{mode.sort} DESC LIMIT 1', md5, int(args['m']), player.id)
+        if best:
+            b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 AND t.{mode.sort} > $3', md5, int(args['m']), best[mode.sort])
+            rank = b_rank['rank'] + 1
+
+            resp.insert(2, f'{best["id"]}|{player.name}|{int(best[mode.sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|"1"')
+        else:
+            resp.insert(2, '')
+
+        if not bmap.lb_cache.get(mode):
+            for rank, s in enumerate(scores):
+                resp.append(f'{s["id"]}|{s["name"]}|{int(s[mode.sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|"1"')
+        
+        if not bmap.lb_cache.get(mode):
+            bmap.lb_cache[mode] = resp.copy() # set cache to current lb
+            bmap.lb_cache[mode].remove(bmap.lb_cache[mode][2]) # remove personal best since it will differ per user
+
+        return '\n'.join(resp).encode()
 
 # POGGG
 @web.route("/web/osu-submit-modular-selector.php", methods=['POST'])
@@ -453,7 +488,13 @@ async def scoreSubmit():
         else:
             st = s.score
 
-        s.map.lb_cache[s.mode].append(f'{s.id}|{s.user.name}|{st}|{s.combo}|{s.n50}|{s.n100}|{s.n300}|{s.miss}|{s.katu}|{s.geki}|{s.fc}|{s.mods}|{s.user.id}|{s.rank}|{s.time}|"1"')
+        # ?
+        fmt = f'|{s.user.name}|'
+        for val in s.map.lb_cache[s.mode.value]:
+            if fmt in val:
+                s.map.lb_cache[s.mode.value].remove(val)
+
+        s.map.lb_cache[s.mode.value].append(f'{s.id}|{s.user.name}|{st}|{s.combo}|{s.n50}|{s.n100}|{s.n300}|{s.miss}|{s.katu}|{s.geki}|{s.fc}|{s.mods}|{s.user.id}|{s.rank}|{s.time}|"1"')
 
     log(f'[{s.mode.name}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
     return '\n'.join(charts).encode() # thank u osu
