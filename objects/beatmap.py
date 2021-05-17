@@ -8,6 +8,8 @@ from pathlib import Path
 import time
 from datetime import datetime as dt
 from typing import Optional
+import asyncio
+import orjson
 
 class Beatmap:
     def __init__(self, **minfo):
@@ -35,6 +37,7 @@ class Beatmap:
         self.nc = minfo.get('nc', 0) # nc = next check (for status update)
         self.pp_cache = minfo.get('pp_cache', {})
         self.lb_cache: Optional[dict] = {}
+        self.mod_cache: Optional[dict] = {}
 
     @property
     def name(self):
@@ -82,33 +85,23 @@ class Beatmap:
         return f'{self.embed}  // 95%: {n95}pp | 98%: {n98}pp | 99%: {n99}pp | 100%: {n100}pp // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od}'
 
     async def calc_acc(self, acc: float):
-        p = pp.parser()
-        bmap = pp.beatmap()
-        stars = pp.diff_calc()
-
-        path = Path.cwd() / f'resources/maps/{self.id}.osu'
+        path = Path.cwd() / f'resources/maps/{self.map.id}.osu'
         if not path.exists():
-            url = f'https://old.ppy.sh/osu/{self.id}'
+            url = f'https://old.ppy.sh/osu/{self.map.id}'
 
             async with glob.web.get(url) as resp:
                 if not resp or resp.status != 200:
-                    ppv = 0
-                else:
-                    m = await resp.read()
-                    path.write_bytes(m)
-                    with open(path, 'r') as f:
-                        p.map(f, bmap=bmap)
+                    return 0.0
 
-                    stars.calc(bmap, 0)
-                    ppv, _, _, _, _ = pp.ppv2(stars.aim, stars.speed, bmap=bmap, mods=0, acc=acc)
-        else:
-            with open(path, 'r') as f:
-                p.map(f, bmap=bmap)
+                m = await resp.read()
+                path.write_bytes(m)
 
-            stars.calc(bmap, 0)
-            ppv, _, _, _, _ = pp.ppv2(stars.aim, stars.speed, bmap=bmap, mods=0, acc=acc)
+        p = asyncio.subprocess.PIPE
+        pr = await asyncio.create_subprocess_shell(f'./osu-tools/compiled/PerformanceCalculator simulate osu {str(path)} -a {acc} -j', stdout=p, stderr=p)
+        ot, _ = await pr.communicate()
+        o = orjson.loads(ot.decode('utf-8'))
+        ppv = round(o['pp'])
 
-        ppv = round(ppv)
         self.pp_cache[acc] = ppv
         await glob.db.execute('UPDATE maps SET pp_cache = $1 WHERE md5 = $2', str(self.pp_cache), self.md5)
         return ppv
@@ -178,6 +171,7 @@ class Beatmap:
             else:
                 pass
         else:
+            b.frozen = True
             await b.save()
 
         log(f'Retrieved Set ID {b.sid} from osu!api', Ansi.LCYAN)
@@ -228,7 +222,7 @@ class Beatmap:
                     continue
             else:
                 m['approved'] = apiStatuses(int(m['approved']))
-                m['frozen'] = False
+                m['frozen'] = True
                 m['pp_cache'] = {}
 
             b = self()
