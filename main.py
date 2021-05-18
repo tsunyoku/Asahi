@@ -15,7 +15,7 @@ from constants.countries import country_codes
 
 app = Quart(__name__) # handler for webserver :D
 app.config['SERVER_NAME'] = glob.config.domain
-glob.version = Version(0, 1, 9) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 2, 0) # set Asahi version, mainly for future updater but also for tracking
 
 CACHE_PATH = Path.cwd() / 'resources/cache'
 BCRYPT_CACHE_FILE = CACHE_PATH / 'bcrypt.p'
