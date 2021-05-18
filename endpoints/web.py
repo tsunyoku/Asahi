@@ -494,7 +494,14 @@ async def scoreSubmit():
             if fmt in val:
                 s.map.lb_cache[s.mode.value].remove(val)
 
-        s.map.lb_cache[s.mode.value].append(f'{s.id}|{s.user.name}|{st}|{s.combo}|{s.n50}|{s.n100}|{s.n300}|{s.miss}|{s.katu}|{s.geki}|{s.fc}|{s.mods}|{s.user.id}|{s.rank}|{s.time}|"1"')
+        for val in s.map.mod_cache.get(s.mode.value).get(s.mods): # using get to avoid errors as there may not be cache for the map in this case
+            if fmt in val:
+                s.map.mod_cache[s.mode.value][s.mods].remove(val)
+
+        s.map.lb_cache[s.mode.value].append(f'{s.id}|{s.user.name}|{st}|{s.combo}|{s.n50}|{s.n100}|{s.n300}|{s.miss}|{s.katu}|{s.geki}|{s.fc}|{s.mods}|{s.user.id}|{s.rank}|{s.time}|1')
+
+        if s.map.mod_cache.get(s.mode.value).get(s.mods): # only append to it if it exists else causing order errors if it eventually exists
+            s.map.mod_cache[s.mode.value][s.mods].append(f'{s.id}|{s.user.name}|{st}|{s.combo}|{s.n50}|{s.n100}|{s.n300}|{s.miss}|{s.katu}|{s.geki}|{s.fc}|{s.mods}|{s.user.id}|{s.rank}|{s.time}|1')
 
     log(f'[{s.mode.name}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
     return '\n'.join(charts).encode() # thank u osu
@@ -517,6 +524,8 @@ async def getReplay():
 
     if f.exists():
         return f.read_bytes()
+
+    return Response(b'', status=400) # osu wants empty response if there's no replay however quart doesn't like this so we just force the request to end xd
     
 
 
