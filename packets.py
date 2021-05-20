@@ -188,6 +188,9 @@ class BanchoPacketReader:
         while True:
             p_type, p_len = self.read_header()
 
+            if p_type == Packets.OSU_PING:
+                continue # we can ignore this, client is just telling us its still alive
+
             if p_type not in self.packet_map:
                 # packet type not handled, remove
                 # from internal buffer and continue.

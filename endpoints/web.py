@@ -3,12 +3,13 @@ from cmyui import log, Ansi
 from collections import defaultdict
 from urllib.parse import unquote
 from pathlib import Path
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
 
 import string
 import random
 import os
 import hashlib
-import bcrypt
 import time
 import orjson
 import re
@@ -180,7 +181,8 @@ async def ingameRegistration():
 
     if int(mpargs['check']) == 0:
         md5 = hashlib.md5(pw.encode()).hexdigest().encode()
-        bc = bcrypt.hashpw(md5, bcrypt.gensalt()).decode() # bcrypt i am begging pls make this faster some day i am actually crying
+        k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'')
+        bc = k.derive(md5).decode('unicode-escape')
 
         await glob.db.execute("INSERT INTO users (name, email, pw, safe_name) VALUES ($1, $2, $3, $4)", name, email, bc, name.lower().replace(' ', '_'))
         uid = await glob.db.fetchval("SELECT id FROM users WHERE name = $1", name)
