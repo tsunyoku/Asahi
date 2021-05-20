@@ -3,8 +3,12 @@ from quart import Blueprint, Response, request, make_response # web server :blob
 from cmyui import Ansi, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from geoip2 import database # for geoloc
 from re import compile
+
+# pw stuff xd
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
+
 import pyfiglet
-import bcrypt
 import uuid
 import time
 
@@ -284,24 +288,27 @@ async def root_client():
             resp.headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
             return resp
 
-        bcache = glob.cache['bcrypt'] # get our cached bcrypts to potentially enhance speed
-        pw_bcrypt = user['pw'].encode()
-        if pw_bcrypt in bcache:
-            if pw != bcache[pw_bcrypt]: # compare provided md5 with the stored (cached) bcrypt to ensure they have provided the correct password
+        bcache = glob.cache['pw'] # get our cached pws to potentially enhance speed
+        user_pw = user['pw'].encode('ISO-8859-1').decode('unicode-escape').encode('ISO-8859-1') # this is cursed SHUT UP
+        if user_pw in bcache:
+            if pw != bcache[user_pw]: # compare provided md5 with the stored (cached) pw to ensure they have provided the correct password
                 if glob.config.debug:
                     log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
                 resp = await make_response(packets.userID(-1))
                 resp.headers['cho-token'] = 'no'
                 return resp
         else:
-            if not bcrypt.checkpw(pw, pw_bcrypt): # compare provided md5 with the stored bcrypt to ensure they have provided the correct password
+            k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'')
+            try:
+                k.verify(pw, user_pw)
+            except:
                 if glob.config.debug:
                     log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
                 resp = await make_response(packets.userID(-1))
                 resp.headers['cho-token'] = 'no'
                 return resp
 
-            bcache[pw_bcrypt] = pw # cache pw for future
+            bcache[user_pw] = pw # cache pw for future
 
         if not user['priv'] & Privileges.Normal:
             resp = await make_response(packets.userID(-3)) # banned packet

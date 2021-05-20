@@ -18,7 +18,7 @@ app.config['SERVER_NAME'] = glob.config.domain
 glob.version = Version(0, 2, 0) # set Asahi version, mainly for future updater but also for tracking
 
 CACHE_PATH = Path.cwd() / 'resources/cache'
-BCRYPT_CACHE_FILE = CACHE_PATH / 'bcrypt.p'
+PW_CACHE_FILE = CACHE_PATH / 'pw.p'
 GEOLOC_CACHE_FILE = CACHE_PATH / 'geoloc.p'
 MAPS_CACHE_FILE = CACHE_PATH / 'maps.p'
 
@@ -67,10 +67,10 @@ async def connect(): # ran before server startup, used to do things like connect
     if not CACHE_PATH.exists():
         CACHE_PATH.mkdir(parents=True)
     else:
-        if BCRYPT_CACHE_FILE.exists():
-            with open(BCRYPT_CACHE_FILE, 'rb') as f:
+        if PW_CACHE_FILE.exists():
+            with open(PW_CACHE_FILE, 'rb') as f:
                 try:
-                    glob.cache['bcrypt'] |= dict(pickle.load(f))
+                    glob.cache['pw'] |= dict(pickle.load(f))
                 except EOFError:
                     pass
 
@@ -121,16 +121,16 @@ async def disconnect():
 
     # this is my most cursed creation part 2 | speed gains but im going to hell for this part 2
 
-    new_bcrypt = glob.cache['bcrypt']
-    if BCRYPT_CACHE_FILE.exists():
+    new_pw = glob.cache['pw']
+    if PW_CACHE_FILE.exists():
         try:
-            with open(BCRYPT_CACHE_FILE, 'rb') as file:
-                new_bcrypt |= dict(pickle.load(file))
+            with open(PW_CACHE_FILE, 'rb') as file:
+                new_pw |= dict(pickle.load(file))
         except EOFError:
             pass
 
-    with open(BCRYPT_CACHE_FILE, 'wb') as file:
-        pickle.dump(new_bcrypt, file, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(PW_CACHE_FILE, 'wb') as file:
+        pickle.dump(new_pw, file, protocol=pickle.HIGHEST_PROTOCOL)
 
     new_geoloc = glob.geoloc
     if GEOLOC_CACHE_FILE.exists():

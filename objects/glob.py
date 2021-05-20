@@ -16,9 +16,9 @@ web: 'ClientSession'
 
 packets: dict['Packets', 'BanchoPacket']
 
-# cache some things like bcrypt for speeeeeeeeeeeeeeeeeed hours
+# cache some things like pws for speeeeeeeeeeeeeeeeeed hours
 cache = {
-    'bcrypt': {}, # store bcrypt pws for speed hours
+    'pw': {}, # store encrypted pws for speed hours
     'maps': {}, # map cache cus xd
     'unsub': [] # unsubmitted maps xd
 }
