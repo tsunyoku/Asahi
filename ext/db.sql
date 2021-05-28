@@ -268,28 +268,28 @@ COPY public.users (id, name, email, pw, country, priv, safe_name) FROM stdin;
 -- Name: channels_id_seq; Type: SEQUENCE SET; Schema: public; Owner: tsunyoku
 --
 
-SELECT pg_catalog.setval('public.channels_id_seq', 2, true);
+SELECT pg_catalog.setval('public.channels_id_seq', 1, true);
 
 
 --
 -- Name: friends_id_seq; Type: SEQUENCE SET; Schema: public; Owner: tsunyoku
 --
 
-SELECT pg_catalog.setval('public.friends_id_seq', 1, true);
+SELECT pg_catalog.setval('public.friends_id_seq', 0, true);
 
 
 --
 -- Name: stats_id_seq; Type: SEQUENCE SET; Schema: public; Owner: tsunyoku
 --
 
-SELECT pg_catalog.setval('public.stats_id_seq', 3, true);
+SELECT pg_catalog.setval('public.stats_id_seq', 2, true);
 
 
 --
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: tsunyoku
 --
 
-SELECT pg_catalog.setval('public.users_id_seq', 3, true);
+SELECT pg_catalog.setval('public.users_id_seq', 2, true);
 
 
 --
