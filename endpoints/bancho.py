@@ -155,15 +155,22 @@ class joinChannel(BanchoPacket, type=Packets.OSU_CHANNEL_JOIN):
     name: osuTypes.string
 
     async def handle(self, user: Player):
-        chan = glob.channels.get(self.name)
+        if self.name == '#spectator':
+            if user.spectating is not None:
+                uid = user.spectating.id
+            elif user.spectators:
+                uid = user.id
+            else:
+                return # not spectating
+
+            chan = glob.channels.get(f'#spec_{uid}')
+        else:
+            chan = glob.channels.get(self.name)
 
         if not chan:
             return
 
         user.join_chan(chan)
-        user.enqueue(packets.channelJoin(chan.name))
-        for o in chan.players:
-            o.enqueue(packets.channelInfo(chan))
 
 @packet
 class leaveChannel(BanchoPacket, type=Packets.OSU_CHANNEL_PART):
@@ -173,7 +180,17 @@ class leaveChannel(BanchoPacket, type=Packets.OSU_CHANNEL_PART):
         if self.name in ['#highlight', '#userlog', '#multiplayer'] or not self.name.startswith('#'): # osu why!!!
             return
 
-        chan = glob.channels.get(self.name)
+        if self.name == '#spectator':
+            if user.spectating is not None:
+                uid = user.spectating.id
+            elif user.spectators:
+                uid = user.id
+            else:
+                return # not spectating
+
+            chan = glob.channels.get(f'#spec_{uid}')
+        else:
+            chan = glob.channels.get(self.name)
 
         if not chan:
             return

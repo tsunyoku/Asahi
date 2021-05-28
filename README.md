@@ -17,6 +17,7 @@ sudo apt install python3.9 python3.9-dev python3.9-distutils nginx build-essenti
 python3.9 -m pip install -r ext/requirements.txt
 wget https://bootstrap.pypa.io/get-pip.py
 python3.9 get-pip.py && rm get-pip.py
+sudo touch /tmp/asahi.sock && sudo chmod 777 /tmp/asahi.sock # create empty sock and give permissions (in case of nginx permission failures)
 ```
 
 You can find the database structure in ext/db.sql, you may want to import that before you advance. (Note: we use postgresql not mysql! You will also need to edit the sql file for use with your postgre user)
@@ -42,5 +43,11 @@ chmod +x ext/osu-tools.sh
 
 Finally, startup Asahi using hypercorn:
 ```bash
-hypercorn main.py -b 127.0.0.1:9384 --reload --log-level error
+hypercorn main.py -b unix:/tmp/asahi.sock --reload --log-level error
 ```
+
+## Related Projects
+
+None of these projects are worked on by me and any issues with them should not be redirected to me, these are simply Asahi-related projects.
+
+- [asahi-web](https://github.com/7ez/asahi-web)
