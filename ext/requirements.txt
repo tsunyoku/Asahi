@@ -7,3 +7,4 @@ aiohttp
 geoip2
 orjson
 py3rijndael
+uvloop
