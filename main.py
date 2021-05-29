@@ -6,6 +6,8 @@ from aiohttp import ClientSession
 import pyfiglet
 import pickle
 import asyncpg
+import asyncio
+import uvloop
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
@@ -30,6 +32,8 @@ RRX_PATH = Path.cwd() / 'resources/replays_rx'
 RAP_PATH = Path.cwd() / 'resources/replays_ap'
 
 MAPS_PATH = Path.cwd() / 'resources/maps'
+
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 @app.before_serving
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
