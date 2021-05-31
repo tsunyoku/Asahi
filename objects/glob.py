@@ -5,14 +5,18 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from aiohttp import ClientSession
 
-    from cmyui import AsyncSQLPool, Version
+    from cmyui import Version
 
     from packets import Packets, BanchoPacket
     from objects.player import Player
 
-db: 'AsyncSQLPool' # type hinting
+    import asyncpg
+    import aioredis
+
+db: 'asyncpg.connect' # type hinting
 version: 'Version' # once again, type hinting
 web: 'ClientSession'
+redis: 'aioredis.create_redis_pool'
 
 packets: dict['Packets', 'BanchoPacket']
 

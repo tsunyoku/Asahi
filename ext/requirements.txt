@@ -2,9 +2,9 @@ quart
 pyfiglet
 cmyui
 hypercorn
-bcrypt
 aiohttp
 geoip2
 orjson
 py3rijndael
 uvloop
+aioredis

@@ -13,7 +13,7 @@ First install any requirements:
 ```bash
 sudo add-apt-repository ppa:deadsnakes/ppa # for python 3.9
 sudo apt update
-sudo apt install python3.9 python3.9-dev python3.9-distutils nginx build-essential certbot postgresql postgresql-contrib
+sudo apt install python3.9 python3.9-dev python3.9-distutils nginx build-essential certbot postgresql postgresql-contrib redis-server
 python3.9 -m pip install -r ext/requirements.txt
 wget https://bootstrap.pypa.io/get-pip.py
 python3.9 get-pip.py && rm get-pip.py

@@ -71,7 +71,17 @@ class Player:
 
     async def set_stats(self):
         for mode in osuModes:
-            stat = await glob.db.fetchrow('SELECT rscore_{0} rscore, acc_{0} acc, pc_{0} pc, tscore_{0} tscore, rank_{0} rank, pp_{0} pp FROM stats WHERE id = $1'.format(mode.name), self.id)
+            stat = dict(await glob.db.fetchrow('SELECT rscore_{0} rscore, acc_{0} acc, pc_{0} pc, tscore_{0} tscore, pp_{0} pp FROM stats WHERE id = $1'.format(mode.name), self.id))
+
+            stat['rank'] = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}', self.id)
+            if stat['rank'] is None:
+                if stat['pp'] > 0:
+                    stat['rank'] = 1
+                else:
+                    stat['rank'] = 0
+            else:
+                stat['rank'] += 1
+
             self.stats[mode.value] = Stats(**stat)
 
     async def update_stats(self, mode: osuModes, table: str, mode_vn: int):
@@ -89,11 +99,11 @@ class Player:
         bonus = 416.6667 * (1 - 0.9994 ** len(s))
         stats.pp = round(weighted + bonus)
 
-        await glob.db.execute('UPDATE stats SET rscore_{0} = $1, acc_{0} = $2, pc_{0} = $3, tscore_{0} = $4, pp_{0} = $5 WHERE id = $6'.format(mode_name), stats.rscore, stats.acc, stats.pc, stats.tscore, stats.pp, self.id)
+        await glob.redis.zadd(f'asahi:leaderboard:{mode_name}', stats.pp, self.id)
+        stats.rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}', self.id) + 1
+        print(stats.rank)
 
-        rank = await glob.db.fetchrow('SELECT COUNT(*) AS r FROM stats LEFT OUTER JOIN users ON users.id = stats.id WHERE stats.pp_{0} > $1 AND users.priv & 1 > 0'.format(mode_name), stats.pp)
-        stats.rank = rank['r'] + 1
-        await glob.db.execute('UPDATE stats SET rank_{0} = $1 WHERE id = $2'.format(mode_name), stats.rank, self.id)
+        await glob.db.execute('UPDATE stats SET rscore_{0} = $1, acc_{0} = $2, pc_{0} = $3, tscore_{0} = $4, pp_{0} = $5 WHERE id = $6'.format(mode_name), stats.rscore, stats.acc, stats.pc, stats.tscore, stats.pp, self.id)
 
         self.enqueue(packets.userStats(self))
         for o in glob.players.values():
