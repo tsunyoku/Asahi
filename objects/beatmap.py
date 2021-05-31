@@ -153,7 +153,7 @@ class Beatmap:
         b.artist = bmap['artist']
         b.title = bmap['title']
         b.diff = bmap['version']
-        b.bmapper = bmap['creator']
+        b.mapper = bmap['creator']
 
         b.status = int(apiStatuses(int(bmap['approved'])))
         b.update = dt.strptime(bmap['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
@@ -241,7 +241,7 @@ class Beatmap:
             b.artist = m['artist']
             b.title = m['title']
             b.diff = m['version']
-            b.mper = m['creator']
+            b.mapper = m['creator']
 
             b.status = m['approved']
             b.frozen = m['frozen']
