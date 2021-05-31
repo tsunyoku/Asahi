@@ -176,7 +176,11 @@ async def disconnect():
 
     await glob.db.close()
     if glob.config.debug:
-        log('==== Closed database connection ====', Ansi.GREEN)
+        log('==== Closed PostgreSQL connection ====', Ansi.GREEN)
+
+    await glob.redis.close()
+    if glob.config.debug:
+        log('==== Closed Redis connection ====', Ansi.GREEN)
 
     log(f'==== Asahi v{glob.version} stopped ====', Ansi.GREEN)
 
