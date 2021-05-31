@@ -6,7 +6,14 @@ postgres = {
     'user': 'tsunyoku'
 }
 
-debug = True # debug is used to print more info & help to debug if you are experiencing issues with the server
+# redis auth info
+redis = {
+    'host': 'localhost',
+    'db': 0, # there's no reason why this shouldn't be 0, only change it if you are certain
+    'password': '' # unless you manually edited the config, this will always be blank
+}
+
+debug = False # debug is used to print more info & help to debug if you are experiencing issues with the server
 
 domain = 'tsunyoku.xyz' # domain for accepting requests
 menu_url = 'https://tsunyoku.xyz' # url to redirect to when clicking menu image

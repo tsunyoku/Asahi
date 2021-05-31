@@ -8,6 +8,7 @@ import pickle
 import asyncpg
 import asyncio
 import uvloop
+import aioredis
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
@@ -17,7 +18,7 @@ from constants.countries import country_codes
 
 app = Quart(__name__) # handler for webserver :D
 app.config['SERVER_NAME'] = glob.config.domain
-glob.version = Version(0, 2, 0) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 2, 1) # set Asahi version, mainly for future updater but also for tracking
 
 CACHE_PATH = Path.cwd() / 'resources/cache'
 PW_CACHE_FILE = CACHE_PATH / 'pw.p'
@@ -47,6 +48,17 @@ async def connect(): # ran before server startup, used to do things like connect
             log('==== Asahi connected to PostgreSQL ====', Ansi.GREEN)
     except Exception as error:
         log(f'==== Asahi failed to connect to PostgreSQL ====\n\n{error}', Ansi.LRED)
+
+    try:
+        if glob.config.redis['password'] != '':
+            glob.redis = await aioredis.create_redis_pool(f"redis://{glob.config.redis['host']}", db=glob.config.redis['db'], password=glob.config.redis['password'])
+        else:
+            glob.redis = await aioredis.create_redis_pool(f"redis://{glob.config.redis['host']}", db=glob.config.redis['db'])
+
+        if glob.config.debug:
+            log('==== Asahi connected to Redis ====', Ansi.GREEN)
+    except Exception as error:
+        log(f'==== Asahi failed to connect to Redis ====\n\n{error}', Ansi.LRED)
 
     if not AVA_PATH.exists():
         AVA_PATH.mkdir(parents=True)
@@ -171,8 +183,10 @@ async def disconnect():
 from endpoints.bancho import bancho
 from endpoints.avatars import avatars
 from endpoints.web import web
+from endpoints.api import api
 app.register_blueprint(bancho, subdomain='c')
 app.register_blueprint(bancho, subdomain='ce')
 app.register_blueprint(bancho, subdomain='c4')
 app.register_blueprint(avatars, subdomain='a')
 app.register_blueprint(web, subdomain='osu')
+app.register_blueprint(api, subdomain='api')

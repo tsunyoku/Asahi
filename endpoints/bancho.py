@@ -233,7 +233,7 @@ class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
         user.map_id = self.mid
 
         if self.actionid == 2:
-            user.info = f'{self.info} +{convert(self.mods)}'
+            user.info += f' +{convert(self.mods)}'
 
         for o in glob.players.values():
             o.enqueue(packets.userStats(user))
