@@ -100,8 +100,15 @@ class Player:
         stats.pp = round(weighted + bonus)
 
         await glob.redis.zadd(f'asahi:leaderboard:{mode_name}', stats.pp, self.id)
-        stats.rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}', self.id) + 1
-        print(stats.rank)
+        stats.rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}', self.id)
+
+        if stats.rank is None:
+            if stats.pp > 0:
+                stats.rank = 1
+            else:
+                stats.rank = 0
+        else:
+            stats.rank += 1
 
         await glob.db.execute('UPDATE stats SET rscore_{0} = $1, acc_{0} = $2, pc_{0} = $3, tscore_{0} = $4, pp_{0} = $5 WHERE id = $6'.format(mode_name), stats.rscore, stats.acc, stats.pc, stats.tscore, stats.pp, self.id)
 
