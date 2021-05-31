@@ -106,13 +106,12 @@ class sendPrivateMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
             return
 
         if target is glob.bot:
-
             regex_domain = glob.config.domain.replace('.', r'\.')
             npr = compile( # yikes
-                r"^\x01ACTION is (?:playing|editing|watching|listening to) "
-                rf"\[https://osu\.(?:{regex_domain}|ppy\.sh)/beatmapsets/(?P<sid>\d{{1,10}})#(?P<bid>\d{{1,10}}) .+\]" 
-                r"(?: <(?P<mode>Taiko|CatchTheBeat|osu!mania)>)?"
-                r"(?P<mods>(?: (?:-|\+|~|\|)\w+(?:~|\|)?)+)?\x01$"
+                r'^\x01ACTION is (?:playing|editing|watching|listening to) '
+                rf'\[https://osu\.(?:{regex_domain})/beatmapsets/(?P<sid>\d{{1,10}})#/?(?P<bid>\d{{1,10}})/? .+\]'
+                r'(?: <(?P<mode>Taiko|CatchTheBeat|osu!mania)>)?'
+                r'(?P<mods>(?: (?:-|\+|~|\|)\w+(?:~|\|)?)+)?\x01$'
             )
 
             if msg.startswith('!'):

@@ -85,9 +85,9 @@ class Beatmap:
         return f'{self.embed}  // 95%: {n95}pp | 98%: {n98}pp | 99%: {n99}pp | 100%: {n100}pp // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od}'
 
     async def calc_acc(self, acc: float):
-        path = Path.cwd() / f'resources/maps/{self.map.id}.osu'
+        path = Path.cwd() / f'resources/maps/{self.id}.osu'
         if not path.exists():
-            url = f'https://old.ppy.sh/osu/{self.map.id}'
+            url = f'https://old.ppy.sh/osu/{self.id}'
 
             async with glob.web.get(url) as resp:
                 if not resp or resp.status != 200:
