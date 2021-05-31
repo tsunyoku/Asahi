@@ -178,7 +178,8 @@ async def disconnect():
     if glob.config.debug:
         log('==== Closed PostgreSQL connection ====', Ansi.GREEN)
 
-    await glob.redis.close()
+    glob.redis.close()
+    await glob.redis.wait_closed()
     if glob.config.debug:
         log('==== Closed Redis connection ====', Ansi.GREEN)
 
