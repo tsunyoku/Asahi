@@ -135,7 +135,15 @@ CREATE TABLE public.stats (
     pp_std_rx integer DEFAULT 0 NOT NULL,
     pp_std_ap integer DEFAULT 0 NOT NULL,
     pp_taiko_rx integer DEFAULT 0 NOT NULL,
-    pp_catch_rx integer DEFAULT 0 NOT NULL
+    pp_catch_rx integer DEFAULT 0 NOT NULL,
+    mc_std integer DEFAULT 0 NOT NULL,
+    mc_std_rx integer DEFAULT 0 NOT NULL,
+    mc_std_ap integer DEFAULT 0 NOT NULL,
+    mc_taiko integer DEFAULT 0 NOT NULL,
+    mc_taiko_rx integer DEFAULT 0 NOT NULL,
+    mc_catch integer DEFAULT 0 NOT NULL,
+    mc_catch_rx integer DEFAULT 0 NOT NULL,
+    mc_mania integer DEFAULT 0 NOT NULL
 );
 
 

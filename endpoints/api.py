@@ -82,6 +82,7 @@ async def user():
             'pp': stats_db[f'pp_{mode}'],
             'ranked_score': stats_db[f'rscore_{mode}'],
             'total_score': stats_db[f'tscore_{mode}'],
+            'max_combo': stats_db[f'mc_{mode}'],
             'global_rank': await get_rank(f'{mode}', id, stats_db[f'pp_{mode}']),
             'country_rank': await get_country_rank(f'{mode}', id, stats_db[f'pp_{mode}'], info['country'].upper())
         }
@@ -96,6 +97,7 @@ async def user():
                 'pp': stats_db[f'pp_{mode}_{s}'],
                 'ranked_score': stats_db[f'rscore_{mode}_{s}'],
                 'total_score': stats_db[f'tscore_{mode}_{s}'],
+                'max_combo': stats_db[f'mc_{mode}_{s}'],
                 'global_rank': await get_rank(f'{mode}_{s}', id, stats_db[f'pp_{mode}_{s}']),
                 'country_rank': await get_country_rank(f'{mode}_{s}', id, stats_db[f'pp_{mode}_{s}'], info['country'].upper())
             }

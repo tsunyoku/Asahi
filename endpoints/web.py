@@ -385,6 +385,9 @@ async def scoreSubmit():
 
         if s.old_best:
             add -= s.old_best.score
+
+        if s.combo > old.max_combo:
+            stats.max_combo = s.combo
         
         stats.rscore += add
 
@@ -418,9 +421,9 @@ async def scoreSubmit():
         charts.append('|'.join((
             'chartId:beatmap',
             f'chartUrl:https://osu.ppy.sh/b/{s.map.id}',
-            'chartName:Current Score', # not sure if this is allowed to be customised ??
+            'chartName:Current Score',
 
-            *(( # wtaf | no previous stats for now
+            *(( # wtaf
                 chart_format('rank', s.old_best.rank, s.rank),
                 chart_format('rankedScore', s.old_best.score, s.score),
                 chart_format('totalScore', s.old_best.score, s.score),
@@ -449,14 +452,14 @@ async def scoreSubmit():
             chart_format('rank', old.rank, stats.rank),
             chart_format('rankedScore', old.rscore, stats.rscore),
             chart_format('totalScore', old.tscore, stats.tscore),
-            chart_format('maxCombo', None, None), # no max combo shit yet
+            chart_format('maxCombo', old.max_combo, stats.max_combo),
             chart_format('accuracy', round(old.acc, 2), round(stats.acc, 2)),
             chart_format('pp', old.pp, stats.pp)
         ) if old else (
             chart_format('rank', None, stats.rank),
             chart_format('rankedScore', None, stats.rscore),
             chart_format('totalScore', None, stats.tscore),
-            chart_format('maxCombo', None, None), # no max combo shit yet
+            chart_format('maxCombo', None, stats.max_combo),
             chart_format('accuracy', None, round(stats.acc, 2)),
             chart_format('pp', None, stats.pp)
         ))
