@@ -38,6 +38,16 @@ async def get_rank(mode, uid, pp):
         else:
             return 0
 
+async def get_country_rank(mode, uid, pp, country):
+    rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode}:{country}', uid)
+    if rank is not None:
+        return rank + 1
+    else:
+        if pp > 0:
+            return 1
+        else:
+            return 0
+
 @api.route('/player_count')
 async def onlinePlayers():
     return {'code': 200, 'online': len(glob.players) - 1}
@@ -72,7 +82,8 @@ async def user():
             'pp': stats_db[f'pp_{mode}'],
             'ranked_score': stats_db[f'rscore_{mode}'],
             'total_score': stats_db[f'tscore_{mode}'],
-            'global_rank': await get_rank(f'{mode}', id, stats_db[f'pp_{mode}'])
+            'global_rank': await get_rank(f'{mode}', id, stats_db[f'pp_{mode}']),
+            'country_rank': await get_country_rank(f'{mode}', id, stats_db[f'pp_{mode}'], info['country'].upper())
         }
 
         for s in ('rx', 'ap'):
@@ -85,7 +96,8 @@ async def user():
                 'pp': stats_db[f'pp_{mode}_{s}'],
                 'ranked_score': stats_db[f'rscore_{mode}_{s}'],
                 'total_score': stats_db[f'tscore_{mode}_{s}'],
-                'global_rank': await get_rank(f'{mode}_{s}', id, stats_db[f'pp_{mode}_{s}'])
+                'global_rank': await get_rank(f'{mode}_{s}', id, stats_db[f'pp_{mode}_{s}']),
+                'country_rank': await get_country_rank(f'{mode}_{s}', id, stats_db[f'pp_{mode}_{s}'], info['country'].upper())
             }
 
     return {'code': 200, 'info': info, 'stats': stats}
