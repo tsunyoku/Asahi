@@ -16,6 +16,7 @@ class Stats:
     pc: int
     tscore: int
     rank: int
+    country_rank: int
     pp: int
 
 class Player:
@@ -74,6 +75,7 @@ class Player:
             stat = dict(await glob.db.fetchrow('SELECT rscore_{0} rscore, acc_{0} acc, pc_{0} pc, tscore_{0} tscore, pp_{0} pp FROM stats WHERE id = $1'.format(mode.name), self.id))
 
             stat['rank'] = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}', self.id)
+
             if stat['rank'] is None:
                 if stat['pp'] > 0:
                     stat['rank'] = 1
@@ -81,6 +83,16 @@ class Player:
                     stat['rank'] = 0
             else:
                 stat['rank'] += 1
+
+            stat['country_rank'] = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}:{self.country_iso}', self.id)
+
+            if stat['country_rank'] is None:
+                if stat['pp'] > 0:
+                    stat['country_rank'] = 1
+                else:
+                    stat['country_rank'] = 0
+            else:
+                stat['country_rank'] += 1
 
             self.stats[mode.value] = Stats(**stat)
 
@@ -100,7 +112,9 @@ class Player:
         stats.pp = round(weighted + bonus)
 
         await glob.redis.zadd(f'asahi:leaderboard:{mode_name}', stats.pp, self.id)
+        await glob.redis.zadd(f'asahi:leaderboard:{mode_name}:{self.country_iso}', stats.pp, self.id)
         stats.rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}', self.id)
+        stats.country_rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}:{self.country_iso}', self.id)
 
         if stats.rank is None:
             if stats.pp > 0:
@@ -109,6 +123,14 @@ class Player:
                 stats.rank = 0
         else:
             stats.rank += 1
+
+        if stats.country_rank is None:
+            if stats.pp > 0:
+                stats.country_rank = 1
+            else:
+                stats.country_rank = 0
+        else:
+            stats.country_rank += 1
 
         await glob.db.execute('UPDATE stats SET rscore_{0} = $1, acc_{0} = $2, pc_{0} = $3, tscore_{0} = $4, pp_{0} = $5 WHERE id = $6'.format(mode_name), stats.rscore, stats.acc, stats.pc, stats.tscore, stats.pp, self.id)
 
