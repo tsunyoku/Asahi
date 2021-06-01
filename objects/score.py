@@ -151,9 +151,8 @@ class Score:
         return s
 
     async def calc_lb(self, table, sort, value):
-        # we will force score sort regardless of rx/ap for now until we have pp calc
         lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.mode = $2 AND {table}.status = 2 AND users.priv & 1 > 0 AND {table}.{sort} > $3', self.map.md5, self.mode.value, value)
-        self.rank = lb['r'] + 1 if lb else 1
+        return lb['r'] + 1 if lb else 1
 
     async def calc_pp(self):
         path = Path.cwd() / f'resources/maps/{self.map.id}.osu'
