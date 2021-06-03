@@ -16,9 +16,9 @@ class Channel:
 
     def send(self, f: 'Player', msg: str, send_self: bool):
         if not send_self:
-            self.enqueue(packets.sendMessage(f.name, msg, self.name, f.id), f.id)
+            self.enqueue(packets.sendMessage(f.name, msg, self.name, f.id), ignore=f.id)
         else:
-            self.enqueue(packets.sendMessage(f.name, msg, self.name, f.id))
+            self.enqueue(packets.sendMessage(f.name, msg, self.name, ignore=f.id))
 
     def add_player(self, user: 'Player'):
         self.players.append(user)
@@ -33,7 +33,11 @@ class Channel:
     def count(self):
         return len(self.players)
 
-    def enqueue(self, b: bytes, ignore: int = 0):
+    def enqueue(self, b: bytes, ignore: int = 0, ignore_list: list = []):
         for o in glob.players.values():
             if o.id != ignore:
-                o.enqueue(b)
+                if ignore_list:
+                    if o.id not in ignore_list:
+                        o.enqueue(b)
+                else:
+                    o.enqueue(b)

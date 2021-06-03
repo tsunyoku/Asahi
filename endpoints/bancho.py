@@ -16,8 +16,10 @@ import time
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
 from objects.player import Player # Player - player object to store stats, info etc.
 from objects.beatmap import Beatmap # Beatmap - object to score map info etc.
+from objects.channel import Channel
+from objects.match import slotStatus, Teams
 from constants.countries import country_codes
-from constants.types import osuTypes
+from constants.types import osuTypes, teamTypes
 from constants.privs import Privileges, ClientPrivileges
 from constants.mods import Mods, convert
 from constants import commands
@@ -141,7 +143,13 @@ class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
             else:
                 return
             c = glob.channels.get(f'#spec_{sid}')
-        elif chan not in ['#multiplayer', '#highlight', '#userlog']: # no mp stuff yet
+        elif chan == '#multiplayer':
+            if not user.match:
+                return
+
+            m = user.match.id
+            c = glob.channels.get(f'#multi_{m}')
+        elif chan not in ['#highlight', '#userlog']:
             c = glob.channels.get(chan)
 
         if not c:
@@ -163,6 +171,12 @@ class joinChannel(BanchoPacket, type=Packets.OSU_CHANNEL_JOIN):
                 return # not spectating
 
             chan = glob.channels.get(f'#spec_{uid}')
+        elif self.name == '#multiplayer':
+            if not user.match:
+                return
+
+            m = user.match.id
+            chan = glob.channels.get(f'#multi_{m}')
         else:
             chan = glob.channels.get(self.name)
 
@@ -176,7 +190,7 @@ class leaveChannel(BanchoPacket, type=Packets.OSU_CHANNEL_PART):
     name: osuTypes.string
 
     async def handle(self, user: Player):
-        if self.name in ['#highlight', '#userlog', '#multiplayer'] or not self.name.startswith('#'): # osu why!!!
+        if self.name in ['#highlight', '#userlog'] or not self.name.startswith('#'): # osu why!!!
             return
 
         if self.name == '#spectator':
@@ -188,6 +202,12 @@ class leaveChannel(BanchoPacket, type=Packets.OSU_CHANNEL_PART):
                 return # not spectating
 
             chan = glob.channels.get(f'#spec_{uid}')
+        elif self.name == '#multiplayer':
+            if not user.match:
+                return
+
+            m = user.match.id
+            chan = glob.channels.get(f'#multi_{m}')
         else:
             chan = glob.channels.get(self.name)
 
@@ -265,6 +285,387 @@ class specFrames(BanchoPacket, type=Packets.OSU_SPECTATE_FRAMES):
     async def handle(self, user: Player):
         for u in user.spectators:
             u.enqueue(packets.spectateFrames(self.frames))
+
+@packet
+class osuPing(BanchoPacket, type=Packets.OSU_PING):
+    async def handle(self, user: Player):
+        pass # useless packet thank you osu
+
+@packet
+class joinLobby(BanchoPacket, type=Packets.OSU_JOIN_LOBBY):
+    async def handle(self, user: Player):
+        for m in glob.matches:
+            user.enqueue(packets.newMatch(m))
+
+@packet
+class leaveLobby(BanchoPacket, type=Packets.OSU_JOIN_LOBBY):
+    async def handle(self, user: Player):
+        pass # ? xd
+
+@packet
+class createMatch(BanchoPacket, type=Packets.OSU_CREATE_MATCH):
+    match: osuTypes.match
+
+    async def handle(self, user: Player):
+        glob.matches[self.match.id] = self.match
+        if not glob.matches.get(self.match.id):
+            user.enqueue(packets.matchJoinFail())
+            return
+
+        mp_chan = Channel(name=f'#multiplayer', desc=f'Multiplayer channel for match ID {self.match.id}', auto=False, perm=False)
+        glob.channels[f'#multi_{self.match.id}'] = mp_chan
+        self.match.chat = mp_chan
+
+        user.join_match(self.match, self.match.pw)
+        log(f'{user.name} created new multiplayer lobby.', Ansi.LBLUE)
+
+@packet
+class joinMatch(BanchoPacket, type=Packets.OSU_JOIN_MATCH):
+    id: osuTypes.i32
+    pw: osuTypes.string
+
+    async def handle(self, user):
+        if not (match := glob.matches[self.id]):
+            user.enqueue(packets.matchJoinFail())
+            return
+        
+        user.join_match(match, self.pw)
+
+@packet
+class leaveMatch(BanchoPacket, type=Packets.OSU_PART_MATCH):
+    async def handle(self, user: Player):
+        user.leave_match()
+
+@packet
+class changeMatchSlot(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_SLOT):
+    id: osuTypes.i32
+
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+        
+        if match.slots[id].status != slotStatus.open:
+            return
+
+        old = match.get_slot(user)
+
+        new = match.slots[self.id]
+        new.copy(old)
+
+        old.reset()
+
+        match.enqueue_state()
+
+@packet
+class playerReady(BanchoPacket, type=Packets.OSU_MATCH_READY):
+    async def handle(self, user):
+        if not (match := user.match):
+            return
+        
+        slot = match.get_slot(user)
+        slot.status = slotStatus.ready
+
+        match.enqueue_state(lobby=False)
+
+@packet
+class lockSlot(BanchoPacket, type=Packets.OSU_MATCH_LOCK):
+    id: osuTypes.i32
+
+    async def handle(self, user):
+        if not (match := user.match):
+            return
+        
+        if user is not match.host:
+            return
+        
+        slot = match.slots[self.id]
+
+        if slot.status == slotStatus.locked:
+            slot.status = slotStatus.open
+        else:
+            if slot.player is match.host:
+                return
+
+            slot.status = slotStatus.locked
+
+        match.enqueue_state()
+
+@packet
+class changeMatchSettings(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_SETTINGS):
+    m: osuTypes.match
+
+    async def handle(self, user):
+        if not (match := user.match):
+            return
+        
+        if user is not match.host:
+            return
+
+        if self.m.fm != match.fm:
+            match.fm = self.m.fm
+
+        if self.m.fm:
+            for s in match.slots:
+                if s.status & slotStatus.has_player:
+                    s.mods = match.mods & ~Mods.SPEED_MODS
+
+            match.mods &= Mods.SPEED_MODS
+        else:
+            host = match.get_host()
+            match.mods &= Mods.SPEED_MODS
+            match.mods |= host.mods
+
+            for s in match.slots:
+                if s.status & slotStatus.has_player:
+                    s.mods = Mods.NOMOD
+
+        if self.m.bname == '':
+            match.unready_players(slotStatus.ready)
+
+        if self.m.bmd5 != match.bmd5:
+            m = await Beatmap.md5_sql(self.m.bmd5)
+
+            if m:
+                match.bid = m.id
+                match.bmd5 = m.md5
+                match.bname = m.name
+                match.mode = m.mode
+            else:
+                match.bid = self.m.bid
+                match.bmd5 = self.m.bmd5
+                match.bname = self.m.bname
+                match.mode = self.m.mode
+
+        if match.type != self.m.type:
+            if self.m.type in (teamTypes.head, teamTypes.tag):
+                team = Teams.neutral
+            else:
+                team = Teams.red
+
+            for s in match.slots:
+                if s.status & slotStatus.has_player:
+                    s.team = team
+
+            match.type = self.m.type
+
+        if match.win_cond != self.m.win_cond:
+            match.win_cond = self.m.win_cond
+
+        match.name = self.m.name
+
+        match.enqueue_state()
+
+@packet
+class startMatch(BanchoPacket, type=Packets.OSU_MATCH_START):
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+
+        if user is not match.host:
+            return
+        
+        match.start()
+
+@packet
+class updateMatchScore(BanchoPacket, type=Packets.OSU_MATCH_SCORE_UPDATE):
+    data: osuTypes.raw
+
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+        
+        r = bytearray(b'0\x00\x00')
+        r += len(self.data).to_bytes(4, 'little')
+        r += self.data
+        r[11] = match.get_slot_id(user)
+
+        match.enqueue(bytes(r), lobby=False)
+
+@packet
+class finishMatch(BanchoPacket, type=Packets.OSU_MATCH_COMPLETE):
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+
+        slot = match.get_slot(user)
+        slot.status = slotStatus.complete
+
+        if any((s.status is slotStatus.playing for s in match.slots)):
+            return
+
+        no_play = []
+
+        for slot in match.slots:
+            if slot.status & slotStatus.has_player and slot.status != slotStatus.complete():
+                no_play.append(slot.player.id)
+
+        match.unready_players(slotStatus.complete)
+        match.in_prog = False
+
+        match.enqueue(packets.matchComplete(), lobby=False, ignore=no_play)
+        match.enqueue_state()
+
+@packet
+class changeMatchMods(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_MODS):
+    mods: osuTypes.i32
+
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+
+        if match.fm:
+            if user is match.host:
+                match.mods = self.mods & Mods.SPEED_MODS
+
+            slot = match.get_slot(user)
+            slot.mods = self.mods & ~Mods.SPEED_MODS
+        else:
+            if user is not match.host:
+                return
+
+            match.mods = self.mods
+        
+        match.enqueue_state()
+
+@packet
+class matchLoaded(BanchoPacket, type=Packets.OSU_MATCH_LOAD_COMPLETE):
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+        
+        slot = match.get_slot(user)
+        slot.loaded = True
+
+        slot_bools = [s.playing for s in match.slots]
+        if not any(slot_bools):
+            match.enqueue(packets.matchAllLoaded(), lobby=False)
+
+@packet
+class matchPlayerMissingMap(BanchoPacket, type=Packets.OSU_MATCH_NO_BEATMAP):
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+
+        slot = match.get_slot(user)
+        slot.status = slotStatus.no_map
+
+        match.enqueue_state(lobby=False)
+
+@packet
+class matchPlayerUnready(BanchoPacket, type=Packets.OSU_MATCH_NOT_READY):
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+
+        slot = match.get_slot(user)
+        slot.status = slotStatus.not_ready
+
+        match.enqueue_state(lobby=False)
+
+@packet
+class matchPlayerFailed(BanchoPacket, type=Packets.OSU_MATCH_FAILED):
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+
+        slot = match.get_slot_id(user)
+        match.enqueue(packets.matchPlayerFailed(slot), lobby=False)
+
+@packet
+class matchPlayerHasMap(BanchoPacket, type=Packets.OSU_MATCH_HAS_BEATMAP):
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+
+        slot = match.get_slot(user)
+        slot.status = slotStatus.not_ready
+
+        match.enqueue_state(lobby=False)
+
+@packet
+class matchPlayerSkip(BanchoPacket, type=Packets.OSU_MATCH_SKIP_REQUEST):
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+    
+        slot = match.get_slot(user)
+        slot.skipped = True
+
+        match.enqueue(packets.matchPlayerSkipped(user.id))
+
+        for slot in match.slots:
+            if slot.status is slotStatus.playing and not slot.skipped:
+                return
+        
+        match.enqueue(packets.matchSkip(), lobby=False)
+
+@packet
+class matchChangeHost(BanchoPacket, type=Packets.OSU_MATCH_TRANSFER_HOST):
+    slot: osuTypes.i32
+
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+        
+        if user is not match.host:
+            return
+
+        if not (host := match.slots[self.slot].player):
+            return
+
+        match.host = host
+        match.host.enqueue(packets.matchTransferHost())
+
+        match.enqueue_state()
+
+@packet
+class matchPlayerChangeTeam(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_TEAM):
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+        
+        slot = match.get_slot(user)
+
+        if slot.team is Teams.teamless:
+            return # ???
+
+        if slot.team is Teams.blue:
+            slot.team = Teams.red
+        else:
+            slot.team = Teams.blue
+
+        match.enqueue_state(lobby=False)
+
+@packet
+class matchInvite(BanchoPacket, type=Packets.OSU_MATCH_INVITE):
+    uid: osuTypes.i32
+
+    async def handle(self, user: Player):
+        if not user.match:
+            return
+        
+        if not (target := glob.players_id.get(self.uid)):
+            return
+        
+        if target is glob.bot:
+            return
+        
+        target.enqueue(packets.matchInvite(user, target.name))
+
+@packet
+class matchChangePassword(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_PASSWORD):
+    m: osuTypes.match
+
+    async def handle(self, user: Player):
+        if not (match := user.match):
+            return
+        
+        if user is not match.host:
+            return
+
+        match.pw = self.m.pw
+
+        match.enqueue_state()
 
 @bancho.route("/", methods=['GET']) # only accept GET requests as POST is for login method, see login method below
 async def root_http():
@@ -407,6 +808,9 @@ async def root_client():
     # handle any packets the client has sent
     for packet in BanchoPacketReader(body, glob.packets):
         await packet.handle(p)
+
+        if glob.config.debug:
+            log(f'Packet {packet.type.name} handled for user {p.name}', Ansi.LMAGENTA)
 
     data = bytearray()
     while not p.queue_empty():

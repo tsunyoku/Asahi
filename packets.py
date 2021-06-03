@@ -1,6 +1,8 @@
 # reader/writer is taken from cmyui's gulag until i can write my own however the packet handlers are my own
 
 import struct
+import asyncio
+
 from collections import namedtuple
 from enum import IntEnum
 from enum import unique
@@ -8,8 +10,13 @@ from functools import cache
 from functools import partialmethod
 from typing import Any, Optional
 
-from constants.types import osuTypes
+from constants.types import osuTypes, winConditions, teamTypes
+from constants.modes import osuModes
+from constants.mods import Mods
 from objects import glob
+
+from objects.match import Match, slotStatus, Teams
+from objects.beatmap import Beatmap
 
 _specifiers = (
     '<b', '<B', # 8
@@ -244,6 +251,8 @@ class BanchoPacketReader:
                 val = self.read_message()
             elif arg_type == osuTypes.channel:
                 val = self.read_channel()
+            elif arg_type == osuTypes.match:
+                val = self.read_match()
 
             elif arg_type == osuTypes.raw:
                 # return all packet data raw.
@@ -356,6 +365,47 @@ class BanchoPacketReader:
             desc = self.read_string(),
             players = self.read_i32()
         )
+    
+    def read_match(self) -> Match:
+        match = Match()
+
+        self.view = self.view[3:]
+
+        self.read_i8()
+
+        match.mods = Mods(self.read_i32())
+        match.name = self.read_string()
+        match.pw = self.read_string()
+
+        match.bname = self.read_string()
+        match.bid = self.read_i32()
+        match.bmd5 = self.read_string()
+
+        for slot in match.slots:
+            slot.status = slotStatus(self.read_i8())
+
+        for slot in match.slots:
+            slot.team = Teams(self.read_i8())
+
+        for slot in match.slots:
+            if slot.status & slotStatus.has_player:
+                self.view = self.view[4:]
+
+        match.host = glob.players_id[self.read_i32()]
+
+        match.mode = osuModes(self.read_i8())
+        match.win_cond = winConditions(self.read_i8())
+        match.type = teamTypes(self.read_i8())
+
+        match.fm = self.read_i8() == 1
+
+        if match.fm:
+            for slot in match.slots:
+                slot.mods = Mods(self.read_i32())
+
+        match.seed = self.read_i32()
+
+        return match
 
 def write_uleb128(num: int) -> bytearray:
     """ Write `num` into an unsigned LEB128. """
@@ -412,6 +462,42 @@ def write_channel(name: str, desc: str,
     ret += players.to_bytes(2, 'little')
     return ret
 
+def write_match(m: Match, send_pw) -> bytearray:
+    if m.pw:
+        if send_pw:
+            pw = write_string(m.pw)
+        else:
+            pw = b'\x0b\x00'
+    else:
+        pw = b'\x00'
+
+    r = bytearray(struct.pack('<HbbI', m.id, m.in_prog, 0, m.mods))
+    r += write_string(m.name)
+    r += pw
+
+    r += write_string(m.bname)
+    r += (m.bid).to_bytes(4, 'little', signed=True)
+    r += write_string(m.bmd5)
+
+    r.extend([slot.status for slot in m.slots])
+    r.extend([slot.team for slot in m.slots])
+
+    for slot in m.slots:
+        if slot.status & slotStatus.has_player:
+            r += (slot.player.id).to_bytes(4, 'little')
+
+    r += (m.host.id).to_bytes(4, 'little')
+
+    r.extend((m.mode.value, m.win_cond, m.type, m.fm))
+
+    if m.fm:
+        for slot in m.slots:
+            r += (slot.mods).to_bytes(4, 'little')
+
+    r += (m.seed).to_bytes(4, 'little') # seed is troll
+
+    return r
+
 def write(packid: int, *args: tuple[Any, ...]) -> bytes:
     """ Write `args` into bytes. """
     ret = bytearray(struct.pack('<Hx', packid))
@@ -427,6 +513,8 @@ def write(packid: int, *args: tuple[Any, ...]) -> bytes:
             ret += write_message(*p_args)
         elif p_type == osuTypes.channel:
             ret += write_channel(*p_args)
+        elif p_type == osuTypes.match:
+            ret += write_match(*p_args)
         else:
             # not a custom type, use struct to pack the data.
             ret += struct.pack(_specifiers[p_type], p_args)
@@ -533,6 +621,7 @@ def menuIcon() -> bytes:
 def friends(friends) -> bytes:
     return write(Packets.CHO_FRIENDS_LIST, (friends, osuTypes.i32_list)) # force just user itself for now to make sure it works
 
+@cache
 def silenceEnd(unix: int) -> bytes:
     return write(Packets.CHO_SILENCE_END, (unix, osuTypes.i32))
 
@@ -574,3 +663,55 @@ def channelInfo(chan) -> bytes:
 
 def channelKick(chan: str) -> bytes:
     return write(Packets.CHO_CHANNEL_KICK, (chan, osuTypes.string))
+
+@cache
+def matchJoinFail() -> bytes:
+    return write(Packets.CHO_MATCH_JOIN_FAIL)
+
+def matchJoinSuccess(match) -> bytes:
+    return write(Packets.CHO_MATCH_JOIN_SUCCESS, ((match, True), osuTypes.match))
+
+def updateMatch(match, send_pw) -> bytes:
+    return write(Packets.CHO_UPDATE_MATCH, ((match, send_pw), osuTypes.match))
+
+@cache
+def disposeMatch(id) -> bytes:
+    return write(Packets.CHO_DISPOSE_MATCH, (id, osuTypes.i32))
+
+@cache
+def matchTransferHost() -> bytes:
+    return write(Packets.CHO_MATCH_TRANSFER_HOST)
+
+def matchStart(match) -> bytes:
+    return write(Packets.CHO_MATCH_START, ((match, True), osuTypes.match))
+
+@cache
+def matchComplete() -> bytes:
+    return write(Packets.CHO_MATCH_COMPLETE)
+
+@cache
+def matchAllLoaded() -> bytes:
+    return write(Packets.CHO_MATCH_ALL_PLAYERS_LOADED)
+
+@cache
+def matchPlayerFailed(sid) -> bytes:
+    return write(Packets.CHO_MATCH_PLAYER_FAILED, (sid, osuTypes.i32))
+
+@cache
+def matchSkip() -> bytes:
+    return write(Packets.CHO_MATCH_SKIP)
+
+@cache
+def matchPlayerSkipped(uid) -> bytes:
+    return write(Packets.CHO_MATCH_PLAYER_SKIPPED, (uid, osuTypes.i32))
+
+@cache
+def matchTransferHost() -> bytes:
+    return write(Packets.CHO_MATCH_TRANSFER_HOST)
+
+def matchInvite(f, to) -> bytes:
+    msg = f'{f.name} invited you to join {f.match.embed}!'
+    return write(Packets.CHO_MATCH_INVITE, ((f.name, msg, to, f.id), osuTypes.message))
+
+def newMatch(m) -> bytes:
+    return write(Packets.CHO_NEW_MATCH, ((m, True), osuTypes.match))

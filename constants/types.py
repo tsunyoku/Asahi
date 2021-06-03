@@ -17,9 +17,24 @@ class osuTypes(IntEnum):
     # osu
     message = 11
     channel = 12
+    match = 13
 
     # misc
     i32_list   = 17 # 2 bytes len
     i32_list4l = 18 # 4 bytes len
     string     = 19
     raw        = 20
+
+@unique
+class teamTypes(IntEnum):
+    head = 0
+    tag = 1
+    team = 2
+    tag_team = 3
+
+@unique
+class winConditions(IntEnum):
+    score = 0
+    acc = 1
+    combo = 2
+    scorev2 = 3

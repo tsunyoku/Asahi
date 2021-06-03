@@ -1,8 +1,10 @@
 from objects import glob
 from objects.channel import Channel
 from objects.beatmap import Beatmap
+from objects.match import Slot, slotStatus, Teams, Match
 from constants.privs import Privileges, ClientPrivileges
 from constants.modes import osuModes
+from constants.types import teamTypes
 from typing import Optional
 from dataclasses import dataclass
 from cmyui import log, Ansi
@@ -46,6 +48,8 @@ class Player:
         self.spectators: list[Player] = []
         self.spectating: Optional[Player] = None
         self.channels: list[Channel] = []
+
+        self.match: Optional[Match] = None
 
         self.np: Optional[Beatmap] = None
 
@@ -251,12 +255,73 @@ class Player:
 
         log(f'{self.name} left channel {chan.name}', Ansi.LBLUE)
 
+    def join_match(self, match, pw):
+        if self.match:
+            self.enqueue(packets.matchJoinFail())
+            return
+
+        if self is not match.host:
+            if pw != match.pw:
+                log(f'{self.name} tried to join multiplayer {match.name} with incorrect password', Ansi.LRED)
+                self.enqueue(packets.matchJoinFail())
+                return
+
+            if not (id := match.next_free()):
+                self.enqueue(packets.matchJoinFail())
+                return
+        else:
+            id = 0
+
+        self.join_chan(match.chat)
+
+        slot = match.slots[id]
+
+        if match.type in (teamTypes.team, teamTypes.tag_team):
+            slot.team = Teams.red
+
+        slot.status = slotStatus.not_ready
+        slot.player = self
+
+        self.match = match
+
+        self.enqueue(packets.matchJoinSuccess(match))
+
+        match.enqueue_state()
+
+    def leave_match(self):
+        if not self.match:
+            return
+
+        if (slot := self.match.get_slot(self)):
+            slot.reset()
+
+        self.leave_chan(self.match.chat)
+
+        if all((s.empty for s in self.match.slots)):
+            glob.matches.pop(self.match.id)
+            glob.channels.pop(f'#multi_{self.match.id}')
+            glob.channels['#lobby'].enqueue(packets.disposeMatch(self.match.id))
+        else:
+            if self is self.match.host:
+                for s in self.match.slots:
+                    if s.status & slotStatus.has_player:
+                        self.match.host = s.player
+                        self.match.host.enqueue(packets.matchTransferHost())
+                        break
+
+            self.match.enqueue_state()
+        
+        self.match = None
+
     def logout(self):
         glob.players.pop(self.token)
         glob.players_name.pop(self.name)
 
         if host := self.spectating:
             host.remove_spectator(self)
+
+        if self.match:
+            self.leave_match()
 
         for o in glob.players.values():
             o.enqueue(packets.logout(self.id))
