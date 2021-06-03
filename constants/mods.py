@@ -34,6 +34,8 @@ class Mods(IntFlag):
     SCOREV2     = 1 << 29
     MIRROR      = 1 << 30
 
+    SPEED_MODS = DOUBLETIME | NIGHTCORE | HALFTIME
+
 def convert(m: int):
     if not m:
         return 'NM'
