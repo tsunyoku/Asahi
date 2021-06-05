@@ -26,12 +26,14 @@ Now, edit your nginx config (found in ext/nginx.conf), here we will generate the
 ```bash
 sudo certbot certonly --manual --preferred-challenges=dns --email your@email.com --server https://acme-v02.api.letsencrypt.org/directory --agree-tos -d *.your.domain -d your.domain # change your.domain & email to your own
 sudo ln ext/nginx.conf /etc/nginx/sites-enabled/asahi.conf # make a link between nginx folder and asahi's folder so you can easy edit the config as needed
+sudo nano ext/nginx.conf # edit the config
 sudo nginx -s reload # reload nginx config
 ```
 
 Now, copy the config file and edit the config:
 ```bash
 cp ext/config.sample.py config.py
+nano config.py
 ```
 
 We also want to compile the pp system:
