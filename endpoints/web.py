@@ -236,29 +236,23 @@ async def getMapScores():
         for o in glob.players.values():
             o.enqueue(packets.userStats(player))
 
-    if not (bmap := Beatmap.md5_cache(md5)):
-        if not (bmap := await Beatmap.md5_sql(md5)):
-            if sid != -1:
-                await Beatmap.cache(sid)
-                bmap = Beatmap.md5_cache(md5)
-            else:
-                bmap = await Beatmap.md5_api(md5)
+    bmap = await Beatmap.from_md5(md5)
 
-        if not bmap:
-            file = args['f'].replace('+', '')
-            reg = re.compile(r'^(?P<artist>.+) - (?P<title>.+) \((?P<mapper>.+)\) \[(?P<diff>.+)\]\.osu$') # fuck sake osu why do this to me
-            if not (info := reg.match(unquote(file))): # once again osu why
-                # invalid file? idfk
-                glob.cache['unsub'].append(md5)
-                return b'-1|false'
+    if not bmap:
+        file = args['f'].replace('+', '')
+        reg = re.compile(r'^(?P<artist>.+) - (?P<title>.+) \((?P<mapper>.+)\) \[(?P<diff>.+)\]\.osu$') # fuck sake osu why do this to me
+        if not (info := reg.match(unquote(file))): # once again osu why
+            # invalid file? idfk
+            glob.cache['unsub'].append(md5)
+            return b'-1|false'
 
-            exists = await glob.db.fetchval('SELECT 1 FROM maps WHERE artist = $1 AND title = $2 AND diff = $3 AND mapper = $4', info['artist'], info['title'], info['diff'], info['mapper'])
+        exists = await glob.db.fetchval('SELECT 1 FROM maps WHERE artist = $1 AND title = $2 AND diff = $3 AND mapper = $4', info['artist'], info['title'], info['diff'], info['mapper'])
 
-            if exists:
-                return b'1|false' # bmap submitted but not up to date, send update available
-            else:
-                glob.cache['unsub'].append(md5)
-                return b'-1|false' # bmap or other version of bmap cannot be found, must be unsubmitted
+        if exists:
+            return b'1|false' # bmap submitted but not up to date, send update available
+        else:
+            glob.cache['unsub'].append(md5)
+            return b'-1|false' # bmap or other version of bmap cannot be found, must be unsubmitted
 
     if not bmap.frozen and bmap.nc < time.time():
         await bmap.check_status()
@@ -447,8 +441,42 @@ async def getReplay():
         return f.read_bytes()
 
     return Response(b'', status=400) # osu wants empty response if there's no replay however quart doesn't like this so we just force the request to end xd
-    
 
+@web.route("/web/lastfm.php")
+async def lastFM():
+    args = request.args
+    if not auth(args['us'], args['ha']):
+        return Response(b'', status=400)
 
+    player = g.pop("player")
 
-        
+    b = args['b']
+
+    if b[0] != 'a':
+        return b'-3'
+
+    flags = int(b[1:])
+
+    # this is quite ugly but whatev
+    if flags & 1 << 1: # speed hack
+        return await player.ban(reason='osu!anticheat flags (speed hack)')
+    if flags & 1 << 4: # checksum failure
+        return await player.ban(reason='osu!anticheat flags (checksum failure)')
+    if flags & 1 << 5: # fl tampering
+        return await player.ban(reason='osu!anticheat flags (fl cheating)')
+    if flags & 1 << 8: # fl hack (tampering v2):
+        return await player.ban(reason='osu!anticheat flags (fl cheating)')
+    if flags & 1 << 9: # spin hack
+        return await player.ban(reason='osu!anticheat flags (spin hack)')
+    if flags & 1 << 10: # transparent window?
+        return await player.ban(reason='osu!anticheat flags (transparent window)')
+    if flags & 1 << 11: # mania fast presses:
+        return await player.ban(reason='osu!anticheat flags (mania fast presses)')
+    if flags & 1 << 12 or flags & 1 << 13: # autobot
+        return await player.ban(reason='osu!anticheat (autobot)')
+    if flags & 1 << 14 or flags & 1 << 15 or flags & 1 << 16 or flags & 1 << 17 or flags & 1 << 18: # hqosu
+        return await player.ban(reason='osu!anticheat flags (hqosu)')
+    if flags & 1 << 20: # old aqn (enlighten crack most likely xd)
+        return await player.ban(reason='osu!anticheat flags (old aqn)')
+
+    return b'-3'

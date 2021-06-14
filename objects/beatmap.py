@@ -65,7 +65,7 @@ class Beatmap:
         return m
 
     @staticmethod
-    def md5_cache(md5: str):
+    def cache(md5: str):
         if (bmap := glob.cache['maps'].get(md5)):
             return bmap
 
@@ -103,27 +103,36 @@ class Beatmap:
         ppv = round(o['pp'])
 
         self.pp_cache[acc] = ppv
-        await glob.db.execute('UPDATE maps SET pp_cache = $1 WHERE md5 = $2', str(self.pp_cache), self.md5)
         return ppv
+    
+    @classmethod
+    async def from_md5(self, md5: str):
+        if (bmap := self.cache(md5)): # first attempt cache
+            return bmap
+
+        if (bmap := await self.sql(md5)): # next, attempt from sql
+            return bmap
+
+        if (bmap := await self.api(md5)):
+            return bmap
+        
+        return # can't find from cache, sql or api so map must be unsubmitted by this point
 
     @classmethod
-    async def md5_sql(self, md5: str):
+    async def sql(self, md5: str):
         bmap = await glob.db.fetchrow('SELECT * FROM maps WHERE md5 = $1', md5)
+
         if not bmap:
-            return
+            return # not in sql so we know to attempt from api next
 
         m = self(**bmap)
-        try:
-            m.pp_cache = dict(bmap['pp_cache'])
-        except ValueError:
-            m.pp_cache = {}
 
-        glob.cache['maps'][bmap['md5']] = m
+        glob.cache['maps'][bmap['md5']] = m # cache the map now we have it from sql
 
         return m
 
     @classmethod
-    async def md5_api(self, md5: str):
+    async def api(self, md5: str):
         api = 'https://old.ppy.sh/api/get_beatmaps'
         params = {'k': glob.config.api_key, 'h': md5}
 
@@ -171,90 +180,13 @@ class Beatmap:
             else:
                 pass
         else:
-            b.frozen = True
+            b.frozen = False # don't freeze by default, we can override if someone manually edits the map status
             await b.save()
+
+        glob.cache['maps'][md5] = b # cache the map now we have it from api & saved in sql
 
         log(f'Retrieved Set ID {b.sid} from osu!api', Ansi.LCYAN)
         return b
-
-    @classmethod
-    async def cache(self, sid: int):
-        api = 'https://old.ppy.sh/api/get_beatmaps'
-        params = {'k': glob.config.api_key, 's': sid}
-
-        async with glob.web.get(api, params=params) as resp:
-            if resp.status != 200 or not resp:
-                return # request failed, map prob doesnt exist
-            
-            data = await resp.json()
-            if not data:
-                return
-
-        bmap = await glob.db.fetchrow('SELECT id, status, frozen, update, pp_cache FROM maps WHERE sid = $1', sid)
-
-        exist = {}
-        try:
-            exist[bmap['id']] = {}
-            for k, v in bmap.items():
-                exist[bmap['id']][k] = v
-        except (AttributeError, TypeError): # incase map aint in db, we dont wanna stop it from loading
-            pass
-
-        for m in data:
-            mid = int(m['beatmap_id'])
-            m['last_update'] = dt.strptime(m['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
-            if mid in exist:
-                try:
-                    m['pp_cache'] = dict(exist[mid]['pp_cache'])
-                except ValueError:
-                    m['pp_cache'] = {}
-
-                if m['last_update'] > exist[mid]['update']:
-                    status = apiStatuses(int(m['approved']))
-
-                    if exist[mid]['frozen'] and status != exist[mid]['status']:
-                        m['approved'] = exist[mid]['status']
-                        m['frozen'] = True
-                    else:
-                        m['approved'] = status
-                        m['frozen'] = False
-                else:
-                    continue
-            else:
-                m['approved'] = apiStatuses(int(m['approved']))
-                m['frozen'] = True
-                m['pp_cache'] = {}
-
-            b = self()
-            b.id = mid
-            b.sid = sid
-            b.md5 = m['file_md5']
-
-            b.bpm = float(m['bpm'])
-            b.cs = float(m['diff_size'])
-            b.ar = float(m['diff_approach'])
-            b.od = float(m['diff_overall'])
-            b.hp = float(m['diff_drain'])
-            b.sr = float(m['difficultyrating'])
-            b.mode = osuModes(int(m['mode']))
-
-            b.artist = m['artist']
-            b.title = m['title']
-            b.diff = m['version']
-            b.mapper = m['creator']
-
-            b.status = m['approved']
-            b.frozen = m['frozen']
-            b.update = m['last_update']
-
-            b.nc = time.time()
-            b.pp_cache = m['pp_cache']
-
-            glob.cache['maps'][b.md5] = b
-
-            await b.save()
-
-        log(f'Cached Set ID {b.sid} from osu!api', Ansi.LCYAN)
 
     async def check_status(self):
         api = 'https://old.ppy.sh/api/get_beatmaps'
@@ -298,4 +230,7 @@ class Beatmap:
                             cached.nc = self.nc
 
     async def save(self):
-        await glob.db.execute('INSERT INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, update, nc, pp_cache) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)', self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc, str(self.pp_cache))
+        try:
+            await glob.db.execute('INSERT INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, update, nc) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)', self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc)
+        except Exception: # sadly there is no good way to update on duplicate like there is with mysql
+            await glob.db.execute('UPDATE maps SET id = $1, sid = $2, bpm = $3, cs = $4, ar = $5, od = $6, hp = $7, sr = $8, mode = $9, artist = $10, title = $11, diff = $12, mapper = $13, status = $14, frozen = $15, update = $16, nc = $17 WHERE md5 = $18', self.id, self.sid, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc, self.md5)

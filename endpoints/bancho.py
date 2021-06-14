@@ -718,7 +718,7 @@ async def root_client():
             k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'')
             try:
                 k.verify(pw, user_pw)
-            except:
+            except Exception:
                 if glob.config.debug:
                     log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
                 resp = await make_response(packets.userID(-1))

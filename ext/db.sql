@@ -342,7 +342,10 @@ CREATE TABLE public.maps (
     title text NOT NULL,
     diff text NOT NULL,
     mapper text NOT NULL,
-    status integer NOT NULL
+    status integer NOT NULL,
+    frozen integer NOT NULL,
+    update bigint NOT NULL,
+    nc bigint DEFAULT 0 NOT NULL
 );
 
 
