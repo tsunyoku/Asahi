@@ -34,7 +34,7 @@ class Player:
         self.country_iso: str = uinfo.get('country_iso')
         self.country: int = uinfo.get('country')
         self.loc: list[float, float] = uinfo.get('loc', [0.0, 0.0]) # store as list cus y not (long, lat)
-        self.friends: set[int] = set()
+        self.friends: list[int] = []
         self.queue = queue.SimpleQueue()
         self.action: int = 0
         self.info: str = ''
@@ -68,10 +68,10 @@ class Player:
             priv=Privileges(user['priv'])
         )
 
-        p.friends = {}
+        p.friends = []
         async with glob.db.transaction():
             async for user in glob.db.cursor("SELECT user2 FROM friends WHERE user1 = $1", p.id):
-                p.friends |= user['row2']
+                p.friends.append(user['row2'])
 
         return p
 
