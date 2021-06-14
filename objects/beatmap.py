@@ -36,8 +36,8 @@ class Beatmap:
 
         self.nc = minfo.get('nc', 0) # nc = next check (for status update)
         self.pp_cache = minfo.get('pp_cache', {})
-        self.lb_cache: Optional[dict] = {}
-        self.mod_cache: Optional[dict] = {}
+
+        self.lb = minfo.get('lb', None)
 
     @property
     def name(self):

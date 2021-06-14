@@ -21,6 +21,7 @@ from objects.score import Score
 from constants.modes import lbModes
 from constants.statuses import mapStatuses, scoreStatuses
 from constants.mods import Mods
+from objects.leaderboard import Leaderboard
 
 import packets
 
@@ -262,74 +263,11 @@ async def getMapScores():
     if not bmap.frozen and bmap.nc < time.time():
         await bmap.check_status()
 
-    if bmap.status < mapStatuses.Ranked:
-        return f'{bmap.status}|false'.encode() # map is unranked, unsubmitted etc. then we return status with no scores or anything
+    if not (lb := bmap.lb):
+        lb = Leaderboard(bmap, mode)
+        bmap.lb = lb
 
-    resp = []
-
-    if lb == 2: # mod-specific lb
-        if base := bmap.mod_cache.get(mode.value):
-            if mods in base:
-                resp = base[mods].copy() # no better conditional way to do this with a list(?)
-        else:
-            bmap.mod_cache[mode] = {}
-        
-        if not base or not mods in base:
-            scores = await glob.db.fetch(f'SELECT t.*, users.name FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = $1 AND t.status = 2 AND mode = $2 AND users.priv & 1 > 0 AND t.mods = $3 ORDER BY t.{mode.sort} DESC LIMIT 100', md5, int(args['m']), mods)
-            resp.append(f'{bmap.status}|false|{bmap.id}|{bmap.sid}|{len(scores)}')
-            resp.append(f'0\n{bmap.name}\n10.0') # why osu using \n :( | force 10.0 rating cus no ratings rn, 0 is map offset (probably wont ever be used)
-            if not scores:
-                bmap.mod_cache[mode.value][mods] = resp.copy()
-                return '\n'.join(resp).encode()
-
-        best = await glob.db.fetchrow(f'SELECT t.* FROM {mode.table} t WHERE md5 = $1 AND mode = $2 AND uid = $3 AND status = 2 AND mods = $4 ORDER BY t.{mode.sort} DESC LIMIT 1', md5, int(args['m']), player.id, mods)
-        if best:
-            b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 AND t.{mode.sort} > $3', md5, int(args['m']), best[mode.sort])
-            rank = b_rank['rank'] + 1
-
-            resp.insert(2, f'{best["id"]}|{player.name}|{int(best[mode.sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|1')
-        else:
-            resp.insert(2, '')
-
-        if not base or not mods in base:
-            for rank, s in enumerate(scores):
-                resp.append(f'{s["id"]}|{s["name"]}|{int(s[mode.sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|1')
-
-        if not base or not mods in base:
-            bmap.mod_cache[mode.value][mods] = resp.copy() # set cache to current lb
-            bmap.mod_cache[mode.value][mods].remove(bmap.mod_cache[mode.value][mods][2]) # remove personal best since it will differ per user
-
-        return '\n'.join(resp).encode()
-    else:
-        if bmap.lb_cache.get(mode.value):
-            resp = bmap.lb_cache[mode.value].copy()
-
-        if not bmap.lb_cache.get(mode.value):
-            scores = await glob.db.fetch(f'SELECT t.*, users.name FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = $1 AND t.status = 2 AND mode = $2 AND users.priv & 1 > 0 ORDER BY t.{mode.sort} DESC LIMIT 100', md5, int(args['m']))
-            resp.append(f'{bmap.status}|false|{bmap.id}|{bmap.sid}|{len(scores)}')
-            resp.append(f'0\n{bmap.name}\n10.0') # why osu using \n :( | force 10.0 rating cus no ratings rn, 0 is map offset (probably wont ever be used)
-            if not scores:
-                bmap.lb_cache[mode.value] = resp.copy()
-                return '\n'.join(resp).encode()
-
-        best = await glob.db.fetchrow(f'SELECT t.* FROM {mode.table} t WHERE md5 = $1 AND mode = $2 AND uid = $3 AND status = 2 ORDER BY t.{mode.sort} DESC LIMIT 1', md5, int(args['m']), player.id)
-        if best:
-            b_rank = await glob.db.fetchrow(f'SELECT COUNT(*) AS rank FROM {mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 AND t.{mode.sort} > $3', md5, int(args['m']), best[mode.sort])
-            rank = b_rank['rank'] + 1
-
-            resp.insert(2, f'{best["id"]}|{player.name}|{int(best[mode.sort])}|{best["combo"]}|{best["n50"]}|{best["n100"]}|{best["n300"]}|{best["miss"]}|{best["katu"]}|{best["geki"]}|{best["fc"]}|{best["mods"]}|{player.id}|{rank}|{best["time"]}|1')
-        else:
-            resp.insert(2, '')
-
-        if not bmap.lb_cache.get(mode.value):
-            for rank, s in enumerate(scores):
-                resp.append(f'{s["id"]}|{s["name"]}|{int(s[mode.sort])}|{s["combo"]}|{s["n50"]}|{s["n100"]}|{s["n300"]}|{s["miss"]}|{s["katu"]}|{s["geki"]}|{s["fc"]}|{s["mods"]}|{s["uid"]}|{rank + 1}|{s["time"]}|1')
-        
-        if not bmap.lb_cache.get(mode.value):
-            bmap.lb_cache[mode.value] = resp.copy() # set cache to current lb
-            bmap.lb_cache[mode.value].remove(bmap.lb_cache[mode.value][2]) # remove personal best since it will differ per user
-
-        return '\n'.join(resp).encode()
+    return await lb.return_leaderboard(player)
 
 # POGGG
 @web.route("/web/osu-submit-modular-selector.php", methods=['POST'])
@@ -484,31 +422,7 @@ async def scoreSubmit():
         chan.send(glob.bot, msg, True)
         
     if s.status == scoreStatuses.Best and s.map.status >= mapStatuses.Ranked:
-        # add score to lb cache xd
-        if s.mode.sort == 'pp':
-            st = s.pp
-        else:
-            st = s.score
-
-        # ?
-        fmt = f'|{s.user.name}|'
-        if s.map.lb_cache.get(s.mode.value):
-            for val in s.map.lb_cache[s.mode.value]:
-                if fmt in val:
-                    s.map.lb_cache[s.mode.value].remove(val)
-
-        if (mc := s.map.mod_cache.get(s.mode.value)):
-            if mc.get(s.mods):
-                for val in mc.get(s.mods):
-                    if fmt in val:
-                        mc[s.mods].remove(val)
-
-        if s.map.lb_cache.get(s.mode.value):
-            s.map.lb_cache[s.mode.value].append(f'{s.id}|{s.user.name}|{st}|{s.combo}|{s.n50}|{s.n100}|{s.n300}|{s.miss}|{s.katu}|{s.geki}|{s.fc}|{s.mods}|{s.user.id}|{s.rank}|{s.time}|1')
-
-        if (mc := s.map.mod_cache.get(s.mode.value)):
-            if mc.get(s.mods):
-                mc[s.mods].append(f'{s.id}|{s.user.name}|{st}|{s.combo}|{s.n50}|{s.n100}|{s.n300}|{s.miss}|{s.katu}|{s.geki}|{s.fc}|{s.mods}|{s.user.id}|{s.rank}|{s.time}|1')
+        s.map.lb.set_user_pb(s.user, s)
 
     log(f'[{s.mode!r}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
     return '\n'.join(charts).encode() # thank u osu

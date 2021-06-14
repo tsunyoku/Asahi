@@ -1,10 +1,8 @@
 # external imports (some may require to be installed, install using ext/requirements.txt)
-from quart import Quart, Response, request, make_response # web server :blobcowboi:
+from quart import Quart, request # web server :blobcowboi:
 from cmyui import Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from pathlib import Path
 from aiohttp import ClientSession
-import pyfiglet
-import pickle
 import asyncpg
 import asyncio
 import uvloop
@@ -18,12 +16,7 @@ from constants.countries import country_codes
 
 app = Quart(__name__) # handler for webserver :D
 app.config['SERVER_NAME'] = glob.config.domain
-glob.version = Version(0, 2, 2) # set Asahi version, mainly for future updater but also for tracking
-
-CACHE_PATH = Path.cwd() / 'resources/cache'
-PW_CACHE_FILE = CACHE_PATH / 'pw.p'
-GEOLOC_CACHE_FILE = CACHE_PATH / 'geoloc.p'
-MAPS_CACHE_FILE = CACHE_PATH / 'maps.p'
+glob.version = Version(0, 2, 3) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
@@ -79,31 +72,6 @@ async def connect(): # ran before server startup, used to do things like connect
     if not MAPS_PATH.exists():
         MAPS_PATH.mkdir(parents=True)
 
-    # this is my most cursed creation | speed gains but im going to hell for this
-    if not CACHE_PATH.exists():
-        CACHE_PATH.mkdir(parents=True)
-    else:
-        if PW_CACHE_FILE.exists():
-            with open(PW_CACHE_FILE, 'rb') as f:
-                try:
-                    glob.cache['pw'] |= dict(pickle.load(f))
-                except EOFError:
-                    pass
-
-        if GEOLOC_CACHE_FILE.exists():
-            with open(GEOLOC_CACHE_FILE, 'rb') as f:
-                try:
-                    glob.geoloc |= dict(pickle.load(f))
-                except EOFError:
-                    pass
-
-        if MAPS_CACHE_FILE.exists():
-            with open(MAPS_CACHE_FILE, 'rb') as f:
-                try:
-                    glob.cache['maps'] |= dict(pickle.load(f))
-                except EOFError:
-                    pass
-
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetchrow('SELECT name, pw, country, name FROM users WHERE id = 1')
     bot = Player(id=1, name=botinfo['name'], offset=1, country_iso=botinfo['country'], country=country_codes[botinfo['country'].upper()])
@@ -142,41 +110,6 @@ async def connect(): # ran before server startup, used to do things like connect
 @app.after_serving
 async def disconnect():
     log(f'==== Asahi v{glob.version} stopping ====', Ansi.GREEN)
-
-    # this is my most cursed creation part 2 | speed gains but im going to hell for this part 2
-
-    new_pw = glob.cache['pw']
-    if PW_CACHE_FILE.exists():
-        try:
-            with open(PW_CACHE_FILE, 'rb') as file:
-                new_pw |= dict(pickle.load(file))
-        except EOFError:
-            pass
-
-    with open(PW_CACHE_FILE, 'wb') as file:
-        pickle.dump(new_pw, file, protocol=pickle.HIGHEST_PROTOCOL)
-
-    new_geoloc = glob.geoloc
-    if GEOLOC_CACHE_FILE.exists():
-        try:
-            with open(GEOLOC_CACHE_FILE, 'rb') as file:
-                new_geoloc |= dict(pickle.load(file))
-        except EOFError:
-            pass
-
-    with open(GEOLOC_CACHE_FILE, 'wb') as file:
-        pickle.dump(new_geoloc, file, protocol=pickle.HIGHEST_PROTOCOL)
-
-    new_maps = glob.cache['maps']
-    if MAPS_CACHE_FILE.exists():
-        try:
-            with open(MAPS_CACHE_FILE, 'rb') as file:
-                new_maps |= dict(pickle.load(file))
-        except EOFError:
-            pass
-
-    with open(MAPS_CACHE_FILE, 'wb') as file:
-        pickle.dump(new_maps, file, protocol=pickle.HIGHEST_PROTOCOL)
 
     await glob.web.close()
     if glob.config.debug:
