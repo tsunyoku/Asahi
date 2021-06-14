@@ -92,24 +92,28 @@ class Leaderboard:
     def set_user_pb(self, user: Player, score: Score):
         self.user_cache[user.name] = score
 
-        for s in self.score_cache:
+        for s in self.score_cache or []:
             if s.user.name == user.name:
                 self.score_cache.remove(s)
                 break
 
-        for s in self.mods_cache.get(score.mods):
+        for s in self.mods_cache.get(score.mods) or {}:
             if s.user.name == user.name:
                 self.mods_cache[score.mods].remove(s)
                 break
 
-        for s in self.country_cache.get(user.country_iso):
+        for s in self.country_cache.get(user.country_iso) or {}:
             if s.user.name == user.name:
                 self.country_cache[user.country_iso].remove(s)
                 break
 
         self.score_cache.append(score)
-        self.mods_cache.get(score.mods).append(score)
-        self.country_cache.get(user.country_iso).append(score)
+
+        try:
+            self.mods_cache.get(score.mods).append(score)
+            self.country_cache.get(user.country_iso).append(score)
+        except Exception:
+            pass # no mods/country cache, simply do nothing
 
     async def get_personal(self, user: Player):
         if user.name in self.user_cache:
