@@ -16,6 +16,9 @@ class Leaderboard:
         self.user_cache = {}
         self.score_cache = []
 
+        self.mods_cache = {}
+        self.country_cache = {}
+
     @cached_property
     def base_body(self):
         return f'{self.map.status}|false|{self.map.id}|{self.map.sid}'
@@ -24,7 +27,7 @@ class Leaderboard:
     def map_body(self):
         return f'0\n{self.map.name}\n10.0'
 
-    async def return_leaderboard(self, user: Player):
+    async def return_leaderboard(self, user: Player, lb, mods):
         if self.map.status < mapStatuses.Ranked:
             return f'{self.map.status}|false'.encode()
 
@@ -35,7 +38,27 @@ class Leaderboard:
         else:
             mode_vn = self.mode.value
 
-        scores = await glob.db.fetch(f'SELECT t.id, {self.mode.sort} as s FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0 ORDER BY s DESC LIMIT 100', self.map.md5, mode_vn)
+        query = [f'SELECT t.id, {self.mode.sort} as s FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0']
+        p = [self.map.md5, mode_vn]
+
+        if lb == 2:
+            query.append('AND t.mods = $3')
+            p.append(mods)
+            sc = self.mods_cache.get(mods)
+        elif lb == 3:
+            f = user.friends + [user.id]
+            query.append(f'AND t.uid IN ({",".join(str(e) for e in f)})') # CURSE YOU ASYNCPG
+            sc = None
+        elif lb == 4:
+            query.append('AND users.country = $3')
+            p.append(user.country_iso.lower())
+            sc = self.country_cache.get(user.country_iso)
+        else:
+            sc = self.score_cache
+
+        query.append('ORDER BY s DESC LIMIT 100')
+
+        scores = await glob.db.fetch(' '.join(query), *p)
 
         mbody = self.base_body + f'|{len(scores)}'
 
@@ -52,8 +75,8 @@ class Leaderboard:
 
         scrs = []
 
-        if self.score_cache:
-            scrs.extend(self.score_cache)
+        if sc:
+            scrs.extend(sc)
         else:
             for s in scores:
                 score = await Score.sql(s['id'], self.mode.table, self.mode.sort, s['s'], ensure=True)
@@ -61,8 +84,8 @@ class Leaderboard:
 
         s = [s.calc_lb_format() for s in scrs]
 
-        if self.score_cache != scrs:
-            self.score_cache = scrs
+        if sc != scrs:
+            sc = scrs
 
         return '\n'.join(base + s).encode()
 
@@ -74,7 +97,19 @@ class Leaderboard:
                 self.score_cache.remove(s)
                 break
 
+        for s in self.mods_cache.get(score.mods):
+            if s.user.name == user.name:
+                self.mods_cache[score.mods].remove(s)
+                break
+
+        for s in self.country_cache.get(user.country_iso):
+            if s.user.name == user.name:
+                self.country_cache[user.country_iso].remove(s)
+                break
+
         self.score_cache.append(score)
+        self.mods_cache.get(score.mods).append(score)
+        self.country_cache.get(user.country_iso).append(score)
 
     async def get_personal(self, user: Player):
         if user.name in self.user_cache:

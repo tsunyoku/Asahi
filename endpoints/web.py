@@ -226,7 +226,7 @@ async def getMapScores():
     mods = int(args['mods'])
     mode = lbModes(int(args['m']), mods)
     sid = int(args['i'])
-    lb = int(args['v'])
+    lbm = int(args['v'])
 
     player = g.pop("player")
 
@@ -267,7 +267,7 @@ async def getMapScores():
         lb = Leaderboard(bmap, mode)
         bmap.lb = lb
 
-    return await lb.return_leaderboard(player)
+    return await lb.return_leaderboard(player, lbm, mods)
 
 # POGGG
 @web.route("/web/osu-submit-modular-selector.php", methods=['POST'])
