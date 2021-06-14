@@ -111,13 +111,6 @@ class Score:
         s.passed = s.status.value != 0
         s.rank = await s.calc_lb(table, sort, t)
 
-        if s.mode.value > 3:
-            val = s.pp
-        else:
-            val = s.score
-
-        s.lb_format = f'{s.id}|{s.user.name}|{val}|{s.combo}|{s.n50}|{s.n100}|{s.n300}|{s.miss}|{s.katu}|{s.geki}|{int(s.fc)}|{s.mods}|{s.user.id}|{s.rank}|{s.time}|1'
-
         return s
 
     @classmethod
