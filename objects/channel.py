@@ -18,7 +18,7 @@ class Channel:
         if not send_self:
             self.enqueue(packets.sendMessage(f.name, msg, self.name, f.id), ignore=f.id)
         else:
-            self.enqueue(packets.sendMessage(f.name, msg, self.name, ignore=f.id))
+            self.enqueue(packets.sendMessage(f.name, msg, self.name, f.id))
 
     def add_player(self, user: 'Player'):
         self.players.append(user)

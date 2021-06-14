@@ -2,7 +2,7 @@ from objects.beatmap import Beatmap
 from objects.player import Player
 from constants.mods import Mods, convert
 from constants.modes import osuModes, lbModes
-from constants.statuses import scoreStatuses
+from constants.statuses import scoreStatuses, mapStatuses
 from constants.grades import Grade
 from objects import glob, pp
 
@@ -38,6 +38,8 @@ class Score:
         self.mode_vn: osuModes = None
 
         self.rank: int = None
+        self.pp: float = None
+
         self.fc: bool = None
         self.passed: bool = None
         self.status: scoreStatuses = None
@@ -46,7 +48,7 @@ class Score:
         self.old_best: Score = None
 
     @classmethod
-    async def sql(self, sid: int, table: str, sort: str, t: int):
+    async def sql(self, sid: int, table: str, sort: str, t: int, ensure: bool = False):
         score = await glob.db.fetchrow(f'SELECT * FROM {table} WHERE id = $1', sid)
 
         if not score:
@@ -61,10 +63,29 @@ class Score:
         else:
             s.map = Beatmap.md5_cache(score['md5'])
 
-        s.user = glob.players_id[score['uid']]
+        s.user = glob.players_id.get(score['uid'])
 
-        if not s.user:
+        if not s.user and not ensure:
             return s # even if user isnt found, may be related to connection and we want to tell the client to retry
+        
+        if not s.user and ensure:
+            # construct user from sql
+            info = await glob.db.fetchrow('SELECT * FROM users WHERE id = $1', score['uid'])
+            user = {
+                'id': info['id'],
+                'name': info['name'],
+                'token': '',
+                'offset': 24,
+                'ltime': 0,
+                'country_iso': info['country'],
+                'country': 0,
+                'lon': 0,
+                'lat': 0,
+                'md5': b'',
+                'priv': info['priv']
+            }
+
+            s.user = await Player.login(user)
 
         if not s.map:
             return # ??
@@ -89,6 +110,13 @@ class Score:
         s.time = score['time']
         s.passed = s.status.value != 0
         s.rank = await s.calc_lb(table, sort, t)
+
+        if s.mode.value > 3:
+            val = s.pp
+        else:
+            val = s.score
+
+        s.lb_format = f'{s.id}|{s.user.name}|{val}|{s.combo}|{s.n50}|{s.n100}|{s.n300}|{s.miss}|{s.katu}|{s.geki}|{int(s.fc)}|{s.mods}|{s.user.id}|{s.rank}|{s.time}|1'
 
         return s
 
@@ -149,6 +177,14 @@ class Score:
         await s.calc_info()
 
         return s
+
+    def calc_lb_format(self):
+        if self.mode.value > 3:
+            val = self.pp
+        else:
+            val = self.score
+
+        return f'{self.id}|{self.user.name}|{val}|{self.combo}|{self.n50}|{self.n100}|{self.n300}|{self.miss}|{self.katu}|{self.geki}|{int(self.fc)}|{self.mods}|{self.user.id}|{self.rank}|{self.time}|1'
 
     async def calc_lb(self, table, sort, value):
         lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.mode = $2 AND {table}.status = 2 AND users.priv & 1 > 0 AND {table}.{sort} > $3', self.map.md5, self.mode.value, value)
