@@ -58,10 +58,10 @@ class Score:
 
         s.id = sid
 
-        if not Beatmap.md5_cache(score['md5']): # it should have the map in cache already for global lbs, but if not we can just grab from sql
-            s.map = await Beatmap.md5_sql(score['md5'])
-        else:
-            s.map = Beatmap.md5_cache(score['md5'])
+        s.map = await Beatmap.from_md5(score['md5'])
+
+        if not s.map:
+            return # ?
 
         s.user = glob.players_id.get(score['uid'])
 
@@ -124,10 +124,7 @@ class Score:
 
         s = self()
 
-        if not Beatmap.md5_cache(data[0]): # it should have the map in cache already for global lbs, but if not we can just grab from sql
-            s.map = await Beatmap.md5_sql(data[0])
-        else:
-            s.map = Beatmap.md5_cache(data[0])
+        s.map = await Beatmap.from_md5(data[0])
 
         # i need to find a faster way to do this some day
         for o in glob.players.values():

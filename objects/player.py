@@ -329,6 +329,16 @@ class Player:
         while self.channels:
             self.leave_chan(self.channels[0])
 
+    async def ban(self, reason):
+        self.priv &= ~Privileges.Normal
+
+        await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', self.priv, self.id)
+
+        if self.token:
+            self.enqueue(packets.userID(-3))
+
+        log(f'{self.name} banned for {reason}')
+
     def enqueue(self, b: bytes):
         self.queue.put_nowait(b)
 
