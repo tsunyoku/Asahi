@@ -1,9 +1,7 @@
-from quart import Blueprint, request, g, send_file
+from quart import Blueprint, request, g, make_response
 from cmyui import log, Ansi
 from pathlib import Path
 from datetime import datetime
-
-from quart.helpers import make_response
 
 from objects import glob
 
@@ -76,8 +74,15 @@ async def user():
     if not id:
         return {'code': 400, 'message': 'user could not be found! please check the username/id you specified and try again'}
 
-    info = dict(await glob.db.fetchrow('SELECT id, name, country FROM users WHERE id = $1', id))
-    stats_db = dict(await glob.db.fetchrow('SELECT * FROM stats WHERE id = $1', id))
+    info = await glob.db.fetchrow('SELECT id, name, country FROM users WHERE id = $1', id)
+
+    if not info:
+        return {'code': 400, 'message': 'user could not be found! please check the username/id you specified and try again'}
+
+    stats_db = await glob.db.fetchrow('SELECT * FROM stats WHERE id = $1', id)
+
+    info = dict(info)
+    stats_db = dict(stats_db)
 
     stats = {}
 

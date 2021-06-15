@@ -9,3 +9,4 @@ py3rijndael
 uvloop
 aioredis
 asyncpg
+circleguard
