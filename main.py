@@ -16,7 +16,7 @@ from constants.countries import country_codes
 
 app = Quart(__name__) # handler for webserver :D
 app.config['SERVER_NAME'] = glob.config.domain
-glob.version = Version(0, 2, 3) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 2, 4) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
