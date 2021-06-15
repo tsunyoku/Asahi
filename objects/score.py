@@ -10,11 +10,13 @@ from base64 import b64decode
 from py3rijndael import RijndaelCbc, ZeroPadding
 from pathlib import Path
 from cmyui import log
+from circleguard import Circleguard, ReplayString
 
 import time
 import re
 import asyncio
 import orjson
+import requests
 
 class Score:
     def __init__(self):
@@ -167,6 +169,31 @@ class Score:
         await s.calc_info()
 
         return s
+
+    def analyse(self):
+        # BIG NOTE: THIS IS MORE OF A PREVENTATIVE MEASURE TO STOP BLATANT CHEATERS. SOME VERY GOOD LEGIT PLAYERS COULD GET FLAGGED BY THIS SO PLEASE BE AWARE
+        # however: 9 times out of 10 this shouldn't false ban, most players getting e.g sub 60 ur will be relax cheats. but maybe you have umbre playing on your server, i don't know.
+
+        if self.mods & Mods.RELAX:
+            rx = 1
+        elif self.mods & Mods.AUTOPILOT:
+            rx = 2
+        else:
+            rx = 0
+
+        url = f'https://api.{glob.config.domain}/get_replay?id={self.id}&rx={rx}'
+        r = requests.get(url, stream=True)
+
+        cg = Circleguard(glob.config.api_key)
+        replay = ReplayString(r.raw.read())
+
+        # TODO: compare replay against bancho leaderboards
+
+        if (ur := cg.ur(replay)) < 60:
+            asyncio.run(self.user.ban(reason=f'relax cheating (ur: {ur:.2f})'))
+
+        if (ft := cg.frametime(replay)) < 14:
+            asyncio.run(self.user.ban(reason=f'timewarp cheating (frametime: {ft:.2f})'))
 
     def calc_lb_format(self):
         if self.mode.value > 3:

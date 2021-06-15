@@ -337,7 +337,7 @@ class Player:
         if self.token:
             self.enqueue(packets.userID(-3))
 
-        log(f'{self.name} banned for {reason}')
+        log(f'{self.name} has been banned for {reason}')
 
     def enqueue(self, b: bytes):
         self.queue.put_nowait(b)

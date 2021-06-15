@@ -1,5 +1,10 @@
-from quart import Blueprint, request, g
+from quart import Blueprint, request, g, send_file
 from cmyui import log, Ansi
+from pathlib import Path
+from datetime import datetime
+
+from quart.helpers import make_response
+
 from objects import glob
 
 from objects.beatmap import Beatmap
@@ -7,6 +12,9 @@ from constants.mods import convert
 from constants.modes import osuModes
 
 import time
+import hashlib
+import packets
+import struct
 
 api = Blueprint('api', __name__)
 
@@ -148,3 +156,79 @@ async def playerStatus():
     }
 
     return {'code': 200, 'status': status}
+
+@api.route("/get_replay")
+async def getReplay():
+    args = request.args
+
+    sid = int(args.get('id', 0))
+    rx = int(args.get('rx', 0))
+
+    if not sid:
+        return {'code': 400, 'message': 'please specify a score id!'}
+
+    BASE_DIR = Path.cwd() / 'resources'
+
+    if rx == 0:
+        REPLAY_PATH = BASE_DIR / 'replays'
+        table = 'scores'
+    elif rx == 1:
+        REPLAY_PATH = BASE_DIR / 'replays_rx'
+        table = 'scores_rx'
+    elif rx == 2:
+        REPLAY_PATH = BASE_DIR / 'replays_ap'
+        table = 'scores_ap'
+
+    file = REPLAY_PATH / f'{sid}.osr'
+
+    if not file.exists():
+        return {'code': 400, 'message': "replay couldn't be found. please check the score id and try again!"}
+
+    raw = file.read_bytes()
+
+    # get score from sql
+    score = await glob.db.fetchrow(f'SELECT t.*, t.mode m, users.name, maps.* FROM {table} t LEFT OUTER JOIN users ON users.id = t.uid LEFT OUTER JOIN maps ON maps.md5 = t.md5 WHERE t.id = $1', sid)
+
+    hash = hashlib.md5(
+        (f'{score["n100"] + score["n300"]}p{score["n50"]}o'
+        f'{score["geki"]}o{score["katu"]}t'
+        f'{score["miss"]}a{score["md5"]}r'
+        f'{score["combo"]}e{score["fc"] == 1}y'
+        f'{score["name"]}o{score["score"]}u'
+        f'0{score["mods"]}True'
+        '').encode() # when im not lazy ill use Score.sql to get score object so we can implement rank and shit
+    ).hexdigest()
+
+    rp = bytearray() # headers timeee
+
+    rp += struct.pack('<Bi', score["m"], 20210523) # osuver once im not lazy (score sub provides it so easy solution lol)
+    rp += packets.write_string(score["md5"])
+
+    rp += packets.write_string(score["name"])
+    rp += packets.write_string(hash)
+
+    rp += struct.pack('<hhhhhhihBi',
+        score["n300"], score["n100"],
+        score["n50"], score["geki"],
+        score["katu"], score["miss"],
+        score["score"], score["combo"],
+        score["fc"], score["mods"]
+    )
+
+    rp += b'\x00' # graph probably NEVER
+
+    t = int(score["time"] * 1e7)
+    rp += struct.pack('<q', t + 0x89F7FF5F7B58000) # interesting choice osu
+
+    rp += struct.pack('<i', len(raw))
+    rp += raw
+    rp += struct.pack('<q', sid)
+
+    resp = await make_response(bytes(rp))
+    name = f'{score["name"]} ~ {score["artist"]} - {score["title"]} [{score["diff"]}] +{score["readable_mods"]} ({datetime.fromtimestamp(score["time"]).strftime("%Y/%m/%d")})'
+
+    resp.headers['Content-Type'] = 'application/octet-stream'
+    resp.headers['Content-Description'] = 'File Transfer'
+    resp.headers['Content-Disposition'] = f'attachment; filename={name}.osr'
+
+    return resp

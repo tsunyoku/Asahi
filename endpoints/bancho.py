@@ -71,7 +71,7 @@ class addFriend(BanchoPacket, type=Packets.OSU_FRIEND_ADD):
     async def handle(self, user: Player):
         req = user.id
         tar = self.uid
-        user.friends.add(tar)
+        user.friends.append(tar)
         await glob.db.execute('INSERT INTO friends (user1, user2) VALUES ($1, $2)', req, tar)
         log(f"{user.name} added UID {tar} into their friends list.", Ansi.LCYAN)
 
