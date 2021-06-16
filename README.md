@@ -40,9 +40,9 @@ chmod +x ext/osu-tools.sh
 ./ext/osu-tools.sh
 ```
 
-Finally, startup Asahi using hypercorn:
+Finally, start up Asahi:
 ```bash
-hypercorn main.py -b unix:/tmp/asahi.sock --reload --log-level error
+python3.9 main.py
 ```
 
 ## Related Projects
