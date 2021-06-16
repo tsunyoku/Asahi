@@ -3,6 +3,9 @@ from quart import Quart, request # web server :blobcowboi:
 from cmyui import Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from pathlib import Path
 from aiohttp import ClientSession
+from discord.ext import commands
+from hypercorn.asyncio import serve
+from hypercorn.config import Config
 import asyncpg
 import asyncio
 import uvloop
@@ -16,6 +19,13 @@ from constants.countries import country_codes
 
 app = Quart(__name__) # handler for webserver :D
 app.config['SERVER_NAME'] = glob.config.domain
+
+config = Config()
+config.bind = [f"unix:{glob.config.socket}"]
+config.loglevel = 'error'
+
+dc = commands.Bot(command_prefix=glob.config.bot_prefix)
+
 glob.version = Version(0, 2, 4) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
@@ -124,6 +134,10 @@ async def disconnect():
     if glob.config.debug:
         log('==== Closed Redis connection ====', Ansi.GREEN)
 
+    await dc.close()
+    if glob.config.debug:
+        log('==== Asahi Discord bot stopped ====', Ansi.GREEN)
+
     log(f'==== Asahi v{glob.version} stopped ====', Ansi.GREEN)
 
 from endpoints.bancho import bancho
@@ -136,3 +150,8 @@ app.register_blueprint(bancho, subdomain='c4')
 app.register_blueprint(avatars, subdomain='a')
 app.register_blueprint(web, subdomain='osu')
 app.register_blueprint(api, subdomain='api')
+
+if __name__ == '__main__':
+    dc.loop.create_task(serve(app, config))
+    dc.load_extension('disc.bot')
+    dc.run(glob.config.token)
