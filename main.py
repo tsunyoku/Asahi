@@ -1,3 +1,6 @@
+#!/usr/bin/env python3.9
+# above is so we can use ./main.py instead
+
 # external imports (some may require to be installed, install using ext/requirements.txt)
 from quart import Quart, request # web server :blobcowboi:
 from cmyui import Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
