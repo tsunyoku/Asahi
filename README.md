@@ -39,7 +39,7 @@ chmod +x ext/osu-tools.sh
 
 Finally, start up Asahi:
 ```bash
-python3.9 main.py
+./main.py
 ```
 
 ## Related Projects
