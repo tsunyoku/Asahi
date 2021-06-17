@@ -1,11 +1,9 @@
 [![Discord](https://discordapp.com/api/guilds/833325274934411274/widget.png?style=shield)](https://discord.gg/d62tzSYv3z)
 # Asahi
 
-avatar, bancho & /web/ server hybrid for osu! 😎
+avatar, bancho & /web/ server & Discord bot hybrid for osu! 😎
 
-Note: This has only been tested on Ubuntu 18.04 LTS and other operating systems may have unpredicted behaviour
-
-Note 2: This is a very experimental project mainly for my own learning and I don't suggest in any world using this on your own server in its current state for the forseeable future.
+Note: This has only been tested on Ubuntu 18.04 LTS. If you would like to use it on a distro other than Ubuntu or a version greater than 18.04, you can make Asahi work by changing the minimum TLS version in the nginx config (to my belief atleast).
 
 ## Setup
 
@@ -20,7 +18,6 @@ python3.9 -m pip install -r ext/requirements.txt
 ```
 
 You can find the database structure in ext/db.sql, you may want to import that before you advance. (Note: we use postgresql not mysql! You will also need to edit the sql file for use with your postgre user)
-I will sadly not provide support with postgre setup as I still don't even understand it myself, lol.
 
 Now, edit your nginx config (found in ext/nginx.conf), here we will generate the certificate for your nginx config and reload:
 ```bash
