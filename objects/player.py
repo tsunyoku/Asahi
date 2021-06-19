@@ -1,6 +1,7 @@
 from objects import glob
 from objects.channel import Channel
 from objects.beatmap import Beatmap
+from objects.clan import Clan
 from objects.match import Slot, slotStatus, Teams, Match
 from constants.privs import Privileges, ClientPrivileges
 from constants.modes import osuModes
@@ -53,6 +54,15 @@ class Player:
 
         self.np: Optional[Beatmap] = None
 
+        self.clan: Optional[Clan] = None
+
+    @property
+    def full_name(self):
+        if self.clan:
+            return f'[{self.clan.tag}] {self.name}'
+        else:
+            return self.name
+
     @classmethod
     async def login(self, user):
         p = self(
@@ -72,6 +82,10 @@ class Player:
         async with glob.db.transaction():
             async for user in glob.db.cursor("SELECT user2 FROM friends WHERE user1 = $1", p.id):
                 p.friends.append(user['row2'])
+
+        clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = $1', p.id)
+        if clan:
+            p.clan = glob.clans.get(clan)
 
         return p
 
@@ -276,8 +290,14 @@ class Player:
 
         slot = match.slots[id]
 
-        if match.type in (teamTypes.team, teamTypes.tag_team):
+        if match.type in (teamTypes.team, teamTypes.tag_team) and not match.clan_battle:
             slot.team = Teams.red
+
+        if match.clan_battle:
+            if self.clan is match.clan_1:
+                slot.team = Teams.red
+            else:
+                slot.team = Teams.blue
 
         slot.status = slotStatus.not_ready
         slot.player = self

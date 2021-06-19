@@ -61,7 +61,7 @@ if glob.config.debug:
         else:
             ret = ''
 
-        if resp.status_code != 200:
+        if resp.status_code >= 400:
             colourret = Ansi.LRED
         else:
             colourret = Ansi.LCYAN
@@ -307,8 +307,7 @@ async def scoreSubmit():
             f = vn_path / f'{s.id}.osr'
 
         replay.save(str(f))
-
-        threading.Thread(target=s.analyse).start()
+        #threading.Thread(target=s.analyse).start()
 
     # update stats EEEEEEE
     stats = s.user.stats[s.mode.value]
@@ -403,6 +402,10 @@ async def scoreSubmit():
 
     if s.status == scoreStatuses.Best and s.rank == 1 and s.map.status >= mapStatuses.Ranked:
         # announce #1 to announce channel cus they achieved #1
+
+        perf = ''
+        prev = ''
+
         if s.map.status != mapStatuses.Loved:
             perf = f' worth {round(s.pp):,}pp'
 
@@ -411,7 +414,7 @@ async def scoreSubmit():
         if prev1:
             prev = f' (Previous #1: [https://{glob.config.domain}/u/{prev1["name"]} {prev1["name"]}])'
 
-        msg = f'[{s.mode!r}] {s.user.embed} achieved #1 on {s.map.embed} +{s.readable_mods}{perf or ""}{prev or ""}'
+        msg = f'[{s.mode!r}] {s.user.embed} achieved #1 on {s.map.embed} +{s.readable_mods}{perf}{prev}'
         chan = glob.channels['#announce']
         chan.send(glob.bot, msg, True)
         

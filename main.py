@@ -10,14 +10,13 @@ from discord.ext import commands
 from hypercorn.asyncio import serve
 from hypercorn.config import Config
 import asyncpg
-import asyncio
-import uvloop
 import aioredis
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
 from objects.player import Player # Player - player object to store stats, info etc.
 from objects.channel import Channel # Channel - channel object to store name, desc etc.
+from objects.clan import Clan
 from constants.countries import country_codes
 
 app = Quart(__name__) # handler for webserver :D
@@ -29,7 +28,7 @@ config.loglevel = 'error'
 
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
 
-glob.version = Version(0, 2, 4) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 2, 5) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
@@ -39,8 +38,6 @@ RRX_PATH = Path.cwd() / 'resources/replays_rx'
 RAP_PATH = Path.cwd() / 'resources/replays_ap'
 
 MAPS_PATH = Path.cwd() / 'resources/maps'
-
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 @app.before_serving
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
@@ -117,6 +114,20 @@ async def connect(): # ran before server startup, used to do things like connect
     glob.channels[lobby.name] = lobby
     if glob.config.debug:
         log(f'==== Added channel #lobby to channel list ====', Ansi.GREEN)
+
+    # add all clans to cache
+    async with glob.db.transaction():
+        async for c in glob.db.cursor('SELECT * FROM clans'):
+            clan = Clan(id=c['id'], name=c['name'], tag=c['tag'], owner=c['owner'])
+            clan_chan = Channel(name='#clan', desc=f'Clan chat for clan {clan.name}', auto=0, perm=1)
+            clan.chan = clan_chan
+            glob.clans[clan.id] = clan
+
+            async for id in glob.db.cursor('SELECT id FROM users WHERE clan = $1', clan.id):
+                clan.members.append(id['id'])
+
+            if glob.config.debug:
+                log(f'==== Added clan {clan.name} to clan list ====', Ansi.GREEN)
 
     log(f'==== Asahi v{glob.version} started ====', Ansi.GREEN)
 

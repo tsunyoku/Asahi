@@ -118,7 +118,8 @@ class sendPrivateMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
 
             if msg.startswith('!'):
                 cmd = await commands.process(user, target, msg)
-                user.enqueue(packets.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
+                if cmd is not None:
+                    user.enqueue(packets.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
             elif m := npr.match(msg):
                 user.np = await Beatmap.bid_fetch(int(m['bid']))
                 np = await user.np.np_msg
@@ -149,6 +150,11 @@ class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
 
             m = user.match.id
             c = glob.channels.get(f'#multi_{m}')
+        elif chan == '#clan':
+            if not user.clan:
+                return
+
+            c = user.clan.chan
         elif chan not in ['#highlight', '#userlog']:
             c = glob.channels.get(chan)
 
@@ -177,6 +183,11 @@ class joinChannel(BanchoPacket, type=Packets.OSU_CHANNEL_JOIN):
 
             m = user.match.id
             chan = glob.channels.get(f'#multi_{m}')
+        elif self.name == '#clan':
+            if not user.clan:
+                return
+
+            chan = user.clan.chan
         else:
             chan = glob.channels.get(self.name)
 
@@ -208,6 +219,11 @@ class leaveChannel(BanchoPacket, type=Packets.OSU_CHANNEL_PART):
 
             m = user.match.id
             chan = glob.channels.get(f'#multi_{m}')
+        elif self.name == '#clan':
+            if not user.clan:
+                return
+
+            chan = user.clan.chan
         else:
             chan = glob.channels.get(self.name)
 
@@ -325,11 +341,27 @@ class joinMatch(BanchoPacket, type=Packets.OSU_JOIN_MATCH):
     pw: osuTypes.string
 
     async def handle(self, user):
-        if not (match := glob.matches[self.id]):
+        if not (match := glob.matches.get(self.id)):
             user.enqueue(packets.matchJoinFail())
             return
+
+        if match.clan_battle:
+            if user.clan not in (match.clan_1, match.clan_2) or match.battle_ready:
+                user.enqueue(packets.matchJoinFail())
+                return
         
         user.join_match(match, self.pw)
+
+        # enqueue after final user has joined
+        if match.clan_battle:
+            total = []
+            for slot in match.slots:
+                if slot.status & slotStatus.has_player:
+                    total.append(slot.player)
+
+            battle = glob.clan_battles[user.clan]
+            if set(total) == set(battle['total']): # force set so its unordered
+                await match.start_battle()
 
 @packet
 class leaveMatch(BanchoPacket, type=Packets.OSU_PART_MATCH):
@@ -373,6 +405,9 @@ class lockSlot(BanchoPacket, type=Packets.OSU_MATCH_LOCK):
 
     async def handle(self, user):
         if not (match := user.match):
+            return
+
+        if match.clan_battle:
             return
         
         if user is not match.host:
@@ -423,7 +458,7 @@ class changeMatchSettings(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_SETTINGS):
             match.unready_players(slotStatus.ready)
 
         if self.m.bmd5 != match.bmd5:
-            m = await Beatmap.md5_sql(self.m.bmd5)
+            m = await Beatmap.from_md5(self.m.bmd5)
 
             if m:
                 match.bid = m.id
@@ -436,7 +471,7 @@ class changeMatchSettings(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_SETTINGS):
                 match.bname = self.m.bname
                 match.mode = self.m.mode
 
-        if match.type != self.m.type:
+        if match.type != self.m.type and not match.clan_battle:
             if self.m.type in (teamTypes.head, teamTypes.tag):
                 team = Teams.neutral
             else:
@@ -448,10 +483,11 @@ class changeMatchSettings(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_SETTINGS):
 
             match.type = self.m.type
 
-        if match.win_cond != self.m.win_cond:
+        if match.win_cond != self.m.win_cond and not match.clan_battle:
             match.win_cond = self.m.win_cond
 
-        match.name = self.m.name
+        if not match.clan_battle:
+            match.name = self.m.name
 
         match.enqueue_state()
 
@@ -496,7 +532,7 @@ class finishMatch(BanchoPacket, type=Packets.OSU_MATCH_COMPLETE):
         no_play = []
 
         for slot in match.slots:
-            if slot.status & slotStatus.has_player and slot.status != slotStatus.complete():
+            if slot.status & slotStatus.has_player and slot.status != slotStatus.complete:
                 no_play.append(slot.player.id)
 
         match.unready_players(slotStatus.complete)
@@ -504,6 +540,9 @@ class finishMatch(BanchoPacket, type=Packets.OSU_MATCH_COMPLETE):
 
         match.enqueue(packets.matchComplete(), lobby=False, ignore=no_play)
         match.enqueue_state()
+
+        if match.clan_battle:
+            await match.clan_scores(no_play)
 
 @packet
 class changeMatchMods(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_MODS):
@@ -613,6 +652,9 @@ class matchChangeHost(BanchoPacket, type=Packets.OSU_MATCH_TRANSFER_HOST):
         if not (host := match.slots[self.slot].player):
             return
 
+        if match.clan_battle:
+            return
+
         match.host = host
         match.host.enqueue(packets.matchTransferHost())
 
@@ -622,6 +664,9 @@ class matchChangeHost(BanchoPacket, type=Packets.OSU_MATCH_TRANSFER_HOST):
 class matchPlayerChangeTeam(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_TEAM):
     async def handle(self, user: Player):
         if not (match := user.match):
+            return
+        
+        if match.clan_battle:
             return
         
         slot = match.get_slot(user)
@@ -788,6 +833,33 @@ async def root_client():
         for o in glob.players.values(): # enqueue other users to client
             o.enqueue((packets.userPresence(p) + packets.userStats(p))) # enqueue this user to every other logged in user
             data += (packets.userPresence(o) + packets.userStats(o)) # enqueue every other logged in user to this user
+
+        if p.clan:
+            p.join_chan(p.clan.chan)
+            data += packets.channelJoin(p.clan.chan.name)
+            data += packets.channelInfo(p.clan.chan)
+
+            # check if clan is in battle, if so: send invite to them too
+            if (m := p.clan.battle):
+                if not m.battle_ready:
+                    # battle hasn't started/isn't ready yet, lets invite them too!
+                    if p.clan == m.clan_1:
+                        against = m.clan_2
+                        add = 'online1'
+                    else:
+                        against = m.clan_1
+                        add = 'online2'
+                    
+                    data += packets.sendMessage(fromname=glob.bot.name, msg=f'Your clan has initiated in a clan battle against the clan {against.name}! Please join the battle here: {m.embed}', tarname=p.name, fromid=glob.bot.id)
+
+                    # update player lists for the battle
+                    b1 = glob.clan_battles[m.clan_1]
+                    b2 = glob.clan_battles[m.clan_2]
+
+                    b1['total'].append(p)
+                    b2['total'].append(p)
+                    b1[add].append(p)
+                    b2[add].append(p)
 
         elapsed = (time.time() - start) * 1000
         data += packets.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed:.2f}ms') # send notification as indicator they've logged in i guess

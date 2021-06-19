@@ -1,7 +1,11 @@
 from objects import glob
+from objects.match import Match
+from objects.channel import Channel
 from constants.privs import Privileges
+from constants.types import teamTypes
 
 import time
+import packets
 
 async def help(user, msg):
     allowed_cmds = []
@@ -13,7 +17,7 @@ async def help(user, msg):
     return f'List of available commands:\n\n{cmd_list}'
 
 async def add_priv(user, msg):
-    if len(msg) < 2:
+    if len(msg) < 3:
         return f"You haven't provided a username and privileges!"
     
     name = msg[1]
@@ -31,7 +35,7 @@ async def add_priv(user, msg):
     return f"Added privilege(s) {new_privs} to {name}."
 
 async def rm_priv(user, msg):
-    if len(msg) < 2:
+    if len(msg) < 3:
         return f"You haven't provided a username and privileges!"
 
     name = msg[1]
@@ -47,6 +51,89 @@ async def rm_priv(user, msg):
 
     await glob.db.execute("UPDATE users SET priv = $1 WHERE name = $2", int(priv), name)
     return f"Removed privilege(s) {new_privs} from {name}."
+
+async def clan_battle(user, msg):
+    if msg[1] in ('accept', 'deny'):
+        if len(msg) < 3:
+            return f'Please accept/deny a battle and specify the clan!'
+
+        clan_name = msg[2]
+        clan = glob.clans.get(await glob.db.fetchval('SELECT id FROM clans WHERE name = $1', clan_name))
+        
+        if not clan:
+            return f'We could not find a clan by this name!'
+
+        if not (owner := glob.players_id.get(clan.owner)):
+            return f'Clan owner offline, battle request cancelled!'
+        
+        if msg[1] == 'deny':
+            owner.enqueue(packets.sendMessage(fromname=glob.bot.name, msg=f'{user.name} denied your request to battle their clan {clan.name}!', tarname=owner.name, fromid=glob.bot.id))
+            return f'Battle request denied!'
+
+        # battle was accepted, create the battle match
+
+        user.enqueue(packets.sendMessage(fromname=glob.bot.name, msg=f'Request accepted! Creating match...', tarname=user.name, fromid=glob.bot.id))
+        owner.enqueue(packets.sendMessage(fromname=glob.bot.name, msg=f'{user.name} accepted your request to battle their clan {user.clan.name}! Creating match...', tarname=owner.name, fromid=glob.bot.id))
+
+        match = Match()
+
+        match.name = f'Clan Battle: ({clan.name}) vs ({user.clan.name})'
+        match.clan_battle = True
+
+        match.clan_1 = clan
+        match.clan_2 = user.clan
+
+        match.host = owner
+        match.type = teamTypes.team
+
+        glob.matches[match.id] = match
+
+        mp_chan = Channel(name=f'#multiplayer', desc=f'Multiplayer channel for match ID {match.id}', auto=False, perm=False)
+        glob.channels[f'#multi_{match.id}'] = mp_chan
+        match.chat = mp_chan
+
+        # get list of potential clan members we should expect (TODO: if a clan member logs in after this point, add to list)
+        online1 = []
+        for m in clan.members:
+            if (e := glob.players_id.get(m)):
+                online1.append(e)
+
+        online2 = []
+        for m in user.clan.members:
+            if (e := glob.players_id.get(m)):
+                online2.append(e)
+
+        b_info = {'clan1': clan, 'clan2': user.clan, 'online1': online1, 'online2': online2, 'total': (online1 + online2), 'match': match}
+
+        glob.clan_battles[match.clan_1] = b_info
+        glob.clan_battles[match.clan_2] = b_info
+
+        for u in online1:
+            u.enqueue(packets.sendMessage(fromname=glob.bot.name, msg=f'Your clan has initiated in a clan battle against the clan {user.clan.name}! Please join the battle here: {match.embed}', tarname=u.name, fromid=glob.bot.id)) 
+
+        for u in online2:
+            u.enqueue(packets.sendMessage(fromname=glob.bot.name, msg=f'Your clan has initiated in a clan battle against the clan {clan.name}! Please join the battle here: {match.embed}', tarname=u.name, fromid=glob.bot.id))
+
+        return
+
+    if user.clan.owner != user.id:
+        return f'You must be the owner of your clan to request a battle!'
+
+    if len(msg) < 2:
+        return f"Please provide a clan to request a battle!"
+
+    clan_name = msg[1]
+    clan = glob.clans.get(await glob.db.fetchval('SELECT id FROM clans WHERE name = $1', clan_name))
+
+    if not clan:
+        return f'We could not find a clan by this name!'
+
+    if not (owner := glob.players_id.get(clan.owner)):
+        return f'The clan owner must be online for you to request a battle!'
+
+    owner.enqueue(packets.sendMessage(fromname=glob.bot.name, msg=f'{user.name} has invited you to a clan battle! If you wish to accept then type !battle accept {user.clan.name}, or !battle deny {user.clan.name} to deny. If you accept, a multiplayer match will be created for you and all your online clanmates to battle to the death!', tarname=owner.name, fromid=glob.bot.id))
+
+    return f'Clan battle request sent to {clan.name} clan!'
 
 privs = {
     'normal': Privileges.Normal,
@@ -64,13 +151,15 @@ privs = {
 cmds = {
     '!addpriv': add_priv,
     '!rmpriv': rm_priv,
-    '!help': help
+    '!help': help,
+    '!battle': clan_battle
 }
 
 cmd_privs = {
     '!addpriv': Privileges.Owner,
     '!rmpriv': Privileges.Owner,
-    '!help': Privileges.Normal
+    '!help': Privileges.Normal,
+    '!battle': Privileges.Normal
 }
 
 async def process(user, target, msg):
@@ -86,7 +175,12 @@ async def process(user, target, msg):
             else:
                 elapsed = ''
 
-            return f'{await cmd(user, args)} {elapsed}'
+            c = await cmd(user, args)
+
+            if c is not None:
+                return f'{await cmd(user, args)} {elapsed}'
+
+            return
         else:
             return f'You have insufficient permissions to perform this command!'
     else:

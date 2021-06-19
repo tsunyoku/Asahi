@@ -6,7 +6,6 @@ aiohttp
 geoip2
 orjson
 py3rijndael
-uvloop
 aioredis
 asyncpg
 circleguard
