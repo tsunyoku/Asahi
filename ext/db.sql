@@ -181,7 +181,8 @@ CREATE TABLE public.users (
     pw text NOT NULL,
     country character varying(2) DEFAULT 'xx'::character varying NOT NULL,
     priv integer DEFAULT 1 NOT NULL,
-    safe_name character varying(16) NOT NULL
+    safe_name character varying(16) NOT NULL,
+    clan integer DEFAULT 0 NOT NULL
 );
 
 
@@ -268,7 +269,7 @@ COPY public.users (id, name, email, pw, country, priv, safe_name) FROM stdin;
 -- Name: channels_id_seq; Type: SEQUENCE SET; Schema: public; Owner: tsunyoku
 --
 
-SELECT pg_catalog.setval('public.channels_id_seq', 1, true);
+SELECT pg_catalog.setval('public.channels_id_seq', 0, true);
 
 
 --
@@ -498,6 +499,39 @@ ALTER TABLE public.scores_ap OWNER TO tsunyoku;
 
 ALTER TABLE ONLY public.scores_ap
     ADD CONSTRAINT scores_ap_pkey PRIMARY KEY (id);
+
+--
+-- Name: clans; Type: TABLE; Schema: public; Owner: tsunyoku
+--
+
+CREATE SEQUENCE public.clans_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.clans_id_seq OWNER TO tsunyoku;
+
+CREATE TABLE public.clans (
+    id integer DEFAULT nextval('public.clans_id_seq'::regclass) NOT NULL,
+    name text NOT NULL,
+    tag text NOT NULL,
+    owner integer NOT NULL
+    score integer DEFAULT 0 NOT NULL
+);
+
+
+ALTER TABLE public.clans OWNER TO tsunyoku;
+
+--
+-- Name: clans clans_pkey; Type: CONSTRAINT; Schema: public; Owner: tsunyoku
+--
+
+ALTER TABLE ONLY public.clans
+    ADD CONSTRAINT clans_pkey PRIMARY KEY (id);
+
 
 --
 -- PostgreSQL database dump complete

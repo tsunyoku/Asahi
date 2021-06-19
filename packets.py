@@ -373,6 +373,8 @@ class BanchoPacketReader:
 
         self.read_i8()
 
+        match.id = len(glob.matches) + 1
+
         match.mods = Mods(self.read_i32())
         match.name = self.read_string()
         match.pw = self.read_string()

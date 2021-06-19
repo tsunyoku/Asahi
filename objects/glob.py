@@ -33,5 +33,7 @@ players_id = {} # playerid dict | player[id] = player
 geoloc = {} # geoloc dict | geoloc[ip] = geoloc
 channels = {} # channels dict | channel[name] = channel
 matches = {} # matches dict | matches[id] = match
+clans = {} # clans dict | clan[id] = clan
+clan_battles = {} # clan battles dict | clan_battle[clan1/clan2] = dict of info
 
 bot: 'Player'
