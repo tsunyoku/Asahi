@@ -443,11 +443,17 @@ class changeMatchSettings(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_SETTINGS):
             for s in match.slots:
                 if s.status & slotStatus.has_player:
                     s.mods = match.mods & ~Mods.SPEED_MODS
+                    if match.clan_battle:
+                        s.mods = (match.mods &~ Mods.SPEED_MODS) & ~Mods.GAME_CHANGING
 
             match.mods &= Mods.SPEED_MODS
+            if match.clan_battle:
+                match.mods &= Mods.GAME_CHANGING
         else:
             host = match.get_host()
             match.mods &= Mods.SPEED_MODS
+            if match.clan_battle:
+                match.mods &= Mods.GAME_CHANGING
             match.mods |= host.mods
 
             for s in match.slots:
@@ -555,9 +561,13 @@ class changeMatchMods(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_MODS):
         if match.fm:
             if user is match.host:
                 match.mods = self.mods & Mods.SPEED_MODS
+                if match.clan_battle:
+                    match.mods = (self.mods & Mods.SPEED_MODS) & Mods.GAME_CHANGING
 
             slot = match.get_slot(user)
             slot.mods = self.mods & ~Mods.SPEED_MODS
+            if match.clan_battle:
+                slot.mods = (self.mods & ~Mods.SPEED_MODS) & ~Mods.GAME_CHANGING
         else:
             if user is not match.host:
                 return

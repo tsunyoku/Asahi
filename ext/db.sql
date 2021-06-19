@@ -251,8 +251,8 @@ COPY public.channels (id, name, descr, auto, perm) FROM stdin;
 -- Data for Name: stats; Type: TABLE DATA; Schema: public; Owner: tsunyoku
 --
 
-COPY public.stats (id, rscore_std, acc_std, pc_std, tscore_std, rank_std, pp_std, rscore_mania, acc_mania, pc_mania, tscore_mania, rank_mania, rscore_catch, acc_catch, pc_catch, tscore_catch, rank_catch, rscore_taiko, acc_taiko, pc_taiko, tscore_taiko, rank_taiko, pp_taiko, pp_catch, pp_mania, rscore_catch_rx, acc_catch_rx, pc_catch_rx, tscore_catch_rx, rank_catch_rx, rscore_taiko_rx, acc_taiko_rx, pc_taiko_rx, tscore_taiko_rx, rank_taiko_rx, rscore_std_ap, acc_std_ap, pc_std_ap, tscore_std_ap, rank_std_ap, rscore_std_rx, acc_std_rx, pc_std_rx, tscore_std_rx, rank_std_rx, pp_std_rx, pp_std_ap, pp_taiko_rx, pp_catch_rx) FROM stdin;
-1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+COPY public.stats (id, rscore_std, acc_std, pc_std, tscore_std, pp_std, rscore_mania, acc_mania, pc_mania, tscore_mania, rscore_catch, acc_catch, pc_catch, tscore_catch, rscore_taiko, acc_taiko, pc_taiko, tscore_taiko, pp_taiko, pp_catch, pp_mania, rscore_catch_rx, acc_catch_rx, pc_catch_rx, tscore_catch_rx, rscore_taiko_rx, acc_taiko_rx, pc_taiko_rx, tscore_taiko_rx, rscore_std_ap, acc_std_ap, pc_std_ap, tscore_std_ap, rscore_std_rx, acc_std_rx, pc_std_rx, tscore_std_rx, pp_std_rx, pp_std_ap, pp_taiko_rx, pp_catch_rx) FROM stdin;
+1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
 \.
 
 
@@ -269,14 +269,14 @@ COPY public.users (id, name, email, pw, country, priv, safe_name) FROM stdin;
 -- Name: channels_id_seq; Type: SEQUENCE SET; Schema: public; Owner: tsunyoku
 --
 
-SELECT pg_catalog.setval('public.channels_id_seq', 0, true);
+SELECT pg_catalog.setval('public.channels_id_seq', 1, true);
 
 
 --
 -- Name: friends_id_seq; Type: SEQUENCE SET; Schema: public; Owner: tsunyoku
 --
 
-SELECT pg_catalog.setval('public.friends_id_seq', 0, true);
+SELECT pg_catalog.setval('public.friends_id_seq', 1, true);
 
 
 --
@@ -518,7 +518,7 @@ CREATE TABLE public.clans (
     id integer DEFAULT nextval('public.clans_id_seq'::regclass) NOT NULL,
     name text NOT NULL,
     tag text NOT NULL,
-    owner integer NOT NULL
+    owner integer NOT NULL,
     score integer DEFAULT 0 NOT NULL
 );
 

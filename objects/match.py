@@ -178,8 +178,24 @@ class Match:
             return
 
         self.battle_ready = True
-        self.chat.send(glob.bot, f"All online clan members have joined! If you're unsure of how clan battles work, here is a rundown. Clan battles are team vs multiplayer matches against 2 clans. You will take turns picking maps until the first clan reaches 5 wins. Wins are decided by average score/pp. If you played vanilla then the clan with the highest average score (all clan users participating added up) will gain a win. This is the same for relax/autopilot but with pp. Once you reach 5 wins, that clan wins and the match is over. When you win a match, your clan gains 'clan score' which is the metric used for clan leaderboards. Have fun!", False)
-        self.chat.send(glob.bot, f'Players fighting:\n{self.clan_1.name}: {", ".join(u.name for u in self.clan_1_users)}\n{self.clan_2.name}: {", ".join(u.name for u in self.clan_2_users)}\n\nAny clan members who come online at this point will be unable to participate!', False)
+
+        self.chat.send(
+            glob.bot, 
+            "All online clan members have joined! If you're unsure of how clan battles work, here is a rundown."
+            "Clan battles are team vs multiplayer matches against 2 clans. You will take turns picking maps until the first clan reaches 5 wins. Wins are decided by average score/pp."
+            "If you played vanilla then the clan with the highest average score (all clan users participating added up) will gain a win. This is the same for relax/autopilot but with pp."
+            "Once you reach 5 wins, that clan wins and the match is over. When you win a match, your clan gains 'clan score' which is the metric used for clan leaderboards. Have fun!",
+            False
+        )
+
+        self.chat.send(
+            glob.bot, 
+            f'Players fighting:'
+            f'\n{self.clan_1.name}: {", ".join(u.name for u in self.clan_1_users)}'
+            f'\n{self.clan_2.name}: {", ".join(u.name for u in self.clan_2_users)}'
+            '\n\nAny clan members who come online at this point will be unable to participate!', 
+            False
+        )
 
     async def clan_scores(self, ignore: list = []):
         time_waited = 0
