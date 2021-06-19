@@ -35,6 +35,7 @@ class Mods(IntFlag):
     MIRROR      = 1 << 30
 
     SPEED_MODS = DOUBLETIME | NIGHTCORE | HALFTIME
+    GAME_CHANGING = RELAX | AUTOPILOT
 
 def convert(m: int):
     if not m:
