@@ -292,38 +292,6 @@ SELECT pg_catalog.setval('public.stats_id_seq', 2, true);
 
 SELECT pg_catalog.setval('public.users_id_seq', 2, true);
 
-
---
--- Name: channels channels_pkey; Type: CONSTRAINT; Schema: public; Owner: tsunyoku
---
-
-ALTER TABLE ONLY public.channels
-    ADD CONSTRAINT channels_pkey PRIMARY KEY (id);
-
-
---
--- Name: friends friends_pkey; Type: CONSTRAINT; Schema: public; Owner: tsunyoku
---
-
-ALTER TABLE ONLY public.friends
-    ADD CONSTRAINT friends_pkey PRIMARY KEY (id);
-
-
---
--- Name: stats stats_pkey; Type: CONSTRAINT; Schema: public; Owner: tsunyoku
---
-
-ALTER TABLE ONLY public.stats
-    ADD CONSTRAINT stats_pkey PRIMARY KEY (id);
-
-
---
--- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: tsunyoku
---
-
-ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
-
 --
 -- Name: maps; Type: TABLE; Schema: public; Owner: tsunyoku
 --
