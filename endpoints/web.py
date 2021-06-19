@@ -307,7 +307,7 @@ async def scoreSubmit():
             f = vn_path / f'{s.id}.osr'
 
         replay.save(str(f))
-        #threading.Thread(target=s.analyse).start()
+        threading.Thread(target=s.analyse).start()
 
     # update stats EEEEEEE
     stats = s.user.stats[s.mode.value]
