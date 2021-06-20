@@ -711,6 +711,10 @@ def matchPlayerSkipped(uid) -> bytes:
 def matchTransferHost() -> bytes:
     return write(Packets.CHO_MATCH_TRANSFER_HOST)
 
+@cache
+def versionUpdateForced() -> bytes:
+    return write(Packets.VERSION_UPDATE_FORCED)
+
 def matchInvite(f, to) -> bytes:
     msg = f'{f.name} invited you to join {f.match.embed}!'
     return write(Packets.CHO_MATCH_INVITE, ((f.name, msg, to, f.id), osuTypes.message))
