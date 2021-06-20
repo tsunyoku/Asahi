@@ -751,7 +751,15 @@ async def root_client():
 
         username = info[0]
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later
-
+        
+        osu_ver = cinfo[0]
+        
+        if osu_ver in ['skooter', 'skooterb']:
+            return (packets.userID(-3) + packets.notification('lol nice try')) # i'll think of a better message later
+        
+        if int(osu_ver[:-1]) <= 20210125:
+            return (packets.userID(-2) + packets.notification('Your osu! version is out of date! Please update your client.'))
+                        
         user = await glob.db.fetchrow("SELECT id, pw, country, name, priv FROM users WHERE name = $1", username)
         if not user: # ensure user actually exists before attempting to do anything else
             if glob.config.debug:
