@@ -758,7 +758,7 @@ async def root_client():
             return (packets.userID(-3) + packets.notification('lol nice try')) # i'll think of a better message later
         
         if int(osu_ver[:-1]) <= 20210125:
-            return (packets.userID(-2) + packets.notification('Your osu! version is out of date! Please update your client.'))
+            return (packets.versionUpdateForced() + packets.notification('Your osu! version is out of date! Please update your client.'))
                         
         user = await glob.db.fetchrow("SELECT id, pw, country, name, priv FROM users WHERE name = $1", username)
         if not user: # ensure user actually exists before attempting to do anything else
