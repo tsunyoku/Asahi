@@ -713,7 +713,7 @@ def matchTransferHost() -> bytes:
 
 @cache
 def versionUpdateForced() -> bytes:
-    return write(Packets.VERSION_UPDATE_FORCED)
+    return write(Packets.CHO_VERSION_UPDATE_FORCED)
 
 def matchInvite(f, to) -> bytes:
     msg = f'{f.name} invited you to join {f.match.embed}!'

@@ -23,6 +23,7 @@ from constants.types import osuTypes, teamTypes
 from constants.privs import Privileges, ClientPrivileges
 from constants.mods import Mods, convert
 from constants import commands
+from constants import regexes
 
 import packets
 from packets import BanchoPacketReader, BanchoPacket, Packets
@@ -757,13 +758,17 @@ async def root_client():
 
         username = info[0]
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later    
-        osu_ver = cinfo[0]     
+        osu_ver = regexes.osu_ver.match(cinfo[0])
         
-        if 'skooterb' in osu_ver:
-            return (packets.userID(-3) + packets.notification('Cheat advantages are not allowed on Asahi. Your account has been restricted.'))
-        
-        if int(osu_ver[:-1]) <= 20210125:
-            return packets.versionUpdateForced()
+        if not osu_ver:
+            resp = await make_response((packets.userID(-3) + packets.notification('Cheat advantages are not allowed on Asahi. Your account has been restricted.')))
+            resp.headers['cho-token'] = 'no'
+            return resp
+
+        if int(osu_ver['ver']) <= 20210125:
+            resp = await make_response(packets.versionUpdateForced())
+            resp.headers['cho-token'] = 'no'
+            return resp
          
         user = await glob.db.fetchrow("SELECT id, pw, country, name, priv FROM users WHERE name = $1", username)
         if not user: # ensure user actually exists before attempting to do anything else
