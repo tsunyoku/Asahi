@@ -12,10 +12,8 @@ import os
 import hashlib
 import time
 import orjson
-import re
 import copy
 import threading
-import asyncio
 
 from objects import glob
 from objects.beatmap import Beatmap
@@ -24,6 +22,7 @@ from constants.modes import lbModes
 from constants.statuses import mapStatuses, scoreStatuses
 from constants.mods import Mods
 from objects.leaderboard import Leaderboard
+from constants import regexes
 
 import packets
 
@@ -242,8 +241,7 @@ async def getMapScores():
 
     if not bmap:
         file = args['f'].replace('+', '')
-        reg = re.compile(r'^(?P<artist>.+) - (?P<title>.+) \((?P<mapper>.+)\) \[(?P<diff>.+)\]\.osu$') # fuck sake osu why do this to me
-        if not (info := reg.match(unquote(file))): # once again osu why
+        if not (info := regexes.map_file.match(unquote(file))): # once again osu why
             # invalid file? idfk
             glob.cache['unsub'].append(md5)
             return b'-1|false'
