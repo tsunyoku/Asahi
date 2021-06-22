@@ -341,6 +341,12 @@ class joinMatch(BanchoPacket, type=Packets.OSU_JOIN_MATCH):
     pw: osuTypes.string
 
     async def handle(self, user):
+        if self.id >= 1000:
+            if not (menu := glob.menus.get(self.id)):
+                return user.enqueue(packets.matchJoinFail())
+            
+            return await menu.handle(user)
+
         if not (match := glob.matches.get(self.id)):
             user.enqueue(packets.matchJoinFail())
             return
@@ -870,6 +876,10 @@ async def root_client():
                     b2['total'].append(p)
                     b1[add].append(p)
                     b2[add].append(p)
+
+        for m in glob.menus.values():
+            if p.priv & m.priv:
+                data += packets.sendMessage(fromname=glob.bot.name, msg=m.embed, tarname=p.name, fromid=glob.bot.id)
 
         elapsed = (time.time() - start) * 1000
         data += packets.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed:.2f}ms') # send notification as indicator they've logged in i guess

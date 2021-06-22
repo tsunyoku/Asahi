@@ -2,7 +2,7 @@
 # above is so we can use ./main.py instead
 
 # external imports (some may require to be installed, install using ext/requirements.txt)
-from quart import Quart, request # web server :blobcowboi:
+from quart import Quart # web server :blobcowboi:
 from cmyui import Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from pathlib import Path
 from aiohttp import ClientSession
@@ -11,13 +11,18 @@ from hypercorn.asyncio import serve
 from hypercorn.config import Config
 import asyncpg
 import aioredis
+import random
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
 from objects.player import Player # Player - player object to store stats, info etc.
 from objects.channel import Channel # Channel - channel object to store name, desc etc.
 from objects.clan import Clan
+from objects.menu import Menu
 from constants.countries import country_codes
+from constants.privs import Privileges
+
+import packets
 
 app = Quart(__name__) # handler for webserver :D
 app.config['SERVER_NAME'] = glob.config.domain
@@ -128,6 +133,11 @@ async def connect(): # ran before server startup, used to do things like connect
 
             if glob.config.debug:
                 log(f'==== Added clan {clan.name} to clan list ====', Ansi.GREEN)
+
+    # menu = Menu(id=random.randint(1000, 1100), name='Test Menu', priv=Privileges.Owner, callback=lambda p: p.enqueue, args=((packets.notification('test menu pressed :flushed:'),)))
+    # glob.menus[menu.id] = menu
+    # if glob.config.debug:
+    #     log(f'==== Added menu {menu.name} to menu list ====', Ansi.GREEN)
 
     log(f'==== Asahi v{glob.version} started ====', Ansi.GREEN)
 
