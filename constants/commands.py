@@ -1,8 +1,10 @@
 from objects import glob
 from objects.match import Match
 from objects.channel import Channel
+from objects.beatmap import Beatmap
 from constants.privs import Privileges
 from constants.types import teamTypes
+from constants.statuses import strStatuses
 
 import time
 import packets
@@ -135,6 +137,38 @@ async def clan_battle(user, msg):
 
     return f'Clan battle request sent to {clan.name} clan!'
 
+async def _map(user, msg):
+    if len(msg) != 3:
+        return 'Please provide the new status & whether we should update the map/set! (!map <rank/love/unrank> <map/set>)'
+
+    status = msg[1]
+    type = msg[2]
+
+    if status not in ('love', 'rank', 'unrank') or type not in ('set', 'map'):
+        return 'Invalid syntax! Command: !map <rank/love/unrank> <set/map>'
+
+    map = user.np
+    ns = strStatuses(status)
+
+    if type == 'map':
+        map.status = ns
+        map.frozen = True
+        await map.save()
+        glob.cache['maps'][map.md5] = map
+    else:
+        sid = await glob.db.fetchval('SELECT sid FROM maps WHERE md5 = $1', map.md5)
+        set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $1', sid)
+
+        for m in set:
+            md5 = m['md5']
+            bm = await Beatmap.from_md5(md5)
+            bm.status = ns
+            bm.frozen = True
+            await bm.save()
+            glob.cache['maps'][bm.md5] = bm
+
+    return 'Status updated!'
+
 privs = {
     'normal': Privileges.Normal,
     'verified': Privileges.Verified,
@@ -152,14 +186,16 @@ cmds = {
     '!addpriv': add_priv,
     '!rmpriv': rm_priv,
     '!help': help,
-    '!battle': clan_battle
+    '!battle': clan_battle,
+    '!map': _map
 }
 
 cmd_privs = {
     '!addpriv': Privileges.Owner,
     '!rmpriv': Privileges.Owner,
     '!help': Privileges.Normal,
-    '!battle': Privileges.Normal
+    '!battle': Privileges.Normal,
+    '!map': Privileges.Nominator
 }
 
 async def process(user, target, msg):
