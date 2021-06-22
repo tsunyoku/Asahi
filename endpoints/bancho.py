@@ -766,7 +766,7 @@ async def root_client():
             return resp
 
         if int(osu_ver['ver']) <= 20210125:
-            resp = await make_response(packets.versionUpdateForced())
+            resp = await make_response((packets.versionUpdateForced() + packets.userID(-2)))
             resp.headers['cho-token'] = 'no'
             return resp
          
@@ -804,6 +804,10 @@ async def root_client():
             resp = await make_response(packets.userID(-3)) # banned packet
             resp.headers['cho-token'] = 'no'
             return resp
+
+        if (p := glob.players_id.get(user['id'])):
+            if (start - p.last_ping) > 10: # game crashes n shit
+                p.logout()
 
         token = uuid.uuid4() # generate token for client to use as auth
         user2 = dict(user)
@@ -919,6 +923,8 @@ async def root_client():
     data = bytearray()
     while not p.queue_empty():
         data += p.dequeue()
+
+    p.last_ping = time.time()
 
     resp = await make_response(bytes(data))
     resp.headers['Content-Type'] = 'text/html; charset=UTF-8' # ?
