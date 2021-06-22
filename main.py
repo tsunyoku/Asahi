@@ -33,7 +33,7 @@ config.loglevel = 'error'
 
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
 
-glob.version = Version(0, 2, 5) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 2, 6) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'

@@ -9,6 +9,14 @@ class mapStatuses(IntEnum):
     Qualified = 4
     Loved = 5
 
+def strStatuses(status: str):
+    if status == 'rank':
+        return mapStatuses.Ranked
+    elif status == 'love':
+        return mapStatuses.Loved
+    else:
+        return mapStatuses.Pending
+
 def apiStatuses(status: int):
     if status in [-2, -1, 0]:
         ns = 0

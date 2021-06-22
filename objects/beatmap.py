@@ -185,8 +185,51 @@ class Beatmap:
 
         glob.cache['maps'][md5] = b # cache the map now we have it from api & saved in sql
 
+        await self.cache_set(b.sid)
+
         log(f'Retrieved Set ID {b.sid} from osu!api', Ansi.LCYAN)
         return b
+
+    @classmethod
+    async def cache_set(self, sid):
+        api = 'https://old.ppy.sh/api/get_beatmaps'
+        params = {'k': glob.config.api_key, 's': sid}
+
+        async with glob.web.get(api, params=params) as resp:
+            if resp.status != 200 or not resp:
+                return
+
+            data = await resp.json()
+            if not data:
+                return
+
+        for bmap in data:
+            b = self()
+            b.id = int(bmap['beatmap_id'])
+            b.sid = int(bmap['beatmapset_id'])
+            b.md5 = bmap['file_md5']
+
+            b.bpm = float(bmap['bpm'])
+            b.cs = float(bmap['diff_size'])
+            b.ar = float(bmap['diff_approach'])
+            b.od = float(bmap['diff_overall'])
+            b.hp = float(bmap['diff_drain'])
+            b.sr = float(bmap['difficultyrating'])
+            b.mode = osuModes(int(bmap['mode']))
+
+            b.artist = bmap['artist']
+            b.title = bmap['title']
+            b.diff = bmap['version']
+            b.mapper = bmap['creator']
+
+            b.status = int(apiStatuses(int(bmap['approved'])))
+            b.update = dt.strptime(bmap['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
+            b.frozen = True
+
+            b.nc = time.time()
+
+            await b.save()
+            glob.cache['maps'][b.md5] = b
 
     async def check_status(self):
         api = 'https://old.ppy.sh/api/get_beatmaps'
