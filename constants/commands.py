@@ -152,14 +152,14 @@ cmds = {
     '!addpriv': add_priv,
     '!rmpriv': rm_priv,
     '!help': help,
-    '!battle': clan_battle,
+    '!battle': clan_battle
 }
 
 cmd_privs = {
     '!addpriv': Privileges.Owner,
     '!rmpriv': Privileges.Owner,
     '!help': Privileges.Normal,
-    '!battle': Privileges.Normal,
+    '!battle': Privileges.Normal
 }
 
 async def process(user, target, msg):
