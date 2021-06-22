@@ -756,8 +756,15 @@ async def root_client():
             return resp
 
         username = info[0]
-        pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later
-
+        pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later    
+        osu_ver = cinfo[0]     
+        
+        if 'skooterb' in osu_ver:
+            return (packets.userID(-3) + packets.notification('Cheat advantages are not allowed on Asahi. Your account has been restricted.'))
+        
+        if int(osu_ver[:-1]) <= 20210125:
+            return packets.versionUpdateForced()
+         
         user = await glob.db.fetchrow("SELECT id, pw, country, name, priv FROM users WHERE name = $1", username)
         if not user: # ensure user actually exists before attempting to do anything else
             if glob.config.debug:
