@@ -31,12 +31,7 @@ class Leaderboard:
         if self.map.status < mapStatuses.Ranked:
             return f'{self.map.status}|false'.encode()
 
-        if self.mode.value > 3 and self.mode.value < 7:
-            mode_vn = self.mode.value - 4
-        elif self.mode == 7:
-            mode_vn = 0
-        else:
-            mode_vn = self.mode.value
+        mode_vn = self.mode.as_vn
 
         query = [f'SELECT t.id, {self.mode.sort} as s FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0']
         p = [self.map.md5, mode_vn]
@@ -123,12 +118,7 @@ class Leaderboard:
         if user.name in self.user_cache:
             return self.user_cache[user.name]
 
-        if self.mode.value > 3 and self.mode.value < 7:
-            mode_vn = self.mode.value - 4
-        elif self.mode == 7:
-            mode_vn = 0
-        else:
-            mode_vn = self.mode.value
+        mode_vn = self.mode.as_vn
 
         pbd = await glob.db.fetchrow(f'SELECT {self.mode.table}.id, {self.mode.sort} as s FROM {self.mode.table} WHERE md5 = $1 AND mode = $2 AND status = 2 AND uid = $3 ORDER BY s DESC LIMIT 1', self.map.md5, mode_vn, user.id)
 

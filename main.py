@@ -2,38 +2,26 @@
 # above is so we can use ./main.py instead
 
 # external imports (some may require to be installed, install using ext/requirements.txt)
-from quart import Quart # web server :blobcowboi:
+from xevel import Xevel # web server :blobcowboi:
 from cmyui import Ansi, Version, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from pathlib import Path
 from aiohttp import ClientSession
 from discord.ext import commands
-from hypercorn.asyncio import serve
-from hypercorn.config import Config
 import asyncpg
 import aioredis
-import random
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
 from objects.player import Player # Player - player object to store stats, info etc.
 from objects.channel import Channel # Channel - channel object to store name, desc etc.
 from objects.clan import Clan
-from objects.menu import Menu
 from constants.countries import country_codes
-from constants.privs import Privileges
 
-import packets
-
-app = Quart(__name__) # handler for webserver :D
-app.config['SERVER_NAME'] = glob.config.domain
-
-config = Config()
-config.bind = [f"unix:{glob.config.socket}"]
-config.loglevel = 'error'
+app = Xevel(glob.config.socket) # handler for webserver :D
 
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
 
-glob.version = Version(0, 2, 6) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 2, 7) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
@@ -44,7 +32,7 @@ RAP_PATH = Path.cwd() / 'resources/replays_ap'
 
 MAPS_PATH = Path.cwd() / 'resources/maps'
 
-@app.before_serving
+@app.before_serving()
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
     log(f'==== Asahi v{glob.version} starting ====', Ansi.GREEN)
 
@@ -134,14 +122,9 @@ async def connect(): # ran before server startup, used to do things like connect
             if glob.config.debug:
                 log(f'==== Added clan {clan.name} to clan list ====', Ansi.GREEN)
 
-    # menu = Menu(id=random.randint(1000, 1100), name='Test Menu', priv=Privileges.Owner, callback=lambda p: p.enqueue, args=((packets.notification('test menu pressed :flushed:'),)))
-    # glob.menus[menu.id] = menu
-    # if glob.config.debug:
-    #     log(f'==== Added menu {menu.name} to menu list ====', Ansi.GREEN)
-
     log(f'==== Asahi v{glob.version} started ====', Ansi.GREEN)
 
-@app.after_serving
+@app.after_serving()
 async def disconnect():
     log(f'==== Asahi v{glob.version} stopping ====', Ansi.GREEN)
 
@@ -168,14 +151,12 @@ from endpoints.bancho import bancho
 from endpoints.avatars import avatars
 from endpoints.web import web
 from endpoints.api import api
-app.register_blueprint(bancho, subdomain='c')
-app.register_blueprint(bancho, subdomain='ce')
-app.register_blueprint(bancho, subdomain='c4')
-app.register_blueprint(avatars, subdomain='a')
-app.register_blueprint(web, subdomain='osu')
-app.register_blueprint(api, subdomain='api')
+app.add_router(bancho)
+app.add_router(avatars)
+app.add_router(web)
+app.add_router(api)
 
 if __name__ == '__main__':
-    dc.loop.create_task(serve(app, config))
+    dc.loop.create_task(app.start())
     dc.load_extension('disc.bot')
     dc.run(glob.config.token)

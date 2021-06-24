@@ -2,14 +2,15 @@ from objects.beatmap import Beatmap
 from objects.player import Player
 from constants.mods import Mods, convert
 from constants.modes import osuModes, lbModes
-from constants.statuses import scoreStatuses, mapStatuses
+from constants.statuses import scoreStatuses
 from constants.grades import Grade
-from objects import glob, pp
+from objects import glob
 
 from base64 import b64decode
 from py3rijndael import RijndaelCbc, ZeroPadding
 from pathlib import Path
-from cmyui import log
+from cmyui.osu.oppai_ng import OppaiWrapper
+from maniera.calculator import Maniera
 from circleguard import Circleguard, ReplayString
 
 import time
@@ -37,7 +38,6 @@ class Score:
         self.readable_mods: str = None
         self.combo: int = None
         self.mode: osuModes = None
-        self.mode_vn: osuModes = None
 
         self.rank: int = None
         self.pp: float = None
@@ -106,8 +106,7 @@ class Score:
         s.grade = score['grade']
         s.fc = score['fc']
         s.status = scoreStatuses(score['status'])
-        s.mode_vn = score['mode']
-        s.mode = lbModes(s.mode_vn, s.mods)
+        s.mode = lbModes(osuModes(score['mode']).as_vn, s.mods)
 
         s.time = score['time']
         s.passed = s.status.value != 0
@@ -158,15 +157,9 @@ class Score:
 
         s.grade = data[12] if s.passed else 'F'
 
-        if s.mods & Mods.RELAX:
-            s.mode_vn = s.mode.value - 4
-        elif s.mods & Mods.AUTOPILOT:
-            s.mode_vn = 0
-        else:
-            s.mode_vn = s.mode.value
-
-        s.pp = await s.calc_pp()
         await s.calc_info()
+        s.pp = await s.calc_pp(s.mode.as_vn)
+        await s.score_order()
 
         return s
 
@@ -207,7 +200,7 @@ class Score:
         lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.mode = $2 AND {table}.status = 2 AND users.priv & 1 > 0 AND {table}.{sort} > $3', self.map.md5, self.mode.value, value)
         return lb['r'] + 1 if lb else 1
 
-    async def calc_pp(self):
+    async def calc_pp(self, mode_vn):
         path = Path.cwd() / f'resources/maps/{self.map.id}.osu'
         if not path.exists():
             url = f'https://old.ppy.sh/osu/{self.map.id}'
@@ -219,38 +212,39 @@ class Score:
                 m = await resp.read()
                 path.write_bytes(m)
 
-        if self.mode.value in [4, 7]:
-            p = pp.parser()
-            bmap = pp.beatmap()
-            stars = pp.diff_calc()
+        if mode_vn <= 1: # std/taiko: use oppai (cmyui wrapper op)
+            with OppaiWrapper('oppai-ng/liboppai.so') as ezpp:
+                ezpp.set_accuracy_percent(self.acc)
+                ezpp.set_combo(self.combo)
+                ezpp.set_nmiss(self.miss)
 
-            with open(path, 'r') as f:
-                p.map(f, bmap=bmap)
+                if self.mods:
+                    ezpp.set_mods(int(self.mods))
 
-            stars.calc(bmap, self.mods)
-            ppv, _, _, _, _ = pp.ppv2(stars.aim, stars.speed, bmap=bmap, mods=self.mods, n300=self.n300, n100=self.n100, n50=self.n50, nmiss=self.miss, combo=self.combo)
+                ezpp.set_mode(mode_vn)
 
-            return ppv
-        else:
-            if self.mode.name == 'std':
-                nm = 'osu' # fucking osu-tools why
+                ezpp.calculate(path)
+                return ezpp.get_pp() # returning sr soontm
+        elif self.mode.value == 3: # mania: use maniera
+            if self.map.mode != 3:
+                return 0.0 # no convert support
+
+            if self.mods != Mods.NOMOD:
+                mods = int(self.mods)
             else:
-                nm = self.mode.name
+                mods = 0
+
+            c = Maniera(str(path), mods, self.score)
+            c.calculate()
+
+            return c.pp
+        else: # ctb: use shitty osu-tools
 
             cmd = [f'./osu-tools/compiled/PerformanceCalculator simulate {nm} {str(path)}']
-            if self.mode.value == 0:
-                cmd.append(f'-M {self.n50}') # 50s
-            
-            if self.mode.value == 3:
-                cmd.append(f'-s {self.score}') # mania = score game xd
-            else:
-                cmd.append(f'-c {self.combo}') # max combo
-                cmd.append(f'-X {self.miss}') # miss count
+            cmd.append(f'-c {self.combo}') # max combo
+            cmd.append(f'-X {self.miss}') # miss count
 
-            if self.mode.value == 2:
-                cmd.append(f'-D {self.n50}') # 50s equivalent for catch?
-            else:
-                cmd.append(f'-G {self.n100}') # 100s
+            cmd.append(f'-D {self.n50}') # 50s equivalent for catch?
 
             for mod in re.findall('.{1,2}', self.readable_mods):
                 if mod != 'NM': # will confuse osu-tools xd
@@ -265,8 +259,36 @@ class Score:
             o = orjson.loads(ot.decode('utf-8'))
             return o['pp']
 
+    async def score_order(self):
+        mode = self.mode.as_vn
+
+        if self.mods & Mods.RELAX:
+            t = self.pp
+        elif self.mods & Mods.AUTOPILOT:
+            t = self.pp
+        else:
+            t = self.score
+
+        lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = $1 AND t.mode = $2 AND t.status = 2 AND users.priv & 1 > 0 AND t.{self.mode.sort} > $3', self.map.md5, mode, t)
+        self.rank = lb['r'] + 1 if lb else 1
+
+        score = await glob.db.fetchrow(f'SELECT id, pp FROM {self.mode.table} WHERE uid = $1 AND md5 = $2 AND mode = $3 AND status = 2', self.user.id, self.map.md5, mode)
+        if score: # they already have a (best) submitted score
+            self.old_best = await Score.sql(score['id'], self.mode.table, self.mode.sort, t)
+
+            if self.pp > score['pp']:
+                self.status = scoreStatuses.Best
+                self.old_best.status = scoreStatuses.Submitted
+            else:
+                self.status = scoreStatuses.Submitted # not best submitted score
+        else:
+            self.status = scoreStatuses.Best # no previous scores on the map
+        
+        if not self.passed:
+            self.status = scoreStatuses.Failed
+
     async def calc_info(self):
-        mode = self.mode_vn
+        mode = self.mode.as_vn
 
         if mode == 0:
             hits = self.n300 + self.n100 + self.n50 + self.miss
@@ -296,28 +318,3 @@ class Score:
                 self.acc = 0.0
             else:
                 self.acc = 100.0 * ((self.n50 * 50.0) + (self.n100 * 100.0) + (self.katu * 200.0) + ((self.n300 + self.geki) * 300.0)) / (hits * 300.0)
-
-        if self.mods & Mods.RELAX:
-            t = self.pp
-        elif self.mods & Mods.AUTOPILOT:
-            t = self.pp
-        else:
-            t = self.score
-
-        lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = $1 AND t.mode = $2 AND t.status = 2 AND users.priv & 1 > 0 AND t.{self.mode.sort} > $3', self.map.md5, mode, t)
-        self.rank = lb['r'] + 1 if lb else 1
-
-        score = await glob.db.fetchrow(f'SELECT id, pp FROM {self.mode.table} WHERE uid = $1 AND md5 = $2 AND mode = $3 AND status = 2', self.user.id, self.map.md5, mode)
-        if score: # they already have a (best) submitted score
-            self.old_best = await Score.sql(score['id'], self.mode.table, self.mode.sort, t)
-
-            if self.pp > score['pp']:
-                self.status = scoreStatuses.Best
-                self.old_best.status = scoreStatuses.Submitted
-            else:
-                self.status = scoreStatuses.Submitted # not best submitted score
-        else:
-            self.status = scoreStatuses.Best # no previous scores on the map
-        
-        if not self.passed:
-            self.status = scoreStatuses.Failed

@@ -37,6 +37,18 @@ class osuModes(Enum):
             return 'scores'
         else:
             return 'scores_ap'
+
+    @property
+    @cache
+    def as_vn(self):
+        if self.value in [0, 4, 7]:
+            return 0
+        elif self.value in [1, 5]:
+            return 1
+        elif self.value in [2, 6]:
+            return 2
+        else:
+            return self.value
     
     @property
     @cache
