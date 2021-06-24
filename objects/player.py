@@ -56,7 +56,7 @@ class Player:
 
         self.clan: Optional[Clan] = None
 
-        self.last_ping: int = None
+        self.last_ping: int = 0
 
     @property
     def full_name(self):
@@ -338,6 +338,9 @@ class Player:
     def logout(self):
         glob.players.pop(self.token)
         glob.players_name.pop(self.name)
+        glob.players_id.pop(self.id)
+
+        self.token = ''
 
         if host := self.spectating:
             host.remove_spectator(self)
@@ -348,8 +351,8 @@ class Player:
         for o in glob.players.values():
             o.enqueue(packets.logout(self.id))
 
-        while self.channels:
-            self.leave_chan(self.channels[0])
+        for chan in self.channels:
+            self.leave_chan(chan)
 
     async def ban(self, reason):
         self.priv &= ~Privileges.Normal

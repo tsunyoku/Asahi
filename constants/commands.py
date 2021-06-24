@@ -153,6 +153,7 @@ async def _map(user, msg):
     if type == 'map':
         map.status = ns
         map.frozen = True
+        map.lb = None # reset lb cache in case of major status change
         await map.save()
         glob.cache['maps'][map.md5] = map
     else:
@@ -164,6 +165,7 @@ async def _map(user, msg):
             bm = await Beatmap.from_md5(md5)
             bm.status = ns
             bm.frozen = True
+            bm.lb = None # reset lb cache in case of major status change
             await bm.save()
             glob.cache['maps'][bm.md5] = bm
 

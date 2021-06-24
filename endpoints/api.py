@@ -1,4 +1,4 @@
-from quart import Blueprint, request, g, make_response
+from xevel import Router
 from cmyui import log, Ansi
 from pathlib import Path
 from datetime import datetime
@@ -14,25 +14,18 @@ import hashlib
 import packets
 import struct
 
-api = Blueprint('api', __name__)
+api = Router(f'api.{glob.config.domain}')
 
 if glob.config.debug:
-    @api.before_request
-    async def bRequest():
-        g.req_url = request.base_url
-        g.req_method = request.method
-        g.start = time.time()
-
-    @api.after_request
+    @api.after_request()
     async def logRequest(resp):
-        if resp.status_code != 200:
+        if resp.code >= 400:
             colourret = Ansi.LRED
         else:
             colourret = Ansi.LCYAN
 
-        log(f'[{g.pop("req_method")}] {resp.status_code} {g.pop("req_url")} | Time Elapsed: {(time.time() - g.pop("start")) * 1000:.2f}ms', colourret)
+        log(f'[{resp.type}] {resp.code} {resp.url} | Time Elapsed: {resp.elapsed}', colourret)
         return resp
-
 
 async def get_rank(mode, uid, pp):
     rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode}', uid)
@@ -55,11 +48,11 @@ async def get_country_rank(mode, uid, pp, country):
             return 0
 
 @api.route('/player_count')
-async def onlinePlayers():
+async def onlinePlayers(request):
     return {'code': 200, 'online': len(glob.players) - 1}
 
 @api.route('/player')
-async def user():
+async def user(request):
     args = request.args
 
     id = int(args.get('id', 0))
@@ -118,7 +111,7 @@ async def user():
     return {'code': 200, 'info': info, 'stats': stats}
 
 @api.route("/player_status")
-async def playerStatus():
+async def playerStatus(request):
     args = request.args
 
     id = int(args.get('id', 0))
@@ -163,7 +156,7 @@ async def playerStatus():
     return {'code': 200, 'status': status}
 
 @api.route("/get_replay")
-async def getReplay():
+async def getReplay(request):
     args = request.args
 
     sid = int(args.get('id', 0))
@@ -229,11 +222,10 @@ async def getReplay():
     rp += raw
     rp += struct.pack('<q', sid)
 
-    resp = await make_response(bytes(rp))
     name = f'{score["name"]} ~ {score["artist"]} - {score["title"]} [{score["diff"]}] +{score["readable_mods"]} ({datetime.fromtimestamp(score["time"]).strftime("%Y/%m/%d")})'
 
-    resp.headers['Content-Type'] = 'application/octet-stream'
-    resp.headers['Content-Description'] = 'File Transfer'
-    resp.headers['Content-Disposition'] = f'attachment; filename={name}.osr'
+    request.resp_headers['Content-Type'] = 'application/octet-stream'
+    request.resp_headers['Content-Description'] = 'File Transfer'
+    request.resp_headers['Content-Disposition'] = f'attachment; filename={name}.osr'
 
-    return resp
+    return bytes(rp)

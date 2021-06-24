@@ -1,13 +1,14 @@
 from constants.modes import osuModes
 from constants.statuses import mapStatuses, apiStatuses
-from objects import glob, pp
+from objects import glob
 
 from cmyui import log, Ansi
+from cmyui.osu.oppai_ng import OppaiWrapper
 from pathlib import Path
+from maniera.calculator import Maniera
 
 import time
 from datetime import datetime as dt
-from typing import Optional
 import asyncio
 import orjson
 
@@ -35,7 +36,6 @@ class Beatmap:
         self.update = minfo.get('update', 0)
 
         self.nc = minfo.get('nc', 0) # nc = next check (for status update)
-        self.pp_cache = minfo.get('pp_cache', {})
 
         self.lb = minfo.get('lb', None)
 
@@ -71,18 +71,12 @@ class Beatmap:
 
         return # not in cache, return nothing so we know to get from sql/api
 
-    @property
     async def np_msg(self):
-        if not (n99 := self.pp_cache.get(99)):
-            n99 = await self.calc_acc(99)
-        if not (n98 := self.pp_cache.get(98)):
-            n98 = await self.calc_acc(98)
-        if not (n95 := self.pp_cache.get(95)):
-            n95 = await self.calc_acc(95)
-        if not (n100 := self.pp_cache.get(100)):
-            n100 = await self.calc_acc(100)
+        pp = {}
+        for acc in (95, 98, 99, 100):
+            pp[acc] = await self.calc_acc(acc)
 
-        return f'{self.embed}  // 95%: {n95}pp | 98%: {n98}pp | 99%: {n99}pp | 100%: {n100}pp // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od}'
+        return f'{self.embed}  // 95%: {pp[95]}pp | 98%: {pp[98]}pp | 99%: {pp[99]}pp | 100%: {pp[100]}pp // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od}'
 
     async def calc_acc(self, acc: float):
         path = Path.cwd() / f'resources/maps/{self.id}.osu'
@@ -96,14 +90,31 @@ class Beatmap:
                 m = await resp.read()
                 path.write_bytes(m)
 
-        p = asyncio.subprocess.PIPE
-        pr = await asyncio.create_subprocess_shell(f'./osu-tools/compiled/PerformanceCalculator simulate osu {str(path)} -a {acc} -j', stdout=p, stderr=p)
-        ot, _ = await pr.communicate()
-        o = orjson.loads(ot.decode('utf-8'))
-        ppv = round(o['pp'])
+        if self.mode.as_vn <= 1:
+            with OppaiWrapper('oppai-ng/liboppai.so') as ezpp:
+                ezpp.set_accuracy_percent(acc)
+                ezpp.set_mode(self.mode.as_vn)
 
-        self.pp_cache[acc] = ppv
-        return ppv
+                ezpp.calculate(path)
+                return round(ezpp.get_pp()) # returning sr soontm
+        elif self.mode.as_vn == 3: # mania: use maniera
+            c = Maniera(str(path), 0, self.score)
+            c.calculate()
+
+            return round(c.pp)
+        else: # ctb: use shitty osu-tools
+
+            cmd = [f'./osu-tools/compiled/PerformanceCalculator simulate catch {str(path)}']
+            cmd.append(f'-a {acc}')
+
+            cmd.append('-j') # json formatting is godsend thank u peppy
+
+            p = asyncio.subprocess.PIPE
+            comp = ' '.join(cmd)
+            pr = await asyncio.create_subprocess_shell(comp, stdout=p, stderr=p)
+            ot, _ = await pr.communicate()
+            o = orjson.loads(ot.decode('utf-8'))
+            return round(o['pp'])
     
     @classmethod
     async def from_md5(self, md5: str):
@@ -175,6 +186,7 @@ class Beatmap:
                 if e['frozen'] and b.status != e['status']:
                     b.status = e['status']
                     b.frozen = e['frozen'] == 1
+                    b.lb = None # status has changed, lets reset lb cache in case
 
                 await b.save()
             else:

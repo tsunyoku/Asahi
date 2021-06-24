@@ -1,5 +1,5 @@
 # external imports (some may require to be installed, install using ext/requirements.txt)
-from quart import Blueprint, Response, request, make_response # web server :blobcowboi:
+from xevel import Router # web server :blobcowboi:
 from cmyui import Ansi, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from geoip2 import database # for geoloc
 from re import compile
@@ -28,7 +28,7 @@ from constants import regexes
 import packets
 from packets import BanchoPacketReader, BanchoPacket, Packets
 
-bancho = Blueprint('bancho', __name__) # handler for webserver :D
+bancho = Router({f'c.{glob.config.domain}', f'c4.{glob.config.domain}', f'ce.{glob.config.domain}'}) # handler for webserver :D
 glob.packets = {}
 reader = database.Reader('ext/geoloc.mmdb')
 
@@ -123,7 +123,7 @@ class sendPrivateMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
                     user.enqueue(packets.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
             elif m := npr.match(msg):
                 user.np = await Beatmap.bid_fetch(int(m['bid']))
-                np = await user.np.np_msg
+                np = await user.np.np_msg()
                 user.enqueue(packets.sendMessage(fromname = target.name, msg = np, tarname = user.name, fromid = target.id))
         else:
             target.enqueue(packets.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
@@ -729,54 +729,49 @@ class matchChangePassword(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_PASSWORD):
 
         match.enqueue_state()
 
-@bancho.route("/", methods=['GET']) # only accept GET requests as POST is for login method, see login method below
-async def root_http():
+def root_web():
     pl = '\n'.join(p.name for p in glob.players.values())
     message = f"{pyfiglet.figlet_format(f'Asahi v{glob.version}')}\n\ntsunyoku attempts bancho v2, gone right :sunglasses:\n\nOnline Players:\n{pl}"
-    return Response(message, mimetype='text/plain')
+    return message.encode()
 
-@bancho.route("/", methods=['POST']) # only accept POST requests, we can assume it is for a login request but we can deny access if not
-async def root_client():
+@bancho.route("/", ['POST', 'GET']) # only accept POST requests, we can assume it is for a login request but we can deny access if not
+async def root_client(request):
     start = time.time()
     headers = request.headers # request headers, used for things such as user ip and agent
 
-    if 'User-Agent' not in headers or headers['User-Agent'] != 'osu!':
+    if 'User-Agent' not in headers or headers['User-Agent'] != 'osu!' or request.type == 'GET':
         # request isn't sent from osu client, return html
-        return b''
+        return root_web()
 
     if 'osu-token' not in headers: # sometimes a login request will be a re-connect attempt, in which case they will already have a token, if not: login the user
-        data = await request.data # request data, used to get info such as username to login the user
+        data = request.body # request data, used to get info such as username to login the user
         if len(info := data.decode().split('\n')[:-1]) != 3: # format data so we can use it easier & also ensure it is valid at the same time
-            resp = await make_response(packets.userID(-2)) # -2 userid informs client it is too old | i assume that is the only valid reason for this to happen
-            resp.headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
-            return resp
+            request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
+            return packets.userID(-2)
 
         if len(cinfo := info[2].split('|')) != 5: # format client data (hash, utc etc.) & ensure it is valid
-            resp = await make_response(packets.userID(-2)) # -2 userid informs client it is too old
-            resp.headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
-            return resp
+            request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
+            return packets.userID(-2)
 
         username = info[0]
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later    
         osu_ver = regexes.osu_ver.match(cinfo[0])
         
         if not osu_ver:
-            resp = await make_response((packets.userID(-3) + packets.notification('Cheat advantages are not allowed on Asahi. Your account has been restricted.')))
-            resp.headers['cho-token'] = 'no'
-            return resp
+            request.resp_headers['cho-token'] = 'no'
+            return (packets.userID(-3) + packets.notification('Cheat advantages are not allowed on Asahi. Your account has been restricted.'))
 
         if int(osu_ver['ver']) <= 20210125:
-            resp = await make_response((packets.versionUpdateForced() + packets.userID(-2)))
-            resp.headers['cho-token'] = 'no'
-            return resp
+            request.resp_headers['cho-token'] = 'no'
+            return (packets.versionUpdateForced() + packets.userID(-2))
          
         user = await glob.db.fetchrow("SELECT id, pw, country, name, priv FROM users WHERE name = $1", username)
         if not user: # ensure user actually exists before attempting to do anything else
             if glob.config.debug:
                 log(f'User {username} does not exist.', Ansi.LRED)
-            resp = await make_response(packets.userID(-1)) # -1 userid informs client of an auth error
-            resp.headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
-            return resp
+
+            request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
+            return packets.userID(-1)
 
         bcache = glob.cache['pw'] # get our cached pws to potentially enhance speed
         user_pw = user['pw'].encode('ISO-8859-1').decode('unicode-escape').encode('ISO-8859-1') # this is cursed SHUT UP
@@ -784,26 +779,25 @@ async def root_client():
             if pw != bcache[user_pw]: # compare provided md5 with the stored (cached) pw to ensure they have provided the correct password
                 if glob.config.debug:
                     log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
-                resp = await make_response(packets.userID(-1))
-                resp.headers['cho-token'] = 'no'
-                return resp
+
+                request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
+                return packets.userID(-1)
         else:
             k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'')
             try:
                 k.verify(pw, user_pw)
-            except Exception:
+            except Exception as e:
                 if glob.config.debug:
                     log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
-                resp = await make_response(packets.userID(-1))
-                resp.headers['cho-token'] = 'no'
-                return resp
+
+                request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
+                return packets.userID(-1)
 
             bcache[user_pw] = pw # cache pw for future
 
         if not user['priv'] & Privileges.Normal:
-            resp = await make_response(packets.userID(-3)) # banned packet
-            resp.headers['cho-token'] = 'no'
-            return resp
+            request.resp_headers['cho-token'] = 'no'
+            return packets.userID(-3)
 
         if (p := glob.players_id.get(user['id'])):
             if (start - p.last_ping) > 10: # game crashes n shit
@@ -901,9 +895,8 @@ async def root_client():
         data += packets.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed:.2f}ms') # send notification as indicator they've logged in i guess
         log(f'{p.name} successfully logged in.', Ansi.LBLUE)
 
-        resp = await make_response(bytes(data))
-        resp.headers['cho-token'] = token
-        return resp
+        request.resp_headers['cho-token'] = token
+        return bytes(data)
 
     # if we have made it this far then it's a reconnect attempt with token already provided
     user_token = headers['osu-token'] # client-provided token
@@ -911,10 +904,8 @@ async def root_client():
         # user is logged in but token is not found? most likely a restart so we force a reconnection
         return packets.restartServer(0)
 
-    body = await request.body
-
     # handle any packets the client has sent
-    for packet in BanchoPacketReader(body, glob.packets):
+    for packet in BanchoPacketReader(request.body, glob.packets):
         await packet.handle(p)
 
         if glob.config.debug:
@@ -926,6 +917,5 @@ async def root_client():
 
     p.last_ping = time.time()
 
-    resp = await make_response(bytes(data))
-    resp.headers['Content-Type'] = 'text/html; charset=UTF-8' # ?
-    return resp
+    request.resp_headers['Content-Type'] = 'text/html; charset=UTF-8' # ?
+    return bytes(data)

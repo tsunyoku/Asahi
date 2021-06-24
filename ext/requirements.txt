@@ -1,7 +1,6 @@
-quart
+xevel
 pyfiglet
 cmyui
-hypercorn
 aiohttp
 geoip2
 orjson
@@ -9,3 +8,4 @@ py3rijndael
 aioredis
 asyncpg
 circleguard
+maniera
