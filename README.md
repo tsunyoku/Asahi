@@ -15,6 +15,7 @@ sudo apt install python3.9 python3.9-dev python3.9-distutils nginx build-essenti
 wget https://bootstrap.pypa.io/get-pip.py
 python3.9 get-pip.py && rm get-pip.py
 python3.9 -m pip install -r ext/requirements.txt
+git submodule init && git submodule update
 ```
 
 You can find the database structure in ext/db.sql, you may want to import that before you advance. (Note: we use postgresql not mysql! You will also need to edit the sql file for use with your postgre user)
@@ -31,19 +32,15 @@ Now, copy the config file and edit the config:
 cp ext/config.sample.py config.py
 ```
 
-We also want to compile the pp system:
+We also want to compile the pp systems:
 ```bash
 chmod +x ext/osu-tools.sh
 ./ext/osu-tools.sh
+chmod +x oppai-ng/libbuild
+./oppai-ng/libbuild
 ```
 
 Finally, start up Asahi:
 ```bash
 ./main.py
 ```
-
-## Related Projects
-
-None of these projects are worked on by me and any issues with them should not be redirected to me, these are simply Asahi-related projects.
-
-- [asahi-web](https://github.com/7ez/asahi-web)
