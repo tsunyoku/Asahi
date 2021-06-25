@@ -157,6 +157,6 @@ app.add_router(web)
 app.add_router(api)
 
 if __name__ == '__main__':
-    dc.loop.create_task(app.start())
     dc.load_extension('disc.bot')
-    dc.run(glob.config.token)
+    app.add_task((dc.start, glob.config.token))
+    app.start()
