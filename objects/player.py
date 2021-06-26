@@ -3,6 +3,7 @@ from objects.channel import Channel
 from objects.beatmap import Beatmap
 from objects.clan import Clan
 from objects.match import Slot, slotStatus, Teams, Match
+from packets import writer
 from constants.privs import Privileges, ClientPrivileges
 from constants.modes import osuModes
 from constants.types import teamTypes
@@ -10,7 +11,6 @@ from typing import Optional
 from dataclasses import dataclass
 from cmyui import log, Ansi
 import queue
-import packets
 
 @dataclass
 class Stats:
@@ -155,9 +155,9 @@ class Player:
 
         await glob.db.execute('UPDATE stats SET rscore_{0} = $1, acc_{0} = $2, pc_{0} = $3, tscore_{0} = $4, pp_{0} = $5, mc_{0} = $6 WHERE id = $7'.format(mode_name), stats.rscore, stats.acc, stats.pc, stats.tscore, stats.pp, stats.max_combo, self.id)
 
-        self.enqueue(packets.userStats(self))
+        self.enqueue(writer.userStats(self))
         for o in glob.players.values():
-            o.enqueue(packets.userStats(self))
+            o.enqueue(writer.userStats(self))
 
     @property
     def current_stats(self):
@@ -203,7 +203,7 @@ class Player:
         await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', int(self.priv), self.id)
 
     def add_spectator(self, user):
-        joiner = packets.spectatorJoined(user.id)
+        joiner = writer.spectatorJoined(user.id)
         sname = f'#spec_{self.id}'
 
         if not (spec := glob.channels.get(sname)):
@@ -215,11 +215,11 @@ class Player:
 
         for u in self.spectators:
             u.enqueue(joiner)
-            user.enqueue(packets.spectatorJoined(u.id))
+            user.enqueue(writer.spectatorJoined(u.id))
         
         self.spectators.append(user)
         user.spectating = self
-        self.enqueue(packets.hostSpectatorJoined(user.id))
+        self.enqueue(writer.hostSpectatorJoined(user.id))
         log(f'{user.name} started spectating {self.name}.', Ansi.LBLUE)
 
     def remove_spectator(self, user):
@@ -233,13 +233,13 @@ class Player:
         if not self.spectators:
             self.leave_chan(spec)
         else:
-            cinfo = packets.channelInfo(spec)
+            cinfo = writer.channelInfo(spec)
             for u in self.spectators:
-                u.enqueue(packets.spectatorLeft(user.id))
+                u.enqueue(writer.spectatorLeft(user.id))
                 u.enqueue(cinfo)
             self.enqueue(cinfo)
         
-        self.enqueue(packets.hostSpectatorLeft(user.id))
+        self.enqueue(writer.hostSpectatorLeft(user.id))
         log(f'{user.name} stopped spectating {self.name}.', Ansi.LBLUE)
 
     def join_chan(self, chan):
@@ -249,9 +249,9 @@ class Player:
         chan.add_player(self)
         self.channels.append(chan)
 
-        self.enqueue(packets.channelJoin(chan.name))
+        self.enqueue(writer.channelJoin(chan.name))
         for o in chan.players:
-            o.enqueue(packets.channelInfo(chan))
+            o.enqueue(writer.channelInfo(chan))
         
         log(f'{self.name} joined channel {chan.name}', Ansi.LBLUE)
 
@@ -265,25 +265,25 @@ class Player:
         chan.remove_player(self)
         self.channels.remove(chan)
 
-        self.enqueue(packets.channelKick(chan.name))
+        self.enqueue(writer.channelKick(chan.name))
         for o in chan.players:
-            o.enqueue(packets.channelInfo(chan))
+            o.enqueue(writer.channelInfo(chan))
 
         log(f'{self.name} left channel {chan.name}', Ansi.LBLUE)
 
     def join_match(self, match, pw):
         if self.match:
-            self.enqueue(packets.matchJoinFail())
+            self.enqueue(writer.matchJoinFail())
             return
 
         if self is not match.host:
             if pw != match.pw:
                 log(f'{self.name} tried to join multiplayer {match.name} with incorrect password', Ansi.LRED)
-                self.enqueue(packets.matchJoinFail())
+                self.enqueue(writer.matchJoinFail())
                 return
 
             if not (id := match.next_free()):
-                self.enqueue(packets.matchJoinFail())
+                self.enqueue(writer.matchJoinFail())
                 return
         else:
             id = 0
@@ -306,7 +306,7 @@ class Player:
 
         self.match = match
 
-        self.enqueue(packets.matchJoinSuccess(match))
+        self.enqueue(writer.matchJoinSuccess(match))
 
         match.enqueue_state()
 
@@ -322,13 +322,13 @@ class Player:
         if all((s.empty for s in self.match.slots)):
             glob.matches.pop(self.match.id)
             glob.channels.pop(f'#multi_{self.match.id}')
-            glob.channels['#lobby'].enqueue(packets.disposeMatch(self.match.id))
+            glob.channels['#lobby'].enqueue(writer.disposeMatch(self.match.id))
         else:
             if self is self.match.host:
                 for s in self.match.slots:
                     if s.status & slotStatus.has_player:
                         self.match.host = s.player
-                        self.match.host.enqueue(packets.matchTransferHost())
+                        self.match.host.enqueue(writer.matchTransferHost())
                         break
 
             self.match.enqueue_state()
@@ -336,10 +336,9 @@ class Player:
         self.match = None
 
     def logout(self):
-        glob.players.pop(self.token)
         glob.players_name.pop(self.name)
         glob.players_id.pop(self.id)
-
+        
         self.token = ''
 
         if host := self.spectating:
@@ -349,7 +348,7 @@ class Player:
             self.leave_match()
 
         for o in glob.players.values():
-            o.enqueue(packets.logout(self.id))
+            o.enqueue(writer.logout(self.id))
 
         for chan in self.channels:
             self.leave_chan(chan)
@@ -360,7 +359,7 @@ class Player:
         await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', self.priv, self.id)
 
         if self.token:
-            self.enqueue(packets.userID(-3))
+            self.enqueue(writer.userID(-3))
 
         log(f'{self.name} has been banned for {reason}')
 
