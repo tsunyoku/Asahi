@@ -18,7 +18,7 @@ version: 'Version' # once again, type hinting
 web: 'ClientSession'
 redis: 'aioredis.create_redis_pool'
 
-packets: dict['Packets', 'BanchoPacket']
+packets = {}
 
 # cache some things like pws for speeeeeeeeeeeeeeeeeed hours
 cache = {

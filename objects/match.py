@@ -10,10 +10,10 @@ from constants.types import teamTypes, winConditions
 from objects.clan import Clan
 
 from objects import glob
+from packets import writer
 
 from enum import IntEnum, unique
 
-import packets
 import asyncio
 
 @unique
@@ -160,7 +160,7 @@ class Match:
                     missing_map.append(slot.player.id)
 
         self.in_prog = True
-        self.enqueue(packets.matchStart(self), ignore=missing_map)
+        self.enqueue(writer.matchStart(self), ignore=missing_map)
         self.enqueue_state()
 
     async def start_battle(self):
@@ -324,10 +324,10 @@ class Match:
         self.enqueue_state()
 
     def enqueue_state(self, lobby: bool = True):
-        self.chat.enqueue(packets.updateMatch(self, send_pw=True))
+        self.chat.enqueue(writer.updateMatch(self, send_pw=True))
 
         if lobby:
-            glob.channels['#lobby'].enqueue(packets.updateMatch(self, send_pw=False))
+            glob.channels['#lobby'].enqueue(writer.updateMatch(self, send_pw=False))
 
     def enqueue(self, packet, lobby: bool = True, ignore = []):
         self.chat.enqueue(packet, ignore_list=ignore)

@@ -23,8 +23,7 @@ from constants.statuses import mapStatuses, scoreStatuses
 from constants.mods import Mods
 from objects.leaderboard import Leaderboard
 from constants import regexes
-
-import packets
+from packets import writer
 
 ss_path = Path.cwd() / 'resources/screenshots'
 vn_path = Path.cwd() / 'resources/replays'
@@ -244,7 +243,7 @@ async def getMapScores(request):
         player.mode = mode.value
         player.mods = mods
         for o in glob.players.values():
-            o.enqueue(packets.userStats(player))
+            o.enqueue(writer.userStats(player))
 
     bmap = await Beatmap.from_md5(md5)
 
@@ -290,7 +289,7 @@ async def scoreSubmit(request):
         s.user.mode = s.mode.value
         s.user.mods = s.mods
         for o in glob.players.values():
-            o.enqueue(packets.userStats(s.user))
+            o.enqueue(writer.userStats(s.user))
 
     # submit score and get id xd
     await glob.db.execute(f'INSERT INTO {s.mode.table} (md5, score, acc, pp, combo, mods, n300, geki, n100, katu, n50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)', s.map.md5, s.score, s.acc, s.pp, s.combo, s.mods, s.n300, s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status.value, s.mode.as_vn, s.time, s.user.id, s.readable_mods, s.fc)

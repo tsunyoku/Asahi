@@ -1,5 +1,5 @@
 from objects import glob
-import packets
+from packets import writer
 
 from typing import TYPE_CHECKING
 
@@ -16,9 +16,9 @@ class Channel:
 
     def send(self, f: 'Player', msg: str, send_self: bool):
         if not send_self:
-            self.enqueue(packets.sendMessage(f.name, msg, self.name, f.id), ignore=f.id)
+            self.enqueue(writer.sendMessage(f.name, msg, self.name, f.id), ignore=f.id)
         else:
-            self.enqueue(packets.sendMessage(f.name, msg, self.name, f.id))
+            self.enqueue(writer.sendMessage(f.name, msg, self.name, f.id))
 
     def add_player(self, user: 'Player'):
         self.players.append(user)

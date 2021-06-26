@@ -24,710 +24,631 @@ from constants.privs import Privileges, ClientPrivileges
 from constants.mods import Mods, convert
 from constants import commands
 from constants import regexes
-
-import packets
-from packets import BanchoPacketReader, BanchoPacket, Packets
+from packets import writer, reader
+from packets.writer import Packets
 
 bancho = Router({f'c.{glob.config.domain}', f'c4.{glob.config.domain}', f'ce.{glob.config.domain}'}) # handler for webserver :D
-glob.packets = {}
-reader = database.Reader('ext/geoloc.mmdb')
+rdr = database.Reader('ext/geoloc.mmdb')
 
-def packet(cls: BanchoPacket):
-    glob.packets |= {cls.type: cls}
-    return cls
+def packet(pck: Packets):
+    def wrapper(_cb):
+        glob.packets |= {pck: _cb}
 
-@packet
-class updateStats(BanchoPacket, type=Packets.OSU_REQUEST_STATUS_UPDATE):
-    async def handle(self, user: Player):
-        user.enqueue(packets.userStats(user))
+    return wrapper
 
-@packet
-class statsRequest(BanchoPacket, type=Packets.OSU_USER_STATS_REQUEST):
-    uids: osuTypes.i32_list
-
-    async def handle(self, user: Player):
-        for o in glob.players.values():
-            if o.id != user.id and o.id in self.uids:
-                user.enqueue(packets.userStats(o))
-
-@packet
-class presenceRequest(BanchoPacket, type=Packets.OSU_USER_PRESENCE_REQUEST):
-    uids: osuTypes.i32_list
-
-    async def handle(self, user: Player):
-        for o in glob.players.values():
-            user.enqueue(packets.userPresence(o))
-
-@packet
-class presenceRequestAll(BanchoPacket, type=Packets.OSU_USER_PRESENCE_REQUEST_ALL):
-    async def handle(self, user: Player):
-        for o in glob.players.values():
-            if o.id != user.id:
-                user.enqueue(packets.userPresence(o))
-
-@packet
-class addFriend(BanchoPacket, type=Packets.OSU_FRIEND_ADD):
-    uid: osuTypes.i32
-
-    async def handle(self, user: Player):
-        req = user.id
-        tar = self.uid
-        user.friends.append(tar)
-        await glob.db.execute('INSERT INTO friends (user1, user2) VALUES ($1, $2)', req, tar)
-        log(f"{user.name} added UID {tar} into their friends list.", Ansi.LCYAN)
-
-@packet
-class removeFriend(BanchoPacket, type=Packets.OSU_FRIEND_REMOVE):
-    uid: osuTypes.i32
-
-    async def handle(self, user: Player):
-        req = user.id
-        tar = self.uid
-        user.friends.remove(tar)
-        await glob.db.execute('DELETE FROM friends WHERE user1 = $1 AND user2 = $2', req, tar)
-        log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LCYAN)
-
-@packet
-class Logout(BanchoPacket, type=Packets.OSU_LOGOUT):
-    async def handle(self, user: Player):
-        if (time.time() - user.login_time) < 1:
-            return # osu sends random logout packet token on login ?
-
-        user.logout()
-        log(f"{user.name} logged out.", Ansi.LBLUE)
-
-@packet
-class sendPrivateMessage(BanchoPacket, type=Packets.OSU_SEND_PRIVATE_MESSAGE):
-    msg: osuTypes.message # i am so confused man wtf
-
-    async def handle(self, user: Player):
-        msg = self.msg.msg
-        tarname = self.msg.tarname
-
-        if not (target := glob.players_name.get(tarname)):
-            log(f'{user.name} tried to send message to offline user {tarname}', Ansi.LRED)
-            return
-
-        if target is glob.bot:
-            regex_domain = glob.config.domain.replace('.', r'\.')
-            npr = compile( # yikes
-                r'^\x01ACTION is (?:playing|editing|watching|listening to) '
-                rf'\[https://osu\.(?:{regex_domain})/beatmapsets/(?P<sid>\d{{1,10}})#/?(?P<bid>\d{{1,10}})/? .+\]'
-                r'(?: <(?P<mode>Taiko|CatchTheBeat|osu!mania)>)?'
-                r'(?P<mods>(?: (?:-|\+|~|\|)\w+(?:~|\|)?)+)?\x01$'
-            )
-
-            if msg.startswith('!'):
-                cmd = await commands.process(user, target, msg)
-                if cmd is not None:
-                    user.enqueue(packets.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
-            elif m := npr.match(msg):
-                user.np = await Beatmap.bid_fetch(int(m['bid']))
-                np = await user.np.np_msg()
-                user.enqueue(packets.sendMessage(fromname = target.name, msg = np, tarname = user.name, fromid = target.id))
-        else:
-            target.enqueue(packets.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
-            log(f'{user.name} sent message "{msg}" to {tarname}', Ansi.LCYAN)
-
-@packet
-class sendPublicMessage(BanchoPacket, type=Packets.OSU_SEND_PUBLIC_MESSAGE):
-    msg: osuTypes.message
-
-    async def handle(self, user: Player):
-        msg = self.msg.msg
-        chan = self.msg.tarname
-
-        if chan == '#spectator':
-            if user.spectating:
-                sid = user.spectating.id
-            elif user.spectators:
-                sid = user.id
-            else:
-                return
-            c = glob.channels.get(f'#spec_{sid}')
-        elif chan == '#multiplayer':
-            if not user.match:
-                return
-
-            m = user.match.id
-            c = glob.channels.get(f'#multi_{m}')
-        elif chan == '#clan':
-            if not user.clan:
-                return
-
-            c = user.clan.chan
-        elif chan not in ['#highlight', '#userlog']:
-            c = glob.channels.get(chan)
-
-        if not c:
-            return
-
-        c.send(user, msg, False)
-
-@packet
-class joinChannel(BanchoPacket, type=Packets.OSU_CHANNEL_JOIN):
-    name: osuTypes.string
-
-    async def handle(self, user: Player):
-        if self.name == '#spectator':
-            if user.spectating is not None:
-                uid = user.spectating.id
-            elif user.spectators:
-                uid = user.id
-            else:
-                return # not spectating
-
-            chan = glob.channels.get(f'#spec_{uid}')
-        elif self.name == '#multiplayer':
-            if not user.match:
-                return
-
-            m = user.match.id
-            chan = glob.channels.get(f'#multi_{m}')
-        elif self.name == '#clan':
-            if not user.clan:
-                return
-
-            chan = user.clan.chan
-        else:
-            chan = glob.channels.get(self.name)
-
-        if not chan:
-            return
-
-        user.join_chan(chan)
-
-@packet
-class leaveChannel(BanchoPacket, type=Packets.OSU_CHANNEL_PART):
-    name: osuTypes.string
-
-    async def handle(self, user: Player):
-        if self.name in ['#highlight', '#userlog'] or not self.name.startswith('#'): # osu why!!!
-            return
-
-        if self.name == '#spectator':
-            if user.spectating is not None:
-                uid = user.spectating.id
-            elif user.spectators:
-                uid = user.id
-            else:
-                return # not spectating
-
-            chan = glob.channels.get(f'#spec_{uid}')
-        elif self.name == '#multiplayer':
-            if not user.match:
-                return
-
-            m = user.match.id
-            chan = glob.channels.get(f'#multi_{m}')
-        elif self.name == '#clan':
-            if not user.clan:
-                return
-
-            chan = user.clan.chan
-        else:
-            chan = glob.channels.get(self.name)
-
-        if not chan:
-            return
-
-        if user not in chan.players:
-            return
-
-        user.leave_chan(chan)
-        for o in chan.players:
-            o.enqueue(packets.channelInfo(chan))
-
-@packet
-class updateAction(BanchoPacket, type=Packets.OSU_CHANGE_ACTION):
-    actionid: osuTypes.u8
-    info: osuTypes.string
-    md5: osuTypes.string
-    mods: osuTypes.u32
-    mode: osuTypes.u8
-    mid: osuTypes.i32
-
-    async def handle(self, user: Player):
-        if self.actionid == 0 and self.mods & Mods.RELAX:
-            self.info = 'on Relax'
-        elif self.actionid == 0 and self.mods & Mods.AUTOPILOT:
-            self.info = 'on Autopilot'
-
-        user.action = self.actionid
-        user.info = self.info
-        user.map_md5 = self.md5
-        user.mods = self.mods
-
-        if user.mods & Mods.RELAX:
-            user.mode_vn = self.mode
-            self.mode += 4
-        elif user.mods & Mods.AUTOPILOT:
-            user.mode_vn = 0
-            self.mode = 7
-
-        user.mode = self.mode
-        user.map_id = self.mid
-
-        if self.actionid == 2:
-            user.info += f' +{convert(self.mods)}'
-
-        for o in glob.players.values():
-            o.enqueue(packets.userStats(user))
-
-@packet
-class startSpec(BanchoPacket, type=Packets.OSU_START_SPECTATING):
-    tid: osuTypes.i32
-
-    async def handle(self, user: Player):
-        if self.tid == 1: # spectating bot is just gonna cause unnecessary errors
-            return
-
-        if not (target := glob.players_id.get(self.tid)):
-            return
-
-        target.add_spectator(user)
-
-@packet
-class stopSpec(BanchoPacket, type=Packets.OSU_STOP_SPECTATING):
-    async def handle(self, user: Player):
-        if not (host := user.spectating):
-            return
-
-        host.remove_spectator(user)
-
-@packet
-class specFrames(BanchoPacket, type=Packets.OSU_SPECTATE_FRAMES):
-    frames: osuTypes.raw
-
-    async def handle(self, user: Player):
-        for u in user.spectators:
-            u.enqueue(packets.spectateFrames(self.frames))
-
-@packet
-class osuPing(BanchoPacket, type=Packets.OSU_PING):
-    async def handle(self, user: Player):
-        pass # useless packet thank you osu
-
-@packet
-class joinLobby(BanchoPacket, type=Packets.OSU_JOIN_LOBBY):
-    async def handle(self, user: Player):
-        for m in glob.matches:
-            user.enqueue(packets.newMatch(m))
-
-@packet
-class leaveLobby(BanchoPacket, type=Packets.OSU_JOIN_LOBBY):
-    async def handle(self, user: Player):
-        pass # ? xd
-
-@packet
-class createMatch(BanchoPacket, type=Packets.OSU_CREATE_MATCH):
-    match: osuTypes.match
-
-    async def handle(self, user: Player):
-        glob.matches[self.match.id] = self.match
-        if not glob.matches.get(self.match.id):
-            user.enqueue(packets.matchJoinFail())
-            return
-
-        mp_chan = Channel(name=f'#multiplayer', desc=f'Multiplayer channel for match ID {self.match.id}', auto=False, perm=False)
-        glob.channels[f'#multi_{self.match.id}'] = mp_chan
-        self.match.chat = mp_chan
-
-        user.join_match(self.match, self.match.pw)
-        log(f'{user.name} created new multiplayer lobby.', Ansi.LBLUE)
-
-@packet
-class joinMatch(BanchoPacket, type=Packets.OSU_JOIN_MATCH):
-    id: osuTypes.i32
-    pw: osuTypes.string
-
-    async def handle(self, user):
-        if self.id >= 1000:
-            if not (menu := glob.menus.get(self.id)):
-                return user.enqueue(packets.matchJoinFail())
-            
-            return await menu.handle(user)
-
-        if not (match := glob.matches.get(self.id)):
-            user.enqueue(packets.matchJoinFail())
-            return
-
-        if match.clan_battle:
-            if user.clan not in (match.clan_1, match.clan_2) or match.battle_ready:
-                user.enqueue(packets.matchJoinFail())
-                return
+@packet(Packets.OSU_REQUEST_STATUS_UPDATE)
+async def update_stats(user: Player, p):
+    user.enqueue(writer.userStats(user))
         
-        user.join_match(match, self.pw)
-
-        # enqueue after final user has joined
-        if match.clan_battle:
-            total = []
-            for slot in match.slots:
-                if slot.status & slotStatus.has_player:
-                    total.append(slot.player)
-
-            battle = glob.clan_battles[user.clan]
-            if set(total) == set(battle['total']): # force set so its unordered
-                await match.start_battle()
-
-@packet
-class leaveMatch(BanchoPacket, type=Packets.OSU_PART_MATCH):
-    async def handle(self, user: Player):
-        user.leave_match()
-
-@packet
-class changeMatchSlot(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_SLOT):
-    id: osuTypes.i32
-
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
-        
-        if match.slots[id].status != slotStatus.open:
-            return
-
-        old = match.get_slot(user)
-
-        new = match.slots[self.id]
-        new.copy(old)
-
-        old.reset()
-
-        match.enqueue_state()
-
-@packet
-class playerReady(BanchoPacket, type=Packets.OSU_MATCH_READY):
-    async def handle(self, user):
-        if not (match := user.match):
-            return
-        
-        slot = match.get_slot(user)
-        slot.status = slotStatus.ready
-
-        match.enqueue_state(lobby=False)
-
-@packet
-class lockSlot(BanchoPacket, type=Packets.OSU_MATCH_LOCK):
-    id: osuTypes.i32
-
-    async def handle(self, user):
-        if not (match := user.match):
-            return
-
-        if match.clan_battle:
-            return
-        
-        if user is not match.host:
-            return
-        
-        slot = match.slots[self.id]
-
-        if slot.status == slotStatus.locked:
-            slot.status = slotStatus.open
-        else:
-            if slot.player is match.host:
-                return
-
-            slot.status = slotStatus.locked
-
-        match.enqueue_state()
-
-@packet
-class changeMatchSettings(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_SETTINGS):
-    m: osuTypes.match
-
-    async def handle(self, user):
-        if not (match := user.match):
-            return
-        
-        if user is not match.host:
-            return
-
-        if self.m.fm != match.fm:
-            match.fm = self.m.fm
-
-        if self.m.fm:
-            for s in match.slots:
-                if s.status & slotStatus.has_player:
-                    s.mods = match.mods & ~Mods.SPEED_MODS
-                    if match.clan_battle:
-                        s.mods = (match.mods &~ Mods.SPEED_MODS) & ~Mods.GAME_CHANGING
-
-            match.mods &= Mods.SPEED_MODS
-            if match.clan_battle:
-                match.mods &= Mods.GAME_CHANGING
-        else:
-            host = match.get_host()
-            match.mods &= Mods.SPEED_MODS
-            if match.clan_battle:
-                match.mods &= Mods.GAME_CHANGING
-            match.mods |= host.mods
-
-            for s in match.slots:
-                if s.status & slotStatus.has_player:
-                    s.mods = Mods.NOMOD
-
-        if self.m.bname == '':
-            match.unready_players(slotStatus.ready)
-
-        if self.m.bmd5 != match.bmd5:
-            m = await Beatmap.from_md5(self.m.bmd5)
-
-            if m:
-                match.bid = m.id
-                match.bmd5 = m.md5
-                match.bname = m.name
-                match.mode = m.mode
-            else:
-                match.bid = self.m.bid
-                match.bmd5 = self.m.bmd5
-                match.bname = self.m.bname
-                match.mode = self.m.mode
-
-        if match.type != self.m.type and not match.clan_battle:
-            if self.m.type in (teamTypes.head, teamTypes.tag):
-                team = Teams.neutral
-            else:
-                team = Teams.red
-
-            for s in match.slots:
-                if s.status & slotStatus.has_player:
-                    s.team = team
-
-            match.type = self.m.type
-
-        if match.win_cond != self.m.win_cond and not match.clan_battle:
-            match.win_cond = self.m.win_cond
-
-        if not match.clan_battle:
-            match.name = self.m.name
-
-        match.enqueue_state()
-
-@packet
-class startMatch(BanchoPacket, type=Packets.OSU_MATCH_START):
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
-
-        if user is not match.host:
-            return
-        
-        match.start()
-
-@packet
-class updateMatchScore(BanchoPacket, type=Packets.OSU_MATCH_SCORE_UPDATE):
-    data: osuTypes.raw
-
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
-        
-        r = bytearray(b'0\x00\x00')
-        r += len(self.data).to_bytes(4, 'little')
-        r += self.data
-        r[11] = match.get_slot_id(user)
-
-        match.enqueue(bytes(r), lobby=False)
-
-@packet
-class finishMatch(BanchoPacket, type=Packets.OSU_MATCH_COMPLETE):
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
-
-        slot = match.get_slot(user)
-        slot.status = slotStatus.complete
-
-        if any((s.status is slotStatus.playing for s in match.slots)):
-            return
-
-        no_play = []
-
-        for slot in match.slots:
-            if slot.status & slotStatus.has_player and slot.status != slotStatus.complete:
-                no_play.append(slot.player.id)
-
-        match.unready_players(slotStatus.complete)
-        match.in_prog = False
-
-        match.enqueue(packets.matchComplete(), lobby=False, ignore=no_play)
-        match.enqueue_state()
-
-        if match.clan_battle:
-            await match.clan_scores(no_play)
-
-@packet
-class changeMatchMods(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_MODS):
-    mods: osuTypes.i32
-
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
-
-        if match.fm:
-            if user is match.host:
-                match.mods = self.mods & Mods.SPEED_MODS
-                if match.clan_battle:
-                    match.mods = (self.mods & Mods.SPEED_MODS) & Mods.GAME_CHANGING
-
-            slot = match.get_slot(user)
-            slot.mods = self.mods & ~Mods.SPEED_MODS
-            if match.clan_battle:
-                slot.mods = (self.mods & ~Mods.SPEED_MODS) & ~Mods.GAME_CHANGING
-        else:
-            if user is not match.host:
-                return
-
-            match.mods = self.mods
-        
-        match.enqueue_state()
-
-@packet
-class matchLoaded(BanchoPacket, type=Packets.OSU_MATCH_LOAD_COMPLETE):
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
-        
-        slot = match.get_slot(user)
-        slot.loaded = True
-
-        slot_bools = [s.playing for s in match.slots]
-        if not any(slot_bools):
-            match.enqueue(packets.matchAllLoaded(), lobby=False)
-
-@packet
-class matchPlayerMissingMap(BanchoPacket, type=Packets.OSU_MATCH_NO_BEATMAP):
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
-
-        slot = match.get_slot(user)
-        slot.status = slotStatus.no_map
-
-        match.enqueue_state(lobby=False)
-
-@packet
-class matchPlayerUnready(BanchoPacket, type=Packets.OSU_MATCH_NOT_READY):
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
-
-        slot = match.get_slot(user)
-        slot.status = slotStatus.not_ready
-
-        match.enqueue_state(lobby=False)
-
-@packet
-class matchPlayerFailed(BanchoPacket, type=Packets.OSU_MATCH_FAILED):
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
-
-        slot = match.get_slot_id(user)
-        match.enqueue(packets.matchPlayerFailed(slot), lobby=False)
-
-@packet
-class matchPlayerHasMap(BanchoPacket, type=Packets.OSU_MATCH_HAS_BEATMAP):
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
-
-        slot = match.get_slot(user)
-        slot.status = slotStatus.not_ready
-
-        match.enqueue_state(lobby=False)
-
-@packet
-class matchPlayerSkip(BanchoPacket, type=Packets.OSU_MATCH_SKIP_REQUEST):
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
+@packet(Packets.OSU_USER_STATS_REQUEST)
+async def request_stats(user: Player, p):
+    uids = (reader.handle_packet(p, (('uids', osuTypes.i32_list),)))['uids']
     
-        slot = match.get_slot(user)
-        slot.skipped = True
-
-        match.enqueue(packets.matchPlayerSkipped(user.id))
-
-        for slot in match.slots:
-            if slot.status is slotStatus.playing and not slot.skipped:
-                return
+    for o in glob.players.values():
+        if o.id != user.id and o.id in uids:
+            user.enqueue(writer.userStats(o))
+            
+@packet(Packets.OSU_USER_PRESENCE_REQUEST)
+async def presence_request(user: Player, p):
+    uids = (reader.handle_packet(p, (('uids', osuTypes.i32_list),)))['uids']
+    
+    for o in glob.players.values():
+        user.enqueue(writer.userPresence(o))
         
-        match.enqueue(packets.matchSkip(), lobby=False)
+@packet(Packets.OSU_USER_PRESENCE_REQUEST)
+async def presence_request_all(user: Player, p):
+    for o in glob.players.values():
+        if o.id != user.id:
+            user.enqueue(writer.userPresence(o))
+            
+@packet(Packets.OSU_FRIEND_ADD)
+async def friend_add(user: Player, p):
+    tar = (reader.handle_packet(p, (('uid', osuTypes.i32),)))['uid']
+    req = user.id
+    
+    if tar in user.friends:
+        return
 
-@packet
-class matchChangeHost(BanchoPacket, type=Packets.OSU_MATCH_TRANSFER_HOST):
-    slot: osuTypes.i32
+    user.friends.append(tar)
+    await glob.db.execute('INSERT INTO friends (user1, user2) VALUES ($1, $2)', req, tar)
+    
+    log(f"{user.name} added UID {tar} into their friends list.", Ansi.LCYAN)
 
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
+@packet(Packets.OSU_FRIEND_REMOVE)
+async def friend_remove(user: Player, p):
+    tar = (reader.handle_packet(p, (('uid', osuTypes.i32),)))['uid']
+    req = user.id
+
+    if tar not in user.friends:
+        return
+
+    user.friends.remove(tar)
+    await glob.db.execute('DELETE FROM friends WHERE user1 = $1 AND user2 = $2', req, tar)
+
+    log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LCYAN)
+    
+@packet(Packets.OSU_LOGOUT)
+async def logout(user: Player, p):
+    if (time.time() - user.login_time) < 1:
+        return
+    
+    user.logout()
+    log(f'{user.name} logged out.', Ansi.LBLUE)
+    
+@packet(Packets.OSU_SEND_PRIVATE_MESSAGE)
+async def send_pm(user: Player, p):
+    d = reader.handle_packet(p, (('msg', osuTypes.message),))
+    
+    msg = d['msg'].msg
+    tarname = d['msg'].tarname
+
+    if not (target := glob.players_name.get(tarname)):
+        log(f'{user.name} tried to send message to offline user {tarname}', Ansi.LRED)
+        return
+
+    if target is glob.bot:
+        regex_domain = glob.config.domain.replace('.', r'\.')
+        npr = compile( # yikes
+            r'^\x01ACTION is (?:playing|editing|watching|listening to) '
+            rf'\[https://osu\.(?:{regex_domain})/beatmapsets/(?P<sid>\d{{1,10}})#/?(?P<bid>\d{{1,10}})/? .+\]'
+            r'(?: <(?P<mode>Taiko|CatchTheBeat|osu!mania)>)?'
+            r'(?P<mods>(?: (?:-|\+|~|\|)\w+(?:~|\|)?)+)?\x01$'
+        )
+    
+        if msg.startswith('!'):
+            cmd = await commands.process(user, target, msg)
+            if cmd is not None:
+                user.enqueue(writer.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
+        elif m := npr.match(msg):
+            user.np = await Beatmap.bid_fetch(int(m['bid']))
+            np = await user.np.np_msg()
+            user.enqueue(writer.sendMessage(fromname = target.name, msg = np, tarname = user.name, fromid = target.id))
+    else:
+        target.enqueue(writer.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
+        log(f'{user.name} sent message "{msg}" to {tarname}', Ansi.LCYAN)
         
-        if user is not match.host:
-            return
+@packet(Packets.OSU_SEND_PUBLIC_MESSAGE)
+async def send_msg(user: Player, p):
+    d = reader.handle_packet(p, (('msg', osuTypes.message),))
 
-        if not (host := match.slots[self.slot].player):
-            return
-
-        if match.clan_battle:
-            return
-
-        match.host = host
-        match.host.enqueue(packets.matchTransferHost())
-
-        match.enqueue_state()
-
-@packet
-class matchPlayerChangeTeam(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_TEAM):
-    async def handle(self, user: Player):
-        if not (match := user.match):
-            return
-        
-        if match.clan_battle:
-            return
-        
-        slot = match.get_slot(user)
-
-        if slot.team is Teams.teamless:
-            return # ???
-
-        if slot.team is Teams.blue:
-            slot.team = Teams.red
+    msg = d['msg'].msg
+    chan = d['msg'].tarname
+    
+    if chan == '#spectator':
+        if user.spectating:
+            sid = user.spectating.id
+        elif user.spectators:
+            sid = user.id
         else:
-            slot.team = Teams.blue
-
-        match.enqueue_state(lobby=False)
-
-@packet
-class matchInvite(BanchoPacket, type=Packets.OSU_MATCH_INVITE):
-    uid: osuTypes.i32
-
-    async def handle(self, user: Player):
+            return
+        c = glob.channels.get(f'#spec_{sid}')
+    elif chan == '#multiplayer':
         if not user.match:
             return
-        
-        if not (target := glob.players_id.get(self.uid)):
+    
+        m = user.match.id
+        c = glob.channels.get(f'#multi_{m}')
+    elif chan == '#clan':
+        if not user.clan:
             return
-        
-        if target is glob.bot:
-            return
-        
-        target.enqueue(packets.matchInvite(user, target.name))
+    
+        c = user.clan.chan
+    elif chan not in ['#highlight', '#userlog']:
+        c = glob.channels.get(chan)
+    
+    if not c:
+        return
+    
+    c.send(user, msg, False)
 
-@packet
-class matchChangePassword(BanchoPacket, type=Packets.OSU_MATCH_CHANGE_PASSWORD):
-    m: osuTypes.match
+@packet(Packets.OSU_CHANNEL_JOIN)
+async def join_chan(user: Player, p):
+    name = (reader.handle_packet(p, (('chan', osuTypes.string),)))['chan']
 
-    async def handle(self, user: Player):
-        if not (match := user.match):
+    if name == '#spectator':
+        if user.spectating is not None:
+            uid = user.spectating.id
+        elif user.spectators:
+            uid = user.id
+        else:
+            return # not spectating
+
+        chan = glob.channels.get(f'#spec_{uid}')
+    elif name == '#multiplayer':
+        if not user.match:
+            return
+
+        m = user.match.id
+        chan = glob.channels.get(f'#multi_{m}')
+    elif name == '#clan':
+        if not user.clan:
+            return
+
+        chan = user.clan.chan
+    else:
+        chan = glob.channels.get(name)
+
+    if not chan:
+        return
+
+    user.join_chan(chan)
+    
+@packet(Packets.OSU_CHANNEL_PART)
+async def leave_chan(user: Player, p):
+    name = (reader.handle_packet(p, (('chan', osuTypes.string),)))['chan']
+
+    if name in ['#highlight', '#userlog'] or not name.startswith('#'): # osu why!!!
+        return
+
+    if name == '#spectator':
+        if user.spectating is not None:
+            uid = user.spectating.id
+        elif user.spectators:
+            uid = user.id
+        else:
+            return # not spectating
+
+        chan = glob.channels.get(f'#spec_{uid}')
+    elif name == '#multiplayer':
+        if not user.match:
+            return
+
+        m = user.match.id
+        chan = glob.channels.get(f'#multi_{m}')
+    elif name == '#clan':
+        if not user.clan:
+            return
+
+        chan = user.clan.chan
+    else:
+        chan = glob.channels.get(name)
+
+    if not chan:
+        return
+
+    if user not in chan.players:
+        return
+
+    user.leave_chan(chan)
+    for o in chan.players:
+        o.enqueue(writer.channelInfo(chan))
+        
+@packet(Packets.OSU_CHANGE_ACTION)
+async def update_action(user: Player, p):
+    d = reader.handle_packet(p, (
+        ('actionid', osuTypes.u8), 
+        ('info', osuTypes.string),
+        ('md5', osuTypes.string),
+        ('mods', osuTypes.u32),
+        ('mode', osuTypes.u8),
+        ('mid', osuTypes.i32)
+    ))
+    
+    if d['actionid'] == 0 and d['mods'] & Mods.RELAX:
+        d['info'] = 'on Relax'
+    elif d['actionid'] == 0 and d['mods'] & Mods.AUTOPILOT:
+        d['info'] = 'on Autopilot'
+        
+    user.action = d['actionid']
+    user.info = d['info']
+    user.map_md5 = d['md5']
+    user.mods = d['mods']
+    
+    if user.mods & Mods.RELAX:
+        user.mode_vn = d['mode']
+        d['mode'] += 4
+    elif user.mods & Mods.AUTOPILOT:
+        user.mode_vn = 0
+        d['mode'] = 7
+        
+    user.mode = d['mode']
+    user.map_id = d['mid']
+    
+    if d['actionid'] == 2:
+        user.info += f' +{convert(d["mods"])}'
+        
+    for o in glob.players.values():
+        o.enqueue(writer.userStats(user))
+        
+@packet(Packets.OSU_START_SPECTATING)
+async def start_spec(user: Player, p):
+    tid = (reader.handle_packet(p, (('tid', osuTypes.i32),)))['tid']
+    
+    if tid == 1:
+        return
+    
+    if not (target := glob.player_id.get(tid)):
+        return
+    
+    target.add_spectator(user)
+    
+@packet(Packets.OSU_STOP_SPECTATING)
+async def stop_spec(user: Player, p):
+    if not (host := user.spectating):
+        return
+    
+    host.remove_spectator(user)
+    
+@packet(Packets.OSU_SPECTATE_FRAMES)
+async def spec_frames(user: Player, p):
+    frames = (reader.handle_packet(p, (('frames', osuTypes.raw),)))['frames']
+    
+    for u in user.spectators:
+        u.enqueue(writer.spectateFrames(frames))
+
+@packet(Packets.OSU_JOIN_LOBBY)
+async def join_lobby(user: Player, p):
+    for m in glob.matches:
+        user.enqueue(writer.newMatch(m))
+        
+@packet(Packets.OSU_PART_LOBBY)
+async def leave_lobby(user: Player, p):
+    pass # lol
+
+@packet(Packets.OSU_CREATE_MATCH)
+async def create_match(user: Player, p):
+    match = (reader.handle_packet(p, (('match', osuTypes.match),)))['match']
+    
+    glob.matches[match.id] = match
+    if not glob.matches.get(match.id):
+        return user.enqueue(writer.matchJoinFail())
+    
+    mp_chan = Channel(name=f'#multiplayer', desc=f'Multiplayer channel for match ID {match.id}', auto=False, perm=False)
+    glob.channels[f'#multi_{match.id}'] = mp_chan
+    match.chat = mp_chan
+    
+    user.join_match(match, match.pw)
+    log(f'{user.name} created a new multiplayer lobby.', Ansi.LBLUE)
+    
+@packet(Packets.OSU_JOIN_MATCH)
+async def join_match(user: Player, p):
+    d = reader.handle_packet(p, (('id', osuTypes.i32), ('pw', osuTypes.string),))
+    id = d['id']
+    pw = d['pw']
+    
+    if id >= 1000:
+        if not (menu := glob.menus.get(id)):
+            return user.enqueue(writer.matchJoinFail())
+        
+        return await menu.handle(user)
+    
+    if not (match := glob.matches.get(id)):
+        return user.enqueue(writer.matchJoinFail())
+    
+    if match.clan_battle:
+        if user.clan not in (match.clan_1, match.clan_2) or match.battle_ready:
+            return user.enqueue(writer.matchJoinFail())
+        
+    user.join_match(match, pw)
+    
+    if match.clan_battle:
+        total = []
+        for slot in match.slots:
+            if slot.status & slotStatus.has_player:
+                total.append(slot.player)
+                
+        battle = glob.clan_battles[user.clan]
+        if set(total) == set(battle['total']):
+            await match.strat_battle()
+            
+@packet(Packets.OSU_PART_MATCH)
+async def leave_match(user: Player, p):
+    user.leave_match()
+        
+@packet(Packets.OSU_MATCH_CHANGE_SLOT)
+async def change_slot(user: Player, p):
+    id = (reader.handle_packet(p, (('id', osuTypes.i32),)))['id']
+    
+    if not (match := user.match):
+        return
+    
+    if match.slots[id] != slotStatus.open:
+        return
+    
+    old = match.get_slot(user)
+    new = match.slots[id]
+    
+    new.copy(old)
+    old.reset()
+    
+    match.enqueue_state()
+    
+@packet(Packets.OSU_MATCH_READY)
+async def user_ready(user: Player, p):
+    if not (match := user.match):
+        return
+    
+    slot = match.get_slot(user)
+    slot.status = slotStatus.ready
+    
+    match.enqueue_state(lobby=False)
+    
+@packet(Packets.OSU_MATCH_LOCK)
+async def lock_slot(user: Player, p):
+    id = (reader.handle_packet(p, (('id', osuTypes.i32),)))['id']
+    
+    if not (match := user.match) or match.clan_battle or user is not match.host:
+        return
+    
+    slot = match.slots[id]
+    
+    if slot.status == slotStatus.locked:
+        slot.status = slotStatus.open
+    else:
+        if slot.player is match.host:
             return
         
+        slot.status = slotStatus.locked
+        
+    match.enqueue_state()
+    
+@packet(Packets.OSU_MATCH_CHANGE_SETTINGS)
+async def match_settings(user: Player, p):
+    m = (reader.handle_packet(p, (('m', osuTypes.match),)))['m']
+
+    if not (match := user.match) or user is not match.host:
+        return
+
+    if m.fm != match.fm:
+        match.fm = m.fm
+
+    if m.fm:
+        for s in match.slots:
+            if s.status & slotStatus.has_player:
+                s.mods = match.mods & ~Mods.SPEED_MODS
+                if match.clan_battle:
+                    s.mods = match.mods &~ Mods.SPEED_MODS
+
+        match.mods &= Mods.SPEED_MODS
+    else:
+        host = match.get_host()
+        match.mods &= Mods.SPEED_MODS
+        match.mods |= host.mods
+
+        for s in match.slots:
+            if s.status & slotStatus.has_player:
+                s.mods = Mods.NOMOD
+
+    if m.bname == '':
+        match.unready_players(slotStatus.ready)
+
+    if m.bmd5 != match.bmd5:
+        m = await Beatmap.from_md5(m.bmd5)
+
+        if m:
+            match.bid = m.id
+            match.bmd5 = m.md5
+            match.bname = m.name
+            match.mode = m.mode
+        else:
+            match.bid = m.bid
+            match.bmd5 = m.bmd5
+            match.bname = m.bname
+            match.mode = m.mode
+
+    if match.type != m.type and not match.clan_battle:
+        if m.type in (teamTypes.head, teamTypes.tag):
+            team = Teams.neutral
+        else:
+            team = Teams.red
+
+        for s in match.slots:
+            if s.status & slotStatus.has_player:
+                s.team = team
+
+        match.type = m.type
+
+    if match.win_cond != m.win_cond and not match.clan_battle:
+        match.win_cond = m.win_cond
+
+    if not match.clan_battle:
+        match.name = m.name
+
+    match.enqueue_state()
+    
+@packet(Packets.OSU_MATCH_START)
+async def start_match(user: Player, p):
+    if not (match := user.match) or user is not match.host:
+        return
+    
+    match.start()
+    
+@packet(Packets.OSU_MATCH_SCORE_UPDATE)
+async def match_score(user: Player, p):
+    data = (reader.handle_packet(p, (('data', osuTypes.raw),)))['data']
+    
+    if not (match := user.match):
+        return
+    
+    r = bytearray(b'0\x00\x00')
+    r += len(data).to_bytes(4, 'little')
+    r += data
+    r[11] = match.get_slot_id(user)
+    
+    match.enqueue(bytes(r), lobby=False)
+
+@packet(Packets.OSU_MATCH_COMPLETE)
+async def finish_match(user: Player, p):
+    if not (match := user.match):
+        return
+
+    slot = match.get_slot(user)
+    slot.status = slotStatus.complete
+    
+    if any((s.status is slotStatus.playing for s in match.slots)):
+        return
+    
+    no_play = []
+    
+    for slot in match.slots:
+        if slot.status & slotStatus.has_player and slot.status != slotStatus.complete:
+            no_play.append(slot.player.id)
+    
+    match.unready_players(slotStatus.complete)
+    match.in_prog = False
+    
+    match.enqueue(writer.matchComplete(), lobby=False, ignore=no_play)
+    match.enqueue_state()
+    
+    if match.clan_battle:
+        await match.clan_scores(no_play)
+        
+@packet(Packets.OSU_MATCH_CHANGE_MODS)
+async def match_mods(user: Player, p):
+    mods = (reader.handle_packet(p, (('mods', osuTypes.i32),)))['mods']
+    
+    if not (match := user.match):
+        return
+
+    if match.fm:
+        if user is match.host:
+            match.mods = mods & Mods.SPEED_MODS
+
+        slot = match.get_slot(user)
+        slot.mods = mods & ~Mods.SPEED_MODS
+    else:
         if user is not match.host:
             return
 
-        match.pw = self.m.pw
+        match.mods = mods
 
-        match.enqueue_state()
+    match.enqueue_state()
+    
+@packet(Packets.OSU_MATCH_LOAD_COMPLETE)
+async def match_loaded(user: Player, p):
+    if not (match := user.match):
+        return
+
+    slot = match.get_slot(user)
+    slot.loaded = True
+
+    slot_bools = [s.playing for s in match.slots]
+    if not any(slot_bools):
+        match.enqueue(writer.matchAllLoaded(), lobby=False)
+        
+@packet(Packets.OSU_MATCH_NO_BEATMAP)
+async def match_nomap(user: Player, p):
+    if not (match := user.match):
+        return
+
+    slot = match.get_slot(user)
+    slot.status = slotStatus.no_map
+
+    match.enqueue_state(lobby=False) 
+    
+@packet(Packets.OSU_MATCH_NOT_READY)
+async def user_unready(user: Player, p):
+    if not (match := user.match):
+        return
+
+    slot = match.get_slot(user)
+    slot.status = slotStatus.not_ready
+
+    match.enqueue_state(lobby=False)
+    
+@packet(Packets.OSU_MATCH_FAILED)
+async def user_failed(user: Player, p):
+    if not (match := user.match):
+        return
+
+    slot = match.get_slot_id(user)
+    match.enqueue(writer.matchPlayerFailed(slot), lobby=False)
+    
+@packet(Packets.OSU_MATCH_HAS_BEATMAP)
+async def user_map(user: Player, p):
+    if not (match := user.match):
+        return
+
+    slot = match.get_slot(user)
+    slot.status = slotStatus.not_ready
+
+    match.enqueue_state(lobby=False)
+    
+@packet(Packets.OSU_MATCH_SKIP_REQUEST)
+async def user_skip(user: Player, p):
+    if not (match := user.match):
+        return
+
+    slot = match.get_slot(user)
+    slot.skipped = True
+
+    match.enqueue(writer.matchPlayerSkipped(user.id))
+
+    for slot in match.slots:
+        if slot.status is slotStatus.playing and not slot.skipped:
+            return
+
+    match.enqueue(writer.matchSkip(), lobby=False)
+    
+@packet(Packets.OSU_MATCH_TRANSFER_HOST)
+async def match_host(user: Player, p):
+    slot = (reader.handle_packet(p, (('slot', osuTypes.i32),)))['slot']
+    
+    if not (match := user.match) or user is not match.host or not (host := match.slots[slot].player) or match.clan_battle:
+        return
+    
+    match.host = host
+    match.host.enqueue(writer.matchTransferHost())
+    match.enqueue_state()
+    
+@packet(Packets.OSU_MATCH_CHANGE_TEAM)
+async def match_team(user: Player, p):
+    if not (match := user.match):
+        return
+
+    if match.clan_battle:
+        return
+
+    slot = match.get_slot(user)
+
+    if slot.team is Teams.teamless:
+        return # ???
+
+    if slot.team is Teams.blue:
+        slot.team = Teams.red
+    else:
+        slot.team = Teams.blue
+
+    match.enqueue_state(lobby=False)
+    
+@packet(Packets.OSU_MATCH_INVITE)
+async def match_invite(user: Player, p):
+    uid = (reader.handle_packet(p, (('uid', osuTypes.i32),)))['uid']
+    
+    if not user.match or not (target := glob.players_id.get(uid)) or target is glob.bot:
+        return
+    
+    target.enqueue(writer.matchInvite(user, target.name))
+    
+@packet(Packets.OSU_MATCH_CHANGE_PASSWORD)
+async def match_pw(user: Player, p):
+    m = (reader.handle_packet(p, (('m', osuTypes.match),)))['m']
+    
+    if not (match := user.match) or user is not match.host:
+        return
+    
+    match.pw = m.pw
+    match.enqueue_state()
 
 def root_web():
     pl = '\n'.join(p.name for p in glob.players.values())
@@ -747,11 +668,11 @@ async def root_client(request):
         data = request.body # request data, used to get info such as username to login the user
         if len(info := data.decode().split('\n')[:-1]) != 3: # format data so we can use it easier & also ensure it is valid at the same time
             request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
-            return packets.userID(-2)
+            return writer.userID(-2)
 
         if len(cinfo := info[2].split('|')) != 5: # format client data (hash, utc etc.) & ensure it is valid
             request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
-            return packets.userID(-2)
+            return writer.userID(-2)
 
         username = info[0]
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later    
@@ -759,11 +680,11 @@ async def root_client(request):
         
         if not osu_ver:
             request.resp_headers['cho-token'] = 'no'
-            return (packets.userID(-3) + packets.notification('Cheat advantages are not allowed on Asahi. Your account has been restricted.'))
+            return (writer.userID(-3) + writer.notification('Cheat advantages are not allowed on Asahi. Your account has been restricted.'))
 
         if int(osu_ver['ver']) <= 20210125:
             request.resp_headers['cho-token'] = 'no'
-            return (packets.versionUpdateForced() + packets.userID(-2))
+            return (writer.versionUpdateForced() + writer.userID(-2))
          
         user = await glob.db.fetchrow("SELECT id, pw, country, name, priv FROM users WHERE name = $1", username)
         if not user: # ensure user actually exists before attempting to do anything else
@@ -771,7 +692,7 @@ async def root_client(request):
                 log(f'User {username} does not exist.', Ansi.LRED)
 
             request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
-            return packets.userID(-1)
+            return writer.userID(-1)
 
         bcache = glob.cache['pw'] # get our cached pws to potentially enhance speed
         user_pw = user['pw'].encode('ISO-8859-1').decode('unicode-escape').encode('ISO-8859-1') # this is cursed SHUT UP
@@ -781,7 +702,7 @@ async def root_client(request):
                     log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
 
                 request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
-                return packets.userID(-1)
+                return writer.userID(-1)
         else:
             k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'')
             try:
@@ -791,13 +712,13 @@ async def root_client(request):
                     log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
 
                 request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
-                return packets.userID(-1)
+                return writer.userID(-1)
 
             bcache[user_pw] = pw # cache pw for future
 
         if not user['priv'] & Privileges.Normal:
             request.resp_headers['cho-token'] = 'no'
-            return packets.userID(-3)
+            return writer.userID(-3)
 
         if (p := glob.players_id.get(user['id'])):
             if (start - p.last_ping) > 10: # game crashes n shit
@@ -814,7 +735,7 @@ async def root_client(request):
 
         # cache ip's geoloc | the speed gains too are ungodly
         if not glob.geoloc.get(ip):
-            geoloc = reader.city(ip)
+            geoloc = rdr.city(ip)
             glob.geoloc[ip] = geoloc
         else:
             geoloc = glob.geoloc[ip]
@@ -835,35 +756,35 @@ async def root_client(request):
             await p.add_priv(Privileges.Verified) # verify user
             log(f'{p.name} has been successfully verified.', Ansi.LBLUE)
 
-        data = bytearray(packets.userID(p.id)) # initiate login by providing the user's id
-        data += packets.protocolVersion(19) # no clue what this does
-        data += packets.banchoPrivileges(p.client_priv | ClientPrivileges.Supporter)
-        data += (packets.userPresence(p) + packets.userStats(p)) # provide user & other user's presence/stats (for f9 + user stats)
-        data += packets.channelInfoEnd() # no clue what this does either
-        data += packets.menuIcon() # set main menu icon
-        data += packets.friends(p.friends) # send user friend list
-        data += packets.silenceEnd(0) # force to 0 for now since silences arent a thing
+        data = bytearray(writer.userID(p.id)) # initiate login by providing the user's id
+        data += writer.protocolVersion(19) # no clue what this does
+        data += writer.banchoPrivileges(p.client_priv | ClientPrivileges.Supporter)
+        data += (writer.userPresence(p) + writer.userStats(p)) # provide user & other user's presence/stats (for f9 + user stats)
+        data += writer.channelInfoEnd() # no clue what this does either
+        data += writer.menuIcon() # set main menu icon
+        data += writer.friends(p.friends) # send user friend list
+        data += writer.silenceEnd(0) # force to 0 for now since silences arent a thing
 
         # get channels from cache and send to user
         for chan in glob.channels.values():
             if chan.auto:
                 p.join_chan(chan)
-                data += packets.channelJoin(chan.name) # only join user to channel if the channel is meant for purpose
+                data += writer.channelJoin(chan.name) # only join user to channel if the channel is meant for purpose
 
-            data += packets.channelInfo(chan) # regardless of whether the channel should be auto-joined we should make the client aware of it
+            data += writer.channelInfo(chan) # regardless of whether the channel should be auto-joined we should make the client aware of it
 
         # add user to cache?
         glob.players[p.token] = p
         glob.players_name[p.name] = p
         glob.players_id[p.id] = p
         for o in glob.players.values(): # enqueue other users to client
-            o.enqueue((packets.userPresence(p) + packets.userStats(p))) # enqueue this user to every other logged in user
-            data += (packets.userPresence(o) + packets.userStats(o)) # enqueue every other logged in user to this user
+            o.enqueue((writer.userPresence(p) + writer.userStats(p))) # enqueue this user to every other logged in user
+            data += (writer.userPresence(o) + writer.userStats(o)) # enqueue every other logged in user to this user
 
         if p.clan:
             p.join_chan(p.clan.chan)
-            data += packets.channelJoin(p.clan.chan.name)
-            data += packets.channelInfo(p.clan.chan)
+            data += writer.channelJoin(p.clan.chan.name)
+            data += writer.channelInfo(p.clan.chan)
 
             # check if clan is in battle, if so: send invite to them too
             if (m := p.clan.battle):
@@ -876,7 +797,7 @@ async def root_client(request):
                         against = m.clan_1
                         add = 'online2'
                     
-                    data += packets.sendMessage(fromname=glob.bot.name, msg=f'Your clan has initiated in a clan battle against the clan {against.name}! Please join the battle here: {m.embed}', tarname=p.name, fromid=glob.bot.id)
+                    data += writer.sendMessage(fromname=glob.bot.name, msg=f'Your clan has initiated in a clan battle against the clan {against.name}! Please join the battle here: {m.embed}', tarname=p.name, fromid=glob.bot.id)
 
                     # update player lists for the battle
                     b1 = glob.clan_battles[m.clan_1]
@@ -889,10 +810,10 @@ async def root_client(request):
 
         for m in glob.menus.values():
             if p.priv & m.priv:
-                data += packets.sendMessage(fromname=glob.bot.name, msg=m.embed, tarname=p.name, fromid=glob.bot.id)
+                data += writer.sendMessage(fromname=glob.bot.name, msg=m.embed, tarname=p.name, fromid=glob.bot.id)
 
         elapsed = (time.time() - start) * 1000
-        data += packets.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed:.2f}ms') # send notification as indicator they've logged in i guess
+        data += writer.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed:.2f}ms') # send notification as indicator they've logged in i guess
         log(f'{p.name} successfully logged in.', Ansi.LBLUE)
 
         request.resp_headers['cho-token'] = token
@@ -902,14 +823,22 @@ async def root_client(request):
     user_token = headers['osu-token'] # client-provided token
     if not (p := glob.players.get(user_token)):
         # user is logged in but token is not found? most likely a restart so we force a reconnection
-        return packets.restartServer(0)
+        return writer.restartServer(0)
 
     # handle any packets the client has sent
-    for packet in BanchoPacketReader(request.body, glob.packets):
-        await packet.handle(p)
+    body = request.body
 
-        if glob.config.debug:
-            log(f'Packet {packet.type.name} handled for user {p.name}', Ansi.LMAGENTA)
+    for pck, cb in glob.packets.items():
+        if body[0] == 4:
+            break # fuck OSU_PING
+
+        if body[0] == pck:
+            await cb(p, body)
+
+            if glob.config.debug:
+                log(f'Packet {pck.name} handled for user {p.name}', Ansi.LMAGENTA)
+                
+            break # handled packet, end loop
 
     data = bytearray()
     while not p.queue_empty():
