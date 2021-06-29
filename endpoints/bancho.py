@@ -98,14 +98,6 @@ async def logout(user: Player, p):
     
     user.logout()
     log(f'{user.name} logged out.', Ansi.LBLUE)
-    
-regex_domain = glob.config.domain.replace('.', r'\.')
-npr = compile( # yikes
-    r'^\x01ACTION is (?:playing|editing|watching|listening to) '
-    rf'\[https://osu\.(?:{regex_domain})/beatmapsets/(?P<sid>\d{{1,10}})#/?(?P<bid>\d{{1,10}})/? .+\]'
-    r'(?: <(?P<mode>Taiko|CatchTheBeat|osu!mania)>)?'
-    r'(?P<mods>(?: (?:-|\+|~|\|)\w+(?:~|\|)?)+)?\x01$'
-)
 
 @packet(Packets.OSU_SEND_PRIVATE_MESSAGE)
 async def send_pm(user: Player, p):
@@ -124,7 +116,7 @@ async def send_pm(user: Player, p):
             cmd = await commands.process(user, target, msg)
             if cmd is not None:
                 user.enqueue(writer.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
-        elif m := npr.match(msg):
+        elif m := regexes.np_regex.match(msg):
             user.np = await Beatmap.bid_fetch(int(m['bid']))
             np = await user.np.np_msg()
             user.enqueue(writer.sendMessage(fromname = target.name, msg = np, tarname = user.name, fromid = target.id))
