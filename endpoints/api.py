@@ -75,8 +75,8 @@ async def user(request):
 
     stats_db = await glob.db.fetchrow('SELECT * FROM stats WHERE id = $1', id)
     
-    if stats_db['priv'] & Privileges.Restricted:
-        return {'code': 400, 'message': 'user is restricted!'}
+    if stats_db['priv'] & Privileges.Disallowed:
+        return {'code': 400, 'message': 'user is restricted/banned!'}
 
     info = dict(info)
     stats_db = dict(stats_db)
@@ -133,8 +133,8 @@ async def playerStatus(request):
     if not (player := glob.players_id.get(id)):
         return {'code': 200, 'status': {'online': False}}
     
-    if player.restricted:
-        return {'code': 400, 'message': 'user is restricted!'}
+    if player.priv & Privileges.Disallowed:
+        return {'code': 400, 'message': 'user is restricted/banned!'}
 
     if player.map_md5:
         if not (map := Beatmap.md5_cache(player.map_md5)):
