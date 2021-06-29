@@ -215,13 +215,12 @@ async def osuUpdates(request):
     return ret
 
 @web.route("/web/osu-getbeatmapinfo.php")
-async def osuMapInfo(request):
+async def osuMapInfo(request): # TODO
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
 
     data = request.body
-    log(data)
 
 @web.route("/web/osu-osz2-getscores.php")
 async def getMapScores(request):
@@ -324,7 +323,7 @@ async def scoreSubmit(request):
     
     cap = glob.config.pp_caps[s.mode.value]
 
-    if cap is not None and s.pp >= cap and glob.config.anticheat:
+    if cap is not None and s.pp >= cap and glob.config.anticheat and not s.user.restricted:
         await s.user.restrict(reason='Exceeding PP cap')
 
     # update stats EEEEEEE
