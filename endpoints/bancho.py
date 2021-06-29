@@ -718,7 +718,7 @@ async def root_client(request):
 
             bcache[user_pw] = pw # cache pw for future
 
-        if not user['priv'] & Privileges.Banned:
+        if user['priv'] & Privileges.Banned:
             request.resp_headers['cho-token'] = 'no'
             return writer.userID(-3)
 
