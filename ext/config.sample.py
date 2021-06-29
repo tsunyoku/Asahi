@@ -35,7 +35,7 @@ token = ''
 # NOTE: i would recommend not disabling this unless you are using asahi for a cheat server as this removes any form of anticheat (client checks, replay checks, pp cap etc.)
 anticheat = True
 
-webhooks = {
+webhooks = { # you can leave the urls empty if you don't want to use them!
     'logs': '', # server-related logs
     'anticheat': '' # anticheat-related logs (user bans/flags from client/replay checks, pp cap or hardware matches) - only used if anticheat option is enabled
 }

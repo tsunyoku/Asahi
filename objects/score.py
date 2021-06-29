@@ -176,7 +176,7 @@ class Score:
         if (ur := cg.ur(replay)) < 60: # TODO: implement freeze system and freeze for unstable rate as its much less conclusive
             asyncio.run(self.user.restrict(reason=f'relax cheating (ur: {ur:.2f})'))
 
-        if (ft := cg.frametime(replay)) < 14:
+        if (ft := cg.frametime(replay)) < 14: # TODO: check for false positives in frametime
             asyncio.run(self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f})'))
 
     def calc_lb_format(self):

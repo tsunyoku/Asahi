@@ -391,6 +391,8 @@ class Player:
 
         for chan in self.channels:
             self.leave_chan(chan)
+            
+    # TODO: ban/unban, restrict/unrestrict webhooks
 
     async def ban(self, reason):
         await self.add_priv(Privileges.Banned)
