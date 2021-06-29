@@ -8,10 +8,17 @@ class Privileges(IntFlag):
     Admin = 1 << 4
     Developer = 1 << 5
     Owner = 1 << 6
+    
+    # i'm making banned/restricted privileges separately because the system of removing normal really confuses me to this day
+    Restricted = 1 << 7
+    Banned = 1 << 8
+    
+    Whitelisted = 1 << 9 # can bypass anticheat checks
 
     Staff = Nominator | Admin | Developer | Owner
     Manager = Admin | Developer | Owner
-    Master =  Normal | Verified | Supporter | Nominator | Admin | Developer | Owner
+    Master = Normal | Verified | Supporter | Nominator | Admin | Developer | Owner
+    Disallowed = Restricted | Banned
 
 class ClientPrivileges(IntFlag):
     Player = 1 << 0

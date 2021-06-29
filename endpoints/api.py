@@ -8,10 +8,11 @@ from objects import glob
 from objects.beatmap import Beatmap
 from constants.mods import convert
 from constants.modes import osuModes
+from constants.privs import Privileges
+from packets import writer
 
 import time
 import hashlib
-import packets
 import struct
 
 api = Router(f'api.{glob.config.domain}')
@@ -73,6 +74,9 @@ async def user(request):
         return {'code': 400, 'message': 'user could not be found! please check the username/id you specified and try again'}
 
     stats_db = await glob.db.fetchrow('SELECT * FROM stats WHERE id = $1', id)
+    
+    if stats_db['priv'] & Privileges.Restricted:
+        return {'code': 400, 'message': 'user is restricted!'}
 
     info = dict(info)
     stats_db = dict(stats_db)
@@ -128,6 +132,9 @@ async def playerStatus(request):
 
     if not (player := glob.players_id.get(id)):
         return {'code': 200, 'status': {'online': False}}
+    
+    if player.restricted:
+        return {'code': 400, 'message': 'user is restricted!'}
 
     if player.map_md5:
         if not (map := Beatmap.md5_cache(player.map_md5)):
@@ -200,10 +207,10 @@ async def getReplay(request):
     rp = bytearray() # headers timeee
 
     rp += struct.pack('<Bi', score["m"], 20210523) # osuver once im not lazy (score sub provides it so easy solution lol)
-    rp += packets.write_string(score["md5"])
+    rp += writer.write_string(score["md5"])
 
-    rp += packets.write_string(score["name"])
-    rp += packets.write_string(hash)
+    rp += writer.write_string(score["name"])
+    rp += writer.write_string(hash)
 
     rp += struct.pack('<hhhhhhihBi',
         score["n300"], score["n100"],

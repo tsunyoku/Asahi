@@ -71,23 +71,7 @@ class Score:
             return s # even if user isnt found, may be related to connection and we want to tell the client to retry
         
         if not s.user and ensure:
-            # construct user from sql
-            info = await glob.db.fetchrow('SELECT * FROM users WHERE id = $1', score['uid'])
-            user = {
-                'id': info['id'],
-                'name': info['name'],
-                'token': '',
-                'offset': 24,
-                'ltime': 0,
-                'country_iso': info['country'],
-                'country': 0,
-                'lon': 0,
-                'lat': 0,
-                'md5': b'',
-                'priv': info['priv']
-            }
-
-            s.user = await Player.login(user)
+            s.user = Player.from_sql(score['uid'])
 
         if not s.map:
             return # ??
@@ -110,7 +94,11 @@ class Score:
 
         s.time = score['time']
         s.passed = s.status.value != 0
-        s.rank = await s.calc_lb(table, sort, t)
+        
+        if not s.user.restricted:
+            s.rank = await s.calc_lb(table, sort, t)
+        else:
+            s.rank = 0
 
         return s
 
@@ -160,6 +148,9 @@ class Score:
         await s.calc_info()
         s.pp = await s.calc_pp(s.mode.as_vn)
         await s.score_order()
+        
+        if s.user.restricted:
+            s.rank = 0
 
         return s
 
@@ -182,11 +173,11 @@ class Score:
 
         # TODO: compare replay against bancho leaderboards
 
-        if (ur := cg.ur(replay)) < 60:
-            asyncio.run(self.user.ban(reason=f'relax cheating (ur: {ur:.2f})'))
+        if (ur := cg.ur(replay)) < 60: # TODO: implement freeze system and freeze for unstable rate as its much less conclusive
+            asyncio.run(self.user.restrict(reason=f'relax cheating (ur: {ur:.2f})'))
 
         if (ft := cg.frametime(replay)) < 14:
-            asyncio.run(self.user.ban(reason=f'timewarp cheating (frametime: {ft:.2f})'))
+            asyncio.run(self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f})'))
 
     def calc_lb_format(self):
         if self.mode.value > 3:
@@ -214,14 +205,13 @@ class Score:
 
         if mode_vn <= 1: # std/taiko: use oppai (cmyui wrapper op)
             with OppaiWrapper('oppai-ng/liboppai.so') as ezpp:
-                ezpp.set_accuracy_percent(self.acc)
-                ezpp.set_combo(self.combo)
-                ezpp.set_nmiss(self.miss)
-
                 if self.mods:
                     ezpp.set_mods(int(self.mods))
-
+                    
                 ezpp.set_mode(mode_vn)
+                ezpp.set_combo(self.combo)
+                ezpp.set_nmiss(self.miss)
+                ezpp.set_accuracy_percent(self.acc)
 
                 ezpp.calculate(path)
                 return ezpp.get_pp() # returning sr soontm

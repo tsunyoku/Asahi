@@ -21,7 +21,7 @@ app = Xevel(glob.config.socket) # handler for webserver :D
 
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
 
-glob.version = Version(0, 2, 8) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 2, 9) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'

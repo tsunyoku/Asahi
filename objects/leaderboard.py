@@ -3,6 +3,7 @@ from objects.player import Player
 from objects.score import Score
 from constants.modes import osuModes
 from constants.statuses import mapStatuses
+from constants.privs import Privileges
 
 from objects import glob
 
@@ -33,7 +34,7 @@ class Leaderboard:
 
         mode_vn = self.mode.as_vn
 
-        query = [f'SELECT t.id, {self.mode.sort} as s FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & 1 > 0']
+        query = [f'SELECT t.id, {self.mode.sort} as s FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND users.priv & {int(Privileges.Disallowed)} > 0']
         p = [self.map.md5, mode_vn]
 
         if lb == 2:

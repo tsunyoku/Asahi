@@ -193,7 +193,7 @@ class Reader:
     def read_i32l(self):
         l = self.read_i16()
         
-        d = struct.unpack(f'<{"I" * l}', self.data[self.offset:self.offset + l + 4])
+        d = struct.unpack(f'<{"I" * l}', self.data[self.offset:self.offset + l * 4])
         
         self.offset += l * 4
         
@@ -202,9 +202,9 @@ class Reader:
     def read_i32l_4(self): # i dont think this is correct but whatev
         l = self.read_i16()
         
-        d = struct.unpack(f'<{"I" * l}', self.data[self.offset:self.offset + l + 8])
+        d = struct.unpack(f'<{"I" * l}', self.data[self.offset:self.offset + l * 4])
         
-        self.offset += l * 8
+        self.offset += l * 4
         
         return d
     

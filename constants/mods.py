@@ -36,6 +36,8 @@ class Mods(IntFlag):
 
     SPEED_MODS = DOUBLETIME | NIGHTCORE | HALFTIME
     GAME_CHANGING = RELAX | AUTOPILOT
+    
+    UNRANKED = SCOREV2 | AUTOPLAY | TARGET
 
 def convert(m: int):
     if not m:
