@@ -776,10 +776,9 @@ async def root_client(request):
 
             data += writer.channelInfo(chan) # regardless of whether the channel should be auto-joined we should make the client aware of it
 
-        if glob.config.anticheat:
-            if not osu_ver:
-                await p.restrict(reason='Missing osu! version')
-                data += writer.notification('Cheat advantages are not allowed! Your account has been restricted.')
+        if glob.config.anticheat and not osu_ver:
+            await p.restrict(reason='Missing osu! version')
+            data += writer.notification('Cheat advantages are not allowed! Your account has been restricted.')
 
         # add user to cache?
         glob.players[p.token] = p

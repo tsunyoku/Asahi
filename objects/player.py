@@ -116,6 +116,9 @@ class Player:
             priv=Privileges(user['priv']) 
         )
         
+        if p.priv & Privileges.Disallowed:
+            p.restricted = True
+        
         return p
 
     async def set_stats(self):
