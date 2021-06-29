@@ -30,30 +30,34 @@ from packets.writer import Packets
 bancho = Router({f'c.{glob.config.domain}', f'c4.{glob.config.domain}', f'ce.{glob.config.domain}'}) # handler for webserver :D
 rdr = database.Reader('ext/geoloc.mmdb')
 
-def packet(pck: Packets):
+def packet(pck: Packets, allow_res: bool = False):
     def wrapper(_cb):
         glob.packets |= {pck: _cb}
+        
+        if allow_res:
+            glob.packets_restricted |= {pck: _cb}
 
     return wrapper
 
-@packet(Packets.OSU_REQUEST_STATUS_UPDATE)
+@packet(Packets.OSU_REQUEST_STATUS_UPDATE, allow_res=True)
 async def update_stats(user: Player, p):
     user.enqueue(writer.userStats(user))
         
-@packet(Packets.OSU_USER_STATS_REQUEST)
+@packet(Packets.OSU_USER_STATS_REQUEST, allow_res=True)
 async def request_stats(user: Player, p):
     uids = (reader.handle_packet(p, (('uids', osuTypes.i32_list),)))['uids']
     
     for o in glob.players.values():
-        if o.id != user.id and o.id in uids:
+        if o.id != user.id and o.id in uids and not o.restricted:
             user.enqueue(writer.userStats(o))
             
 @packet(Packets.OSU_USER_PRESENCE_REQUEST)
 async def presence_request(user: Player, p):
     uids = (reader.handle_packet(p, (('uids', osuTypes.i32_list),)))['uids']
     
-    for o in glob.players.values():
-        user.enqueue(writer.userPresence(o))
+    for u in uid:
+        if o := glob.players_id.get(u):
+            user.enqueue(writer.userPresence(o))
         
 @packet(Packets.OSU_USER_PRESENCE_REQUEST)
 async def presence_request_all(user: Player, p):
@@ -87,7 +91,7 @@ async def friend_remove(user: Player, p):
 
     log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LCYAN)
     
-@packet(Packets.OSU_LOGOUT)
+@packet(Packets.OSU_LOGOUT, allow_res=True)
 async def logout(user: Player, p):
     if (time.time() - user.login_time) < 1:
         return
@@ -161,7 +165,7 @@ async def send_msg(user: Player, p):
     
     c.send(user, msg, False)
 
-@packet(Packets.OSU_CHANNEL_JOIN)
+@packet(Packets.OSU_CHANNEL_JOIN, allow_res=True)
 async def join_chan(user: Player, p):
     name = (reader.handle_packet(p, (('chan', osuTypes.string),)))['chan']
 
@@ -193,7 +197,7 @@ async def join_chan(user: Player, p):
 
     user.join_chan(chan)
     
-@packet(Packets.OSU_CHANNEL_PART)
+@packet(Packets.OSU_CHANNEL_PART, allow_res=True)
 async def leave_chan(user: Player, p):
     name = (reader.handle_packet(p, (('chan', osuTypes.string),)))['chan']
 
@@ -233,7 +237,7 @@ async def leave_chan(user: Player, p):
     for o in chan.players:
         o.enqueue(writer.channelInfo(chan))
         
-@packet(Packets.OSU_CHANGE_ACTION)
+@packet(Packets.OSU_CHANGE_ACTION, allow_res=True)
 async def update_action(user: Player, p):
     d = reader.handle_packet(p, (
         ('actionid', osuTypes.u8), 
@@ -267,8 +271,9 @@ async def update_action(user: Player, p):
     if d['actionid'] == 2:
         user.info += f' +{convert(d["mods"])}'
         
-    for o in glob.players.values():
-        o.enqueue(writer.userStats(user))
+    if not user.restricted:
+        for o in glob.players.values():
+            o.enqueue(writer.userStats(user))
         
 @packet(Packets.OSU_START_SPECTATING)
 async def start_spec(user: Player, p):
@@ -677,14 +682,11 @@ async def root_client(request):
         username = info[0]
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later    
         osu_ver = regexes.osu_ver.match(cinfo[0])
-        
-        if not osu_ver:
-            request.resp_headers['cho-token'] = 'no'
-            return (writer.userID(-3) + writer.notification('Cheat advantages are not allowed on Asahi. Your account has been restricted.'))
 
-        if int(osu_ver['ver']) <= 20210125:
-            request.resp_headers['cho-token'] = 'no'
-            return (writer.versionUpdateForced() + writer.userID(-2))
+        if glob.config.anticheat:
+            if int(osu_ver['ver']) <= 20210125:
+                request.resp_headers['cho-token'] = 'no'
+                return writer.versionUpdateForced() + writer.userID(-2)
          
         user = await glob.db.fetchrow("SELECT id, pw, country, name, priv FROM users WHERE name = $1", username)
         if not user: # ensure user actually exists before attempting to do anything else
@@ -716,7 +718,7 @@ async def root_client(request):
 
             bcache[user_pw] = pw # cache pw for future
 
-        if not user['priv'] & Privileges.Normal:
+        if not user['priv'] & Privileges.Banned:
             request.resp_headers['cho-token'] = 'no'
             return writer.userID(-3)
 
@@ -756,6 +758,7 @@ async def root_client(request):
             await p.add_priv(Privileges.Verified) # verify user
             log(f'{p.name} has been successfully verified.', Ansi.LBLUE)
 
+
         data = bytearray(writer.userID(p.id)) # initiate login by providing the user's id
         data += writer.protocolVersion(19) # no clue what this does
         data += writer.banchoPrivileges(p.client_priv | ClientPrivileges.Supporter)
@@ -773,12 +776,19 @@ async def root_client(request):
 
             data += writer.channelInfo(chan) # regardless of whether the channel should be auto-joined we should make the client aware of it
 
+        if glob.config.anticheat:
+            if not osu_ver:
+                await p.restrict(reason='Missing osu! version')
+                data += writer.notification('Cheat advantages are not allowed! Your account has been restricted.')
+
         # add user to cache?
         glob.players[p.token] = p
         glob.players_name[p.name] = p
         glob.players_id[p.id] = p
         for o in glob.players.values(): # enqueue other users to client
-            o.enqueue((writer.userPresence(p) + writer.userStats(p))) # enqueue this user to every other logged in user
+            if not p.restricted:
+                o.enqueue((writer.userPresence(p) + writer.userStats(p))) # enqueue this user to every other logged in user
+
             data += (writer.userPresence(o) + writer.userStats(o)) # enqueue every other logged in user to this user
 
         if p.clan:
@@ -807,10 +817,9 @@ async def root_client(request):
                     b2['total'].append(p)
                     b1[add].append(p)
                     b2[add].append(p)
-
-        for m in glob.menus.values():
-            if p.priv & m.priv:
-                data += writer.sendMessage(fromname=glob.bot.name, msg=m.embed, tarname=p.name, fromid=glob.bot.id)
+                
+        if p.restricted:
+            data += writer.sendMessage(fromname=glob.bot.name, msg='Your account is currently restricted!', tarname=p.name, fromid=glob.bot.id)
 
         elapsed = (time.time() - start) * 1000
         data += writer.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed:.2f}ms') # send notification as indicator they've logged in i guess
@@ -827,24 +836,27 @@ async def root_client(request):
 
     # handle any packets the client has sent
     body = request.body
+    
+    if p.restricted:
+        pm = glob.packets_restricted
+    else:
+        pm = glob.packets
 
-    for pck, cb in glob.packets.items():
+    for pck, cb in pm.items():
         if body[0] == 4:
-            break # fuck OSU_PING
+            continue # fuck OSU_PING
 
         if body[0] == pck:
             await cb(p, body)
 
             if glob.config.debug:
                 log(f'Packet {pck.name} handled for user {p.name}', Ansi.LMAGENTA)
-                
-            break # handled packet, end loop
-
-    data = bytearray()
-    while not p.queue_empty():
-        data += p.dequeue()
 
     p.last_ping = time.time()
 
     request.resp_headers['Content-Type'] = 'text/html; charset=UTF-8' # ?
-    return bytes(data)
+
+    if not (d := p.dequeue()):
+        return b''
+
+    return d

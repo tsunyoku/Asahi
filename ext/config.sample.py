@@ -13,8 +13,8 @@ redis = {
     'password': '' # unless you manually edited the config, this will always be blank
 }
 
-# where the socket should be stored (for nginx & asahi to communicate, you will need to edit this in your nginx config also)
-socket = '/tmp/asahi.sock'
+# where the socket (unix or inet4) should be stored (for nginx & asahi to communicate, you will need to edit this in your nginx config also)
+socket = '/tmp/asahi.sock' # ('localhost', port) if you want to use ports over unix sockets
 
 debug = False # debug is used to print more info & help to debug if you are experiencing issues with the server
 
@@ -31,3 +31,24 @@ bot_prefix = '!'
 
 # discord bot token
 token = ''
+
+# NOTE: i would recommend not disabling this unless you are using asahi for a cheat server as this removes any form of anticheat (client checks, replay checks, pp cap etc.)
+anticheat = True
+
+webhooks = {
+    'logs': '', # server-related logs
+    'anticheat': '' # anticheat-related logs (user bans/flags from client/replay checks, pp cap or hardware matches) - only used if anticheat option is enabled
+}
+
+pp_caps = (
+    600, # vanilla std
+    None, # vanilla taiko
+    None, # vanilla catch
+    None, # mania
+    
+    1400, # rx std
+    None, # rx taiko
+    None, # rx catch
+
+    1200 # autopilot std
+)

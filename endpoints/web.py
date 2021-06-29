@@ -241,9 +241,12 @@ async def getMapScores(request):
 
     if mode.value != player.mode or mods != player.mods:
         player.mode = mode.value
+        player.mode_vn = mode.as_vn
         player.mods = mods
-        for o in glob.players.values():
-            o.enqueue(writer.userStats(player))
+        
+        if not player.restricted:
+            for o in glob.players.values():
+                o.enqueue(writer.userStats(player))
 
     bmap = await Beatmap.from_md5(md5)
 
@@ -268,7 +271,7 @@ async def getMapScores(request):
     if not (lb := bmap.lb):
         lb = Leaderboard(bmap, mode)
         bmap.lb = lb
-
+        
     return await lb.return_leaderboard(player, lbm, mods)
 
 # POGGG
@@ -284,6 +287,8 @@ async def scoreSubmit(request):
         return b'' # player not online, make client make resubmit attempts
     elif not s.map:
         return b'error: beatmap' # map unsubmitted
+    elif s.mods & Mods.UNRANKED:
+        return b'error: no'
 
     if s.mode != s.user.mode or s.mods != s.user.mods:
         s.user.mode = s.mode.value
@@ -313,7 +318,14 @@ async def scoreSubmit(request):
             f = vn_path / f'{s.id}.osr'
 
         f.write_bytes(replay)
-        threading.Thread(target=s.analyse).start()
+        
+        if glob.config.anticheat:
+            threading.Thread(target=s.analyse).start()
+    
+    cap = glob.config.pp_caps[s.mode.value]
+
+    if cap is not None and s.pp >= cap and glob.config.anticheat:
+        await s.user.restrict(reason='Exceeding PP cap')
 
     # update stats EEEEEEE
     stats = s.user.stats[s.mode.value]
@@ -337,7 +349,7 @@ async def scoreSubmit(request):
     await s.user.update_stats(s.mode, s.mode.table, s.mode.as_vn)
 
     # sub charts bruh
-    if s.mods & Mods.RELAX or s.mods & Mods.AUTOPILOT or s.status == scoreStatuses.Failed:
+    if s.mods & Mods.GAME_CHANGING or s.status == scoreStatuses.Failed:
         log(f'[{s.mode!r}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
         return b'error: no' # not actually erroring, score is already submitted we just want client to stop request as we cannot provide chart
 
@@ -449,7 +461,7 @@ async def getReplay(request):
     if f.exists():
         return f.read_bytes()
 
-    return b'' # osu wants empty response if there's no replay however quart doesn't like this so we just force the request to end xd
+    return # osu wants empty response if there's no replay
 
 @web.route("/web/lastfm.php")
 async def lastFM(request):
@@ -461,31 +473,31 @@ async def lastFM(request):
 
     b = args['b']
 
-    if b[0] != 'a':
+    if b[0] != 'a' or not glob.config.anticheat:
         return b'-3'
 
     flags = int(b[1:])
 
     # this is quite ugly but whatev
     if flags & 1 << 1: # speed hack
-        return await player.ban(reason='osu!anticheat flags (speed hack)')
+        return await player.restrict(reason='osu!anticheat flags (speed hack)')
     if flags & 1 << 4: # checksum failure
-        return await player.ban(reason='osu!anticheat flags (checksum failure)')
+        return await player.restrict(reason='osu!anticheat flags (checksum failure)')
     if flags & 1 << 5: # fl tampering
-        return await player.ban(reason='osu!anticheat flags (fl cheating)')
+        return await player.restrict(reason='osu!anticheat flags (fl cheating)')
     if flags & 1 << 8: # fl hack (tampering v2):
-        return await player.ban(reason='osu!anticheat flags (fl cheating)')
+        return await player.restrict(reason='osu!anticheat flags (fl cheating)')
     if flags & 1 << 9: # spin hack
-        return await player.ban(reason='osu!anticheat flags (spin hack)')
+        return await player.restrict(reason='osu!anticheat flags (spin hack)')
     if flags & 1 << 10: # transparent window?
-        return await player.ban(reason='osu!anticheat flags (transparent window)')
+        return await player.restrict(reason='osu!anticheat flags (transparent window)')
     if flags & 1 << 11: # mania fast presses:
-        return await player.ban(reason='osu!anticheat flags (mania fast presses)')
+        return await player.restrict(reason='osu!anticheat flags (mania fast presses)')
     if flags & 1 << 12 or flags & 1 << 13: # autobot
-        return await player.ban(reason='osu!anticheat (autobot)')
+        return await player.restrict(reason='osu!anticheat (autobot)')
     if flags & 1 << 14 or flags & 1 << 15 or flags & 1 << 16 or flags & 1 << 17 or flags & 1 << 18: # hqosu
-        return await player.ban(reason='osu!anticheat flags (hqosu)')
+        return await player.restrict(reason='osu!anticheat flags (hqosu)')
     if flags & 1 << 20: # old aqn (enlighten crack most likely xd)
-        return await player.ban(reason='osu!anticheat flags (old aqn)')
+        return await player.restrict(reason='osu!anticheat flags (old aqn)')
 
     return b'-3'

@@ -4,10 +4,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aiohttp import ClientSession
-
     from cmyui import Version
-
-    from packets import Packets, BanchoPacket
     from objects.player import Player
 
     import asyncpg
@@ -19,6 +16,7 @@ web: 'ClientSession'
 redis: 'aioredis.create_redis_pool'
 
 packets = {}
+packets_restricted = {} # packet dict for packets that restricted players *can* use
 
 # cache some things like pws for speeeeeeeeeeeeeeeeeed hours
 cache = {

@@ -57,6 +57,8 @@ class Player:
         self.clan: Optional[Clan] = None
 
         self.last_ping: int = 0
+        
+        self.restricted: bool = False
 
     @property
     def full_name(self):
@@ -88,33 +90,62 @@ class Player:
         clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = $1', p.id)
         if clan:
             p.clan = glob.clans.get(clan)
+            
+        if p.priv & Privileges.Restricted:
+            p.restricted = True
 
+        return p
+    
+    @classmethod
+    async def from_sql(self, id):
+        user = await glob.db.fetchrow('SELECT * FROM users WHERE id = $1', id)
+        
+        if not pl:
+            return
+        
+        p = self(
+            id=user['id'],
+            name=user['name'],
+            token='',
+            offset=0,
+            login_time=0,
+            country_iso=user['country'],
+            country=0,
+            loc=[0, 0],
+            pw='',
+            priv=Privileges(user['priv']) 
+        )
+        
         return p
 
     async def set_stats(self):
         for mode in osuModes:
             stat = dict(await glob.db.fetchrow('SELECT rscore_{0} rscore, acc_{0} acc, pc_{0} pc, tscore_{0} tscore, pp_{0} pp, mc_{0} max_combo FROM stats WHERE id = $1'.format(mode.name), self.id))
 
-            stat['rank'] = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}', self.id)
-
-            if stat['rank'] is None:
-                if stat['pp'] > 0:
-                    stat['rank'] = 1
+            if not self.restricted:
+                stat['rank'] = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}', self.id)
+    
+                if stat['rank'] is None:
+                    if stat['pp'] > 0:
+                        stat['rank'] = 1
+                    else:
+                        stat['rank'] = 0
                 else:
-                    stat['rank'] = 0
-            else:
-                stat['rank'] += 1
-
-            stat['country_rank'] = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}:{self.country_iso}', self.id)
-
-            if stat['country_rank'] is None:
-                if stat['pp'] > 0:
-                    stat['country_rank'] = 1
+                    stat['rank'] += 1
+    
+                stat['country_rank'] = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}:{self.country_iso}', self.id)
+    
+                if stat['country_rank'] is None:
+                    if stat['pp'] > 0:
+                        stat['country_rank'] = 1
+                    else:
+                        stat['country_rank'] = 0
                 else:
-                    stat['country_rank'] = 0
+                    stat['country_rank'] += 1
             else:
-                stat['country_rank'] += 1
-
+                stat['rank'] = 0
+                stat['country_rank']
+                
             self.stats[mode.value] = Stats(**stat)
 
     async def update_stats(self, mode: osuModes, table: str, mode_vn: int):
@@ -132,32 +163,35 @@ class Player:
         bonus = 416.6667 * (1 - 0.9994 ** len(s))
         stats.pp = round(weighted + bonus)
 
-        await glob.redis.zadd(f'asahi:leaderboard:{mode_name}', stats.pp, self.id)
-        await glob.redis.zadd(f'asahi:leaderboard:{mode_name}:{self.country_iso}', stats.pp, self.id)
-        stats.rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}', self.id)
-        stats.country_rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}:{self.country_iso}', self.id)
-
-        if stats.rank is None:
-            if stats.pp > 0:
-                stats.rank = 1
+        if not self.restricted:
+            await glob.redis.zadd(f'asahi:leaderboard:{mode_name}', stats.pp, self.id)
+            await glob.redis.zadd(f'asahi:leaderboard:{mode_name}:{self.country_iso}', stats.pp, self.id)
+            stats.rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}', self.id)
+            stats.country_rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}:{self.country_iso}', self.id)
+    
+            if stats.rank is None:
+                if stats.pp > 0:
+                    stats.rank = 1
+                else:
+                    stats.rank = 0
             else:
-                stats.rank = 0
-        else:
-            stats.rank += 1
-
-        if stats.country_rank is None:
-            if stats.pp > 0:
-                stats.country_rank = 1
+                stats.rank += 1
+    
+            if stats.country_rank is None:
+                if stats.pp > 0:
+                    stats.country_rank = 1
+                else:
+                    stats.country_rank = 0
             else:
-                stats.country_rank = 0
-        else:
-            stats.country_rank += 1
+                stats.country_rank += 1
 
         await glob.db.execute('UPDATE stats SET rscore_{0} = $1, acc_{0} = $2, pc_{0} = $3, tscore_{0} = $4, pp_{0} = $5, mc_{0} = $6 WHERE id = $7'.format(mode_name), stats.rscore, stats.acc, stats.pc, stats.tscore, stats.pp, stats.max_combo, self.id)
 
         self.enqueue(writer.userStats(self))
-        for o in glob.players.values():
-            o.enqueue(writer.userStats(self))
+        
+        if not self.restricted:
+            for o in glob.players.values():
+                o.enqueue(writer.userStats(self))
 
     @property
     def current_stats(self):
@@ -336,6 +370,7 @@ class Player:
         self.match = None
 
     def logout(self):
+        glob.players.pop(self.token)
         glob.players_name.pop(self.name)
         glob.players_id.pop(self.id)
         
@@ -347,14 +382,15 @@ class Player:
         if self.match:
             self.leave_match()
 
-        for o in glob.players.values():
-            o.enqueue(writer.logout(self.id))
+        if not self.restricted:
+            for o in glob.players.values():
+                o.enqueue(writer.logout(self.id))
 
         for chan in self.channels:
             self.leave_chan(chan)
 
     async def ban(self, reason):
-        self.priv &= ~Privileges.Normal
+        self.priv &= Privileges.Banned
 
         await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', self.priv, self.id)
 
@@ -362,6 +398,37 @@ class Player:
             self.enqueue(writer.userID(-3))
 
         log(f'{self.name} has been banned for {reason}')
+        
+    async def unban(self, reason):
+        self.priv &= ~Privileges.Banned
+
+        await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', self.priv, self.id)
+
+        log(f'{self.name} has been unbanned for {reason}')
+        
+    async def restrict(self, reason):
+        self.priv &= Privileges.Restricted
+
+        await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', self.priv, self.id)
+
+        log(f'{self.name} has been restricted for {reason}')
+        
+        self.restricted = True
+
+        if self.token:
+            self.enqueue(writer.restartServer(0)) # force relog if they're online
+
+    async def unrestrict(self, reason):
+        self.priv &= ~Privileges.Restricted
+
+        await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', self.priv, self.id)
+
+        log(f'{self.name} has been unrestricted for {reason}')
+        
+        self.restricted = False
+
+        if self.token:
+            self.enqueue(writer.restartServer(0)) # force relog if they're online
 
     def enqueue(self, b: bytes):
         self.queue.put_nowait(b)
