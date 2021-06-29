@@ -758,7 +758,6 @@ async def root_client(request):
             await p.add_priv(Privileges.Verified) # verify user
             log(f'{p.name} has been successfully verified.', Ansi.LBLUE)
 
-
         data = bytearray(writer.userID(p.id)) # initiate login by providing the user's id
         data += writer.protocolVersion(19) # no clue what this does
         data += writer.banchoPrivileges(p.client_priv | ClientPrivileges.Supporter)

@@ -100,7 +100,7 @@ class Player:
     async def from_sql(self, id):
         user = await glob.db.fetchrow('SELECT * FROM users WHERE id = $1', id)
         
-        if not pl:
+        if not user:
             return
         
         p = self(
@@ -393,9 +393,7 @@ class Player:
             self.leave_chan(chan)
 
     async def ban(self, reason):
-        self.priv &= Privileges.Banned
-
-        await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', self.priv, self.id)
+        await self.add_priv(Privileges.Banned)
 
         if self.token:
             self.enqueue(writer.userID(-3))
@@ -403,16 +401,14 @@ class Player:
         log(f'{self.name} has been banned for {reason}')
         
     async def unban(self, reason):
-        self.priv &= ~Privileges.Banned
+        await self.remove_priv(Privileges.Banned)
 
         await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', self.priv, self.id)
 
         log(f'{self.name} has been unbanned for {reason}')
         
     async def restrict(self, reason):
-        self.priv &= Privileges.Restricted
-
-        await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', self.priv, self.id)
+        await self.add_priv(Privileges.Restricted)
 
         log(f'{self.name} has been restricted for {reason}')
         
@@ -422,9 +418,7 @@ class Player:
             self.enqueue(writer.restartServer(0)) # force relog if they're online
 
     async def unrestrict(self, reason):
-        self.priv &= ~Privileges.Restricted
-
-        await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', self.priv, self.id)
+        await self.remove_priv(Privileges.Restricted)
 
         log(f'{self.name} has been unrestricted for {reason}')
         
