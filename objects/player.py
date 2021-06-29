@@ -147,7 +147,7 @@ class Player:
                     stat['country_rank'] += 1
             else:
                 stat['rank'] = 0
-                stat['country_rank']
+                stat['country_rank'] = 0
                 
             self.stats[mode.value] = Stats(**stat)
 
