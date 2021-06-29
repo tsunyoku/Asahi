@@ -99,6 +99,14 @@ async def logout(user: Player, p):
     user.logout()
     log(f'{user.name} logged out.', Ansi.LBLUE)
     
+regex_domain = glob.config.domain.replace('.', r'\.')
+npr = compile( # yikes
+    r'^\x01ACTION is (?:playing|editing|watching|listening to) '
+    rf'\[https://osu\.(?:{regex_domain})/beatmapsets/(?P<sid>\d{{1,10}})#/?(?P<bid>\d{{1,10}})/? .+\]'
+    r'(?: <(?P<mode>Taiko|CatchTheBeat|osu!mania)>)?'
+    r'(?P<mods>(?: (?:-|\+|~|\|)\w+(?:~|\|)?)+)?\x01$'
+)
+
 @packet(Packets.OSU_SEND_PRIVATE_MESSAGE)
 async def send_pm(user: Player, p):
     d = reader.handle_packet(p, (('msg', osuTypes.message),))
@@ -111,13 +119,6 @@ async def send_pm(user: Player, p):
         return
 
     if target is glob.bot:
-        regex_domain = glob.config.domain.replace('.', r'\.')
-        npr = compile( # yikes
-            r'^\x01ACTION is (?:playing|editing|watching|listening to) '
-            rf'\[https://osu\.(?:{regex_domain})/beatmapsets/(?P<sid>\d{{1,10}})#/?(?P<bid>\d{{1,10}})/? .+\]'
-            r'(?: <(?P<mode>Taiko|CatchTheBeat|osu!mania)>)?'
-            r'(?P<mods>(?: (?:-|\+|~|\|)\w+(?:~|\|)?)+)?\x01$'
-        )
     
         if msg.startswith('!'):
             cmd = await commands.process(user, target, msg)
@@ -234,8 +235,9 @@ async def leave_chan(user: Player, p):
         return
 
     user.leave_chan(chan)
+    chan_leave = writer.channelInfo(chan)
     for o in chan.players:
-        o.enqueue(writer.channelInfo(chan))
+        o.enqueue(chan_leave)
         
 @packet(Packets.OSU_CHANGE_ACTION, allow_res=True)
 async def update_action(user: Player, p):
@@ -298,8 +300,9 @@ async def stop_spec(user: Player, p):
 async def spec_frames(user: Player, p):
     frames = (reader.handle_packet(p, (('frames', osuTypes.raw),)))['frames']
     
+    spec_frames = writer.spectateFrames(frames)
     for u in user.spectators:
-        u.enqueue(writer.spectateFrames(frames))
+        u.enqueue(spec_frames)
 
 @packet(Packets.OSU_JOIN_LOBBY)
 async def join_lobby(user: Player, p):
@@ -426,7 +429,7 @@ async def match_settings(user: Player, p):
 
         match.mods &= Mods.SPEED_MODS
     else:
-        host = match.get_host()
+        host = match.host
         match.mods &= Mods.SPEED_MODS
         match.mods |= host.mods
 
@@ -655,10 +658,10 @@ async def match_pw(user: Player, p):
     match.pw = m.pw
     match.enqueue_state()
 
+BASE_MESSAGE = f"{pyfiglet.figlet_format(f'Asahi v{glob.version}')}\n\ntsunyoku attempts bancho v2, gone right :sunglasses:\n\nOnline Players:\n"
 def root_web():
     pl = '\n'.join(p.name for p in glob.players.values())
-    message = f"{pyfiglet.figlet_format(f'Asahi v{glob.version}')}\n\ntsunyoku attempts bancho v2, gone right :sunglasses:\n\nOnline Players:\n{pl}"
-    return message.encode()
+    return (BASE_MESSAGE + pl).encode()
 
 @bancho.route("/", ['POST', 'GET']) # only accept POST requests, we can assume it is for a login request but we can deny access if not
 async def root_client(request):
@@ -783,9 +786,11 @@ async def root_client(request):
         glob.players[p.token] = p
         glob.players_name[p.name] = p
         glob.players_id[p.id] = p
+
+        own_presence = writer.userPresence(p) + writer.userStats(p)
         for o in glob.players.values(): # enqueue other users to client
             if not p.restricted:
-                o.enqueue((writer.userPresence(p) + writer.userStats(p))) # enqueue this user to every other logged in user
+                o.enqueue(own_presence) # enqueue this user to every other logged in user
 
             data += (writer.userPresence(o) + writer.userStats(o)) # enqueue every other logged in user to this user
 
