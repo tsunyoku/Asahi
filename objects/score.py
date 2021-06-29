@@ -71,7 +71,7 @@ class Score:
             return s # even if user isnt found, may be related to connection and we want to tell the client to retry
         
         if not s.user and ensure:
-            s.user = Player.from_sql(score['uid'])
+            s.user = await Player.from_sql(score['uid'])
 
         if not s.map:
             return # ??
