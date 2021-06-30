@@ -35,6 +35,13 @@ class Teams(IntEnum):
     blue = 1
     red = 2
 
+CLAN_BATTLE_EXPLAIN = (
+    "All online clan members have joined! If you're unsure of how clan battles work, here is a rundown. "
+    "Clan battles are team vs multiplayer matches against 2 clans. You will take turns picking maps until the first clan reaches 5 wins. Wins are decided by average score/pp. "
+    "If you played vanilla then the clan with the highest average score (all clan users participating added up) will gain a win. This is the same for relax/autopilot but with pp. "
+    "Once you reach 5 wins, that clan wins and the match is over. When you win a match, your clan gains 'clan score' which is the metric used for clan leaderboards. Have fun!"
+)
+
 class Slot:
     # i actually kind of like this setup
 
@@ -139,11 +146,6 @@ class Match:
             if user is slot.player:
                 return sn
 
-    def get_host(self):
-        for slot in self.slots:
-            if slot.player is self.host:
-                return slot.player
-
     def unready_players(self, wanted):
         for slot in self.slots:
             if slot.status is wanted:
@@ -181,10 +183,7 @@ class Match:
 
         self.chat.send(
             glob.bot, 
-            "All online clan members have joined! If you're unsure of how clan battles work, here is a rundown."
-            "Clan battles are team vs multiplayer matches against 2 clans. You will take turns picking maps until the first clan reaches 5 wins. Wins are decided by average score/pp."
-            "If you played vanilla then the clan with the highest average score (all clan users participating added up) will gain a win. This is the same for relax/autopilot but with pp."
-            "Once you reach 5 wins, that clan wins and the match is over. When you win a match, your clan gains 'clan score' which is the metric used for clan leaderboards. Have fun!",
+            CLAN_BATTLE_EXPLAIN,
             False
         )
 
