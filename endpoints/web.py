@@ -324,7 +324,7 @@ async def scoreSubmit(request):
     cap = glob.config.pp_caps[s.mode.value]
 
     if cap is not None and s.pp >= cap and glob.config.anticheat and not s.user.restricted:
-        await s.user.restrict(reason='Exceeding PP cap')
+        await s.user.restrict(reason='Exceeding PP cap', fr=glob.bot)
 
     # update stats EEEEEEE
     stats = s.user.stats[s.mode.value]
@@ -479,24 +479,24 @@ async def lastFM(request):
 
     # this is quite ugly but whatev
     if flags & 1 << 1: # speed hack
-        return await player.restrict(reason='osu!anticheat flags (speed hack)')
+        return await player.restrict(reason='osu!anticheat flags (speed hack)', fr=glob.bot)
     if flags & 1 << 4: # checksum failure
-        return await player.restrict(reason='osu!anticheat flags (checksum failure)')
+        return await player.restrict(reason='osu!anticheat flags (checksum failure)', fr=glob.bot)
     if flags & 1 << 5: # fl tampering
-        return await player.restrict(reason='osu!anticheat flags (fl cheating)')
+        return await player.restrict(reason='osu!anticheat flags (fl cheating)', fr=glob.bot)
     if flags & 1 << 8: # fl hack (tampering v2):
-        return await player.restrict(reason='osu!anticheat flags (fl cheating)')
+        return await player.restrict(reason='osu!anticheat flags (fl cheating)', fr=glob.bot)
     if flags & 1 << 9: # spin hack
-        return await player.restrict(reason='osu!anticheat flags (spin hack)')
+        return await player.restrict(reason='osu!anticheat flags (spin hack)', fr=glob.bot)
     if flags & 1 << 10: # transparent window?
-        return await player.restrict(reason='osu!anticheat flags (transparent window)')
+        return await player.restrict(reason='osu!anticheat flags (transparent window)', fr=glob.bot)
     if flags & 1 << 11: # mania fast presses:
-        return await player.restrict(reason='osu!anticheat flags (mania fast presses)')
+        return await player.restrict(reason='osu!anticheat flags (mania fast presses)', fr=glob.bot)
     if flags & 1 << 12 or flags & 1 << 13: # autobot
-        return await player.restrict(reason='osu!anticheat (autobot)')
+        return await player.restrict(reason='osu!anticheat (autobot)', fr=glob.bot)
     if flags & 1 << 14 or flags & 1 << 15 or flags & 1 << 16 or flags & 1 << 17 or flags & 1 << 18: # hqosu
-        return await player.restrict(reason='osu!anticheat flags (hqosu)')
+        return await player.restrict(reason='osu!anticheat flags (hqosu)', fr=glob.bot)
     if flags & 1 << 20: # old aqn (enlighten crack most likely xd)
-        return await player.restrict(reason='osu!anticheat flags (old aqn)')
+        return await player.restrict(reason='osu!anticheat flags (old aqn)', fr=glob.bot)
 
     return b'-3'

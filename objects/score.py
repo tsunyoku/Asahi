@@ -173,11 +173,11 @@ class Score:
 
         # TODO: compare replay against bancho leaderboards
 
-        if (ur := cg.ur(replay)) < 60: # TODO: implement freeze system and freeze for unstable rate as its much less conclusive
-            asyncio.run(self.user.restrict(reason=f'relax cheating (ur: {ur:.2f})'))
+        if (ur := cg.ur(replay)) < 60:
+            asyncio.run(self.user.freeze(reason=f'potential relax (ur: {ur:.2f})', fr=glob.bot))
 
         if (ft := cg.frametime(replay)) < 14: # TODO: check for false positives in frametime
-            asyncio.run(self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f})'))
+            asyncio.run(self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f})', fr=glob.bot))
 
     def calc_lb_format(self):
         if self.mode.value > 3:

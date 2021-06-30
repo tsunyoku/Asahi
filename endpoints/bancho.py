@@ -688,7 +688,7 @@ async def root_client(request):
                 request.resp_headers['cho-token'] = 'no'
                 return writer.versionUpdateForced() + writer.userID(-2)
          
-        user = await glob.db.fetchrow("SELECT id, pw, country, name, priv FROM users WHERE name = $1", username)
+        user = await glob.db.fetchrow("SELECT id, pw, country, name, priv, freeze_timer FROM users WHERE name = $1", username)
         if not user: # ensure user actually exists before attempting to do anything else
             if glob.config.debug:
                 log(f'User {username} does not exist.', Ansi.LRED)
@@ -776,7 +776,7 @@ async def root_client(request):
             data += writer.channelInfo(chan) # regardless of whether the channel should be auto-joined we should make the client aware of it
 
         if glob.config.anticheat and not osu_ver:
-            await p.restrict(reason='Missing osu! version')
+            await p.restrict(reason='Missing osu! version', fr=glob.bot)
             data += writer.notification('Cheat advantages are not allowed! Your account has been restricted.')
 
         # add user to cache?
@@ -818,6 +818,14 @@ async def root_client(request):
                 
         if p.restricted:
             data += writer.sendMessage(fromname=glob.bot.name, msg='Your account is currently restricted!', tarname=p.name, fromid=glob.bot.id)
+            
+        if p.frozen and not p.restricted:
+            if p.freeze_timer.timestamp() < start: # freeze timer has expired lol
+                await p.restrict(reason='Expired freeze timer')
+                data += writer.sendMessage(fromname=glob.bot.name, msg=f'Your freeze timer has expired and you have not submitted any liveplay, you have been restricted as a result!', tarname=p.name, fromid=glob.bot.id)
+            else:
+                reason = await glob.db.fetchval("SELECT reason FROM punishments WHERE type = 'freeze' AND target = $1 ORDER BY time DESC LIMIT 1", p.id)
+                data += writer.sendMessage(fromname=glob.bot.name, msg=f'Your account is currently frozen for reason "{reason}"! If you do not provide a liveplay by {p.freeze_timer.strftime("%d/%m/%Y %H:%M:%S")}, you will be autorestricted.', tarname=p.name, fromid=glob.bot.id)
 
         elapsed = (time.time() - start) * 1000
         data += writer.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed:.2f}ms') # send notification as indicator they've logged in i guess
@@ -840,15 +848,13 @@ async def root_client(request):
     else:
         pm = glob.packets
 
-    for pck, cb in pm.items():
-        if body[0] == 4:
-            continue # fuck OSU_PING
-
-        if body[0] == pck:
-            await cb(p, body)
-
-            if glob.config.debug:
-                log(f'Packet {pck.name} handled for user {p.name}', Ansi.LMAGENTA)
+    if body[0] != 4:
+        for pck, cb in pm.items():
+            if body[0] == pck:
+                await cb(p, body)
+    
+                if glob.config.debug:
+                    log(f'Packet {pck.name} handled for user {p.name}', Ansi.LMAGENTA)
 
     p.last_ping = time.time()
 

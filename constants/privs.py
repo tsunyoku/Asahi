@@ -1,9 +1,10 @@
 from enum import IntFlag
 
 class Privileges(IntFlag):
-    Normal = 1 << 0 # unbanned, even if they have verified but lack normal they are a banned user
+    Normal = 1 << 0
     Verified = 1 << 1
     Supporter = 1 << 2
+
     Nominator = 1 << 3
     Admin = 1 << 4
     Developer = 1 << 5
@@ -14,6 +15,7 @@ class Privileges(IntFlag):
     Banned = 1 << 8
     
     Whitelisted = 1 << 9 # can bypass anticheat checks
+    Frozen = 1 << 10
 
     Staff = Nominator | Admin | Developer | Owner
     Manager = Admin | Developer | Owner
