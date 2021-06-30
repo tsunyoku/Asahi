@@ -182,7 +182,8 @@ CREATE TABLE public.users (
     country character varying(2) DEFAULT 'xx'::character varying NOT NULL,
     priv integer DEFAULT 1 NOT NULL,
     safe_name character varying(16) NOT NULL,
-    clan integer DEFAULT 0 NOT NULL
+    clan integer DEFAULT 0 NOT NULL,
+    freeze_timer integer DEFAULT 0 NOT NULL
 );
 
 
@@ -499,6 +500,44 @@ ALTER TABLE public.clans OWNER TO tsunyoku;
 
 ALTER TABLE ONLY public.clans
     ADD CONSTRAINT clans_pkey PRIMARY KEY (id);
+
+--
+-- Name: punishments; Type: TABLE; Schema: public; Owner: tsunyoku
+--
+
+CREATE TABLE public.punishments (
+                                    id integer NOT NULL,
+                                    type text NOT NULL,
+                                    reason text NOT NULL,
+                                    target integer NOT NULL,
+                                    from integer NOT NULL,
+                                    time integer not NULL
+);
+
+
+ALTER TABLE public.punishments OWNER TO tsunyoku;
+
+--
+-- Name: punishments_id_seq; Type: SEQUENCE; Schema: public; Owner: tsunyoku
+--
+
+CREATE SEQUENCE public.punishments_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.punishments_id_seq OWNER TO tsunyoku;
+
+--
+-- Name: punishments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: tsunyoku
+--
+
+ALTER SEQUENCE public.punishments_id_seq OWNED BY public.punishments.id;
+
+ALTER TABLE ONLY public.punishments ALTER COLUMN id SET DEFAULT nextval('public.punishments_id_seq'::regclass);
 
 
 --

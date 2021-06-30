@@ -2,15 +2,19 @@ from objects import glob
 from objects.channel import Channel
 from objects.beatmap import Beatmap
 from objects.clan import Clan
-from objects.match import Slot, slotStatus, Teams, Match
+from objects.match import slotStatus, Teams, Match
 from packets import writer
 from constants.privs import Privileges, ClientPrivileges
 from constants.modes import osuModes
 from constants.types import teamTypes
+
 from typing import Optional
 from dataclasses import dataclass
 from cmyui import log, Ansi
+from datetime import datetime, timedelta
+
 import queue
+import time
 
 @dataclass
 class Stats:
@@ -59,6 +63,9 @@ class Player:
         self.last_ping: int = 0
         
         self.restricted: bool = False
+        self.frozen: bool = False
+        
+        self.freeze_timer: int = uinfo.get('freeze_timer', 0)
 
     @property
     def full_name(self):
@@ -79,7 +86,8 @@ class Player:
             country=user['country'],
             loc=[user['lon'], user['lat']],
             pw=user['md5'].decode(),
-            priv=Privileges(user['priv'])
+            priv=Privileges(user['priv']),
+            freeze_timer=datetime.fromtimestamp(user['freeze_timer'])
         )
 
         p.friends = []
@@ -93,12 +101,23 @@ class Player:
             
         if p.priv & Privileges.Restricted:
             p.restricted = True
-
+            
+        if p.priv & Privileges.Frozen:
+            p.frozen = True
+            
         return p
     
     @classmethod
-    async def from_sql(self, id):
-        user = await glob.db.fetchrow('SELECT * FROM users WHERE id = $1', id)
+    async def from_sql(self, spc):
+        
+        if isinstance(spc, str):
+            typ = 'name'
+        elif isinstance(spc, int):
+            typ = 'id'
+        else:
+            return # ?
+
+        user = await glob.db.fetchrow(f'SELECT * FROM users WHERE {typ} = $1', spc)
         
         if not user:
             return
@@ -113,11 +132,15 @@ class Player:
             country=0,
             loc=[0, 0],
             pw='',
-            priv=Privileges(user['priv']) 
+            priv=Privileges(user['priv']),
+            freeze_timer=datetime.fromtimestamp(user['freeze_timer'])
         )
         
         if p.priv & Privileges.Disallowed:
             p.restricted = True
+            
+        if p.priv & Privileges.Frozen:
+            p.frozen = True
         
         return p
 
@@ -215,6 +238,10 @@ class Player:
     @property
     def client_priv(self):
         priv = ClientPrivileges(0)
+        
+        if self.restricted:
+            priv |= ClientPrivileges.Player
+            return priv
 
         if self.priv & Privileges.Normal:
             priv |= ClientPrivileges.Player
@@ -394,40 +421,82 @@ class Player:
             
     # TODO: ban/unban, restrict/unrestrict webhooks
 
-    async def ban(self, reason):
+    async def ban(self, reason, fr):
+        if self.priv & Privileges.Banned:
+            return # ?
+
         await self.add_priv(Privileges.Banned)
 
         if self.token:
             self.enqueue(writer.userID(-3))
+            
+        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'ban', reason, self.id, fr.id, time.time())
 
-        log(f'{self.name} has been banned for {reason}')
+        log(f'{self.name} has been banned for {reason}.', Ansi.LBLUE)
+        
+    async def freeze(self, reason, fr):
+        expire = datetime.now() + timedelta(days=7)
+        
+        if self.frozen:
+            return # ?
+        
+        self.frozen = True
+        self.freeze_timer = expire
+        
+        await self.add_priv(Privileges.Frozen)
+        await glob.db.execute('UPDATE users SET freeze_timer = $1 WHERE id = $2', self.freeze_timer.timestamp(), self.id)
+
+        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'freeze', reason, self.id, fr.id, time.time())
+        
+        if self.token:
+            self.enqueue(writer.restartServer(0))
+        
+        log(f'{self.name} has been frozen for {reason}.', Ansi.LBLUE)
+        
+    async def unfreeze(self, reason):
+        if not self.frozen:
+            return # ?
+
+        self.frozen = False
+        self.freeze_timer = 0
+        
+        await self.remove_priv(Privileges.Frozen)
+        await glob.db.execute('UPDATE users SET freeze_timer = 0 WHERE id = $1', self.id)
+        
+        if self.token:
+            self.enqueue(writer.restartServer(0))
+        
+        log(f'{self.name} has been unfrozen for {reason}.', Ansi.LBLUE)
         
     async def unban(self, reason):
         await self.remove_priv(Privileges.Banned)
 
-        await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', self.priv, self.id)
-
-        log(f'{self.name} has been unbanned for {reason}')
+        log(f'{self.name} has been unbanned for {reason}.', Ansi.LBLUE)
         
-    async def restrict(self, reason):
-        await self.add_priv(Privileges.Restricted)
+    async def restrict(self, reason, fr):
+        if self.restricted:
+            return # ?
 
-        log(f'{self.name} has been restricted for {reason}')
+        await self.add_priv(Privileges.Restricted)
         
         self.restricted = True
 
         if self.token:
             self.enqueue(writer.restartServer(0)) # force relog if they're online
 
+        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'restrict', reason, self.id, fr.id, time.time())
+
+        log(f'{self.name} has been restricted for {reason}.', Ansi.LBLUE)
+
     async def unrestrict(self, reason):
         await self.remove_priv(Privileges.Restricted)
-
-        log(f'{self.name} has been unrestricted for {reason}')
         
         self.restricted = False
 
         if self.token:
             self.enqueue(writer.restartServer(0)) # force relog if they're online
+
+        log(f'{self.name} has been unrestricted for {reason}.', Ansi.LBLUE)
 
     def enqueue(self, b: bytes):
         self.queue.put_nowait(b)
