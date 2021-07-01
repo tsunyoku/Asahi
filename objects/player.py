@@ -52,6 +52,7 @@ class Player:
         self.mode_vn: int = 0 
         self.map_id: int = 0
         self.stats: dict[osuModes.value, Stats] = {}
+        self.achievements: list = []
 
         self.spectators: list[Player] = []
         self.spectating: Optional[Player] = None
@@ -108,6 +109,12 @@ class Player:
             
         if p.priv & Privileges.Frozen:
             p.frozen = True
+            
+        db_achs = await glob.db.fetch('SELECT ach FROM user_achievements WHERE uid = $1', p.id)
+        for db in db_achs:
+            for ach in glob.achievements:
+                if db['ach'] == ach.id:
+                    p.achievements.append(ach)
             
         return p
     
@@ -436,6 +443,15 @@ class Player:
             
         await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'ban', reason, self.id, fr.id, time.time())
 
+        for mode, stat in self.stats.items():
+            mode_name = mode.name
+
+            await glob.redis.zrem(f'asahi:leaderboard:{mode_name}', self.id)
+            await glob.redis.zrem(f'asahi:leaderboard:{mode_name}:{self.country_iso}', self.id)
+            
+            stat.rank = 0
+            stat.country_rank = 0
+            
         log(f'{self.name} has been banned for {reason}.', Ansi.LBLUE)
         
     async def freeze(self, reason, fr):
@@ -494,6 +510,15 @@ class Player:
 
         await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'restrict', reason, self.id, fr.id, time.time())
 
+        for mode, stat in self.stats.items():
+            mode_name = mode.name
+
+            await glob.redis.zrem(f'asahi:leaderboard:{mode_name}', self.id)
+            await glob.redis.zrem(f'asahi:leaderboard:{mode_name}:{self.country_iso}', self.id)
+
+            stat.rank = 0
+            stat.country_rank = 0
+
         log(f'{self.name} has been restricted for {reason}.', Ansi.LBLUE)
 
     async def unrestrict(self, reason, fr):
@@ -507,6 +532,10 @@ class Player:
             await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'unrestrict', reason, self.id, fr.id, time.time())
 
         log(f'{self.name} has been unrestricted for {reason}.', Ansi.LBLUE)
+        
+    async def unlock_ach(self, ach):
+        await glob.db.execute('INSERT INTO user_achievements (uid, ach) VALUES ($1, $2)', self.id, ach.id)
+        self.achievements.append(ach)
 
     def enqueue(self, b: bytes):
         self.queue.put_nowait(b)

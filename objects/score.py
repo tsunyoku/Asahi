@@ -41,6 +41,7 @@ class Score:
 
         self.rank: int = None
         self.pp: float = None
+        self.sr: float = None
 
         self.fc: bool = None
         self.passed: bool = None
@@ -146,7 +147,7 @@ class Score:
         s.grade = data[12] if s.passed else 'F'
 
         await s.calc_info()
-        s.pp = await s.calc_pp(s.mode.as_vn)
+        s.pp, s.sr = await s.calc_pp(s.mode.as_vn)
         await s.score_order()
         
         if s.user.restricted:
@@ -214,7 +215,7 @@ class Score:
                 ezpp.set_accuracy_percent(self.acc)
 
                 ezpp.calculate(path)
-                return ezpp.get_pp() # returning sr soontm
+                return (ezpp.get_pp(), ezpp.get_sr())
         elif self.mode.value == 3: # mania: use maniera
             if self.map.mode != 3:
                 return 0.0 # no convert support
@@ -227,7 +228,7 @@ class Score:
             c = Maniera(str(path), mods, self.score)
             c.calculate()
 
-            return c.pp
+            return (c.pp, c.sr)
         else: # ctb: use shitty osu-tools
 
             cmd = [f'./osu-tools/compiled/PerformanceCalculator simulate {nm} {str(path)}']
