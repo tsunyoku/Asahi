@@ -10,16 +10,39 @@ from constants.statuses import strStatuses
 import time
 import packets
 
+cmds = []
+
+def command(priv: Privileges = Privileges.Normal, name: str = None, elapsed: bool = True):
+    def wrapper(cmd_cb):
+        if name is not None:
+            cmds.append({
+                'name': name, 
+                'priv': priv, 
+                'elapsed': elapsed, 
+                'cb': cmd_cb, 
+                'desc': cmd_cb.__doc__
+            })
+        else:
+            log(f'Tried to add command with no name!', Ansi.LRED)
+        
+        return cmd_cb
+    return wrapper
+
+@command(name='help', elapsed=False)
 async def help(user, args):
+    """Displays all available commands to the user"""
     allowed_cmds = []
-    for cmd, req_priv in cmd_privs.items():
-        if user.priv & req_priv:
-            allowed_cmds.append(cmd)
+    for cmd in cmds:
+        if user.priv & cmd['priv']:
+            s = f'{glob.config.prefix}{cmd["name"]} - {cmd["desc"]}'
+            allowed_cmds.append(s)
 
     cmd_list = '\n'.join(allowed_cmds)
     return f'List of available commands:\n\n{cmd_list}'
 
+@command(priv=Privileges.Owner, name='add_priv')
 async def add_priv(user, args):
+    """Adds (a list of) privileges to a user"""
     if len(args) < 2:
         return f"You haven't provided a username and privileges!"
     
@@ -37,7 +60,9 @@ async def add_priv(user, args):
     await glob.db.execute("UPDATE users SET priv = $1 WHERE name = $2", int(priv), name)
     return f"Added privilege(s) {new_privs} to {name}."
 
+@command(priv=Privileges.Owner, name='rm_priv')
 async def rm_priv(user, args):
+    """Removes (a list of) privileges from a user"""
     if len(args) < 2:
         return f"You haven't provided a username and privileges!"
 
@@ -55,7 +80,9 @@ async def rm_priv(user, args):
     await glob.db.execute("UPDATE users SET priv = $1 WHERE name = $2", int(priv), name)
     return f"Removed privilege(s) {new_privs} from {name}."
 
+@command(name='battle')
 async def clan_battle(user, args):
+    """Battle other clans in a scrim-like multi lobby"""
     if args[0] in ('accept', 'deny'):
         if len(args) < 2:
             return f'Please accept/deny a battle and specify the clan!'
@@ -138,7 +165,9 @@ async def clan_battle(user, args):
 
     return f'Clan battle request sent to {clan.name} clan!'
 
+@command(priv=Privileges.Nominator, name='map')
 async def _map(user, args):
+    """Update map statuses on the server"""
     if len(args) != 2:
         return 'Please provide the new status & whether we should update the map/set! (!map <rank/love/unrank> <map/set>)'
 
@@ -172,7 +201,9 @@ async def _map(user, args):
 
     return 'Status updated!'
 
+@command(priv=Privileges.Admin, name='ban')
 async def ban(user, args):
+    """Ban a specified user for a specified reason"""
     if len(args) < 2:
         return f'You must provide a user and a reason to ban!'
     
@@ -186,7 +217,9 @@ async def ban(user, args):
     
     return f'User banned!'
 
+@command(priv=Privileges.Admin, name='unban')
 async def unban(user, args):
+    """Unban a specified user for a specified reason"""
     if len(args) < 2:
         return f'You must provide a user and a reason to unban!'
 
@@ -196,11 +229,13 @@ async def unban(user, args):
     if not (target := glob.players_name.get(username)):
         target = await Player.from_sql(username)
 
-    await target.unban(reason=reason)
+    await target.unban(reason=reason, fr=user)
 
     return f'User unbanned!'
 
+@command(priv=Privileges.Admin, name='restrict')
 async def restrict(user, args):
+    """Restrict a specified user for a specified reason"""
     if len(args) < 2:
         return f'You must provide a user and a reason to restrict!'
 
@@ -214,7 +249,9 @@ async def restrict(user, args):
 
     return f'User restricted!'
 
+@command(priv=Privileges.Admin, name='unrestrict')
 async def unrestrict(user, args):
+    """Unrestrict a specified user for a specified reason"""
     if len(args) < 2:
         return f'You must provide a user and a reason to unrestrict!'
 
@@ -224,11 +261,13 @@ async def unrestrict(user, args):
     if not (target := glob.players_name.get(username)):
         target = await Player.from_sql(username)
 
-    await target.unrestrict(reason=reason)
+    await target.unrestrict(reason=reason, fr=user)
 
     return f'User unrestricted!'
 
+@command(priv=Privileges.Admin, name='freeze')
 async def freeze(user, args):
+    """Freeze a specified user for a specified reason"""
     if len(args) < 2:
         return f'You must provide a user and a reason to freeze!'
 
@@ -245,7 +284,9 @@ async def freeze(user, args):
 
     return f'User frozen!'
 
+@command(priv=Privileges.Admin, name='unfreeze')
 async def unfreeze(user, args):
+    """Unfreeze a specified user for a specified reason"""
     if len(args) < 2:
         return f'You must provide a user and a reason to unfreeze!'
 
@@ -255,73 +296,32 @@ async def unfreeze(user, args):
     if not (target := glob.players_name.get(username)):
         target = await Player.from_sql(username)
 
-    await target.unfreeze(reason=reason)
+    await target.unfreeze(reason=reason, fr=user)
 
     return f'User unfrozen!'
 
-# TODO: command decorators
-
-privs = {
-    'normal': Privileges.Normal,
-    'verified': Privileges.Verified,
-    'supporter': Privileges.Supporter,
-    'nominator': Privileges.Nominator,
-    'admin': Privileges.Admin,
-    'developer': Privileges.Developer,
-    'owner': Privileges.Owner,
-    'master': Privileges.Master,
-    'staff': Privileges.Staff,
-    'manager': Privileges.Manager
-}
-
-cmds = {
-    '!addpriv': add_priv,
-    '!rmpriv': rm_priv,
-    '!help': help,
-    '!battle': clan_battle,
-    '!map': _map,
-    '!ban': ban,
-    '!unban': unban,
-    '!freeze': freeze,
-    '!unfreeze': unfreeze,
-    '!restrict': restrict,
-    '!unrestrict': unrestrict
-}
-
-cmd_privs = {
-    '!addpriv': Privileges.Owner,
-    '!rmpriv': Privileges.Owner,
-    '!help': Privileges.Normal,
-    '!battle': Privileges.Normal,
-    '!map': Privileges.Nominator,
-    '!ban': Privileges.Admin,
-    '!unban': Privileges.Admin,
-    '!freeze': Privileges.Admin,
-    '!unfreeze': Privileges.Admin,
-    '!restrict': Privileges.Admin,
-    '!unrestrict': Privileges.Admin
-}
-
-async def process(user, target, msg):
+async def process(user, msg):
     start = time.time()
     args = msg.split()
-    c = args[0]
-    if c in cmds.keys():
-        if user.priv & cmd_privs[c]:
-            cmd = cmds[c]
+    ct = args[0].split(glob.config.prefix)[1]
+    for c in cmds:
+        cmd = c['name']
+        
+        if cmd == ct:
+            if not user.priv & c['priv']:
+                return 'You have insufficient permissions to perform this command!'
 
-            if c != '!help':
+            cb = c['cb']
+            o = await cb(user, args[1:])
+
+            if c['elapsed']:
                 elapsed = f'| Time Elapsed: {(time.time() - start) * 1000:.2f}ms'
             else:
                 elapsed = ''
 
-            c = await cmd(user, args[1:])
-
-            if c is not None:
-                return f'{await cmd(user, args[1:])} {elapsed}'
-
-            return
-        else:
-            return f'You have insufficient permissions to perform this command!'
+            if o:
+                return f'{o} {elapsed}'
+            
+            return # we still wanna end the loop even if theres no text to return
     else:
-        return f'Unknown command! Use !help for a list of commands.'
+        return 'Unknown command! Use !help for a list of commands.'

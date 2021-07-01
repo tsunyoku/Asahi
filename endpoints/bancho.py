@@ -111,10 +111,9 @@ async def send_pm(user: Player, p):
         return
 
     if target is glob.bot:
-    
-        if msg.startswith('!'):
-            cmd = await commands.process(user, target, msg)
-            if cmd is not None:
+        if msg.startswith(glob.config.prefix):
+            cmd = await commands.process(user, msg)
+            if cmd:
                 user.enqueue(writer.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
         elif m := regexes.np_regex.match(msg):
             user.np = await Beatmap.bid_fetch(int(m['bid']))

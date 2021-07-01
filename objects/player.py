@@ -8,13 +8,16 @@ from constants.privs import Privileges, ClientPrivileges
 from constants.modes import osuModes
 from constants.types import teamTypes
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from dataclasses import dataclass
 from cmyui import log, Ansi
 from datetime import datetime, timedelta
 
 import queue
 import time
+
+if TYPE_CHECKING:
+    from objects.score import Score
 
 @dataclass
 class Stats:
@@ -57,6 +60,7 @@ class Player:
         self.match: Optional[Match] = None
 
         self.np: Optional[Beatmap] = None
+        self.last_score: Optional[Score] = None
 
         self.clan: Optional[Clan] = None
 
@@ -453,7 +457,7 @@ class Player:
         
         log(f'{self.name} has been frozen for {reason}.', Ansi.LBLUE)
         
-    async def unfreeze(self, reason):
+    async def unfreeze(self, reason, fr):
         if not self.frozen:
             return # ?
 
@@ -462,15 +466,19 @@ class Player:
         
         await self.remove_priv(Privileges.Frozen)
         await glob.db.execute('UPDATE users SET freeze_timer = 0 WHERE id = $1', self.id)
+
+        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'unfreeze', reason, self.id, fr.id, time.time())
         
         if self.token:
             self.enqueue(writer.restartServer(0))
         
         log(f'{self.name} has been unfrozen for {reason}.', Ansi.LBLUE)
         
-    async def unban(self, reason):
+    async def unban(self, reason, fr):
         await self.remove_priv(Privileges.Banned)
 
+        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'unban', reason, self.id, fr.id, time.time())
+    
         log(f'{self.name} has been unbanned for {reason}.', Ansi.LBLUE)
         
     async def restrict(self, reason, fr):
@@ -488,13 +496,15 @@ class Player:
 
         log(f'{self.name} has been restricted for {reason}.', Ansi.LBLUE)
 
-    async def unrestrict(self, reason):
+    async def unrestrict(self, reason, fr):
         await self.remove_priv(Privileges.Restricted)
         
         self.restricted = False
 
         if self.token:
             self.enqueue(writer.restartServer(0)) # force relog if they're online
+
+            await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'unrestrict', reason, self.id, fr.id, time.time())
 
         log(f'{self.name} has been unrestricted for {reason}.', Ansi.LBLUE)
 
@@ -506,6 +516,3 @@ class Player:
             return self.queue.get_nowait()
         except queue.Empty:
             pass
-
-    def queue_empty(self):
-        return self.queue.empty()
