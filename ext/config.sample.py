@@ -55,3 +55,9 @@ pp_caps = (
 
     1200 # autopilot std
 )
+
+# these are used for osu!direct mirror. i understand some people may find this sketchy but the entire code is open source so you can see what is using it.
+# the only place these are used are in endpoints/web.py, but feel free to check if you are worried.
+# obviously, if you don't want to provide these then you can just edit the code to use a beatmap mirror instead
+bancho_username = ''
+bancho_hashed_password = '' # md5 hash of your password, you can generate an md5 hash here: https://www.md5hashgenerator.com/

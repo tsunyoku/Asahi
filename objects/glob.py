@@ -34,5 +34,6 @@ matches = {} # matches dict | matches[id] = match
 clans = {} # clans dict | clan[id] = clan
 clan_battles = {} # clan battles dict | clan_battle[clan1/clan2] = dict of info
 menus = {} # ingame menus dict | menu[id] = menu
+achievements = []
 
 bot: 'Player'

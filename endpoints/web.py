@@ -73,7 +73,7 @@ async def uploadScreenshot(request):
         return b'missing screenshot'
 
     if screenshot[:4] == b'\xff\xd8\xff\xe0' and screenshot[6:11] == b'JFIF\x00':
-        extension = 'jpeg'
+        extension = 'jpg'
     else:
         extension = 'png'
 
@@ -85,9 +85,13 @@ async def uploadScreenshot(request):
 @web.route("/ss/<scr>")
 async def getScreenshot(request, scr):
     ss = ss_path / scr
+    type = scr.split('.')[1]
 
     if ss.exists():
-        return ss.read_bytes()
+        ssb = ss.read_bytes()
+        request.resp_headers['Content-Type'] = f'image/{type}'
+        request.resp_headers['Content-Length'] = len(ssb)
+        return ssb
     else:
         return b'could not find screenshot'
 
@@ -108,17 +112,10 @@ async def getFriends(request):
     p = glob.players_name.get(args['u'], request)
     return '\n'.join(map(str, p.friends)).encode()
 
-# doesnt work xd
-# @web.route("/d/<mid>")
-# async def mapDownload(request, mid): # CURSED XD
-#     async with glob.web.get(f'http://tsuki.host/d/{mid}') as m:
-#         if not (c := m.headers.get('Content-Disposition', '')):
-#             return b''
-
-#         request.resp_headers['Content-Description'] = 'File Transfer'
-#         request.resp_headers['Content-Disposition'] = c
-#         request.resp_headers['Content-Type'] = 'application/octet-stream; charset=UTF-8'
-#         return await m.read()
+@web.route("/d/<mid>")
+async def mapDownload(request, mid):
+    request.resp_headers['Location'] = f'https://osu.gatari.pw/d/{mid}' # reliable downloads
+    return (301, b'') # redirect
 
 @web.route("/web/osu-search.php")
 async def osuSearch(request):
@@ -126,17 +123,21 @@ async def osuSearch(request):
     if not auth(args['u'], args['h'], request):
         return b''
 
-    direct_args = {}
-    for key, _ in args.items():
-        direct_args[key] = args[key]
-
-    async with glob.web.get("http://tsuki.host/web/osu-search.php", params=direct_args) as resp:
-        if resp.status != 200:
-            return b'0'
-
-        ret = await resp.read()
-
-    return ret
+    a = 0
+    argstr = f'?'
+    
+    args['u'] = glob.config.bancho_username
+    args['h'] = glob.config.bancho_hashed_password
+    
+    for key, val in args.items():
+        if a == 0:
+            argstr += f'{key}={val}'
+            a = 1
+        else:
+            argstr += f'&{key}={val}'
+            
+    request.resp_headers['Location'] = f'https://osu.ppy.sh/web/osu-search.php{argstr}'
+    return (301, b'')
 
 @web.route("/web/osu-search-set.php")
 async def osuSearchSet(request):
@@ -144,17 +145,21 @@ async def osuSearchSet(request):
     if not auth(args['u'], args['h'], request):
         return b''
 
-    direct_args = {}
-    for key, _ in args.items():
-        direct_args[key] = args[key]
+    a = 0
+    argstr = f'?'
 
-    async with glob.web.get("http://tsuki.host/web/osu-search-set.php", params=direct_args) as resp:
-        if resp.status != 200:
-            return b''
+    args['u'] = glob.config.bancho_username
+    args['h'] = glob.config.bancho_hashed_password
 
-        ret = await resp.read()
+    for key, val in args.items():
+        if a == 0:
+            argstr += f'{key}={val}'
+            a = 1
+        else:
+            argstr += f'&{key}={val}'
 
-    return ret
+    request.resp_headers['Location'] = f'https://osu.ppy.sh/web/osu-search-set.php{argstr}'
+    return (301, b'')
 
 @web.route("/users", ['POST'])
 async def ingameRegistration(request):
@@ -323,7 +328,7 @@ async def scoreSubmit(request):
     
     cap = glob.config.pp_caps[s.mode.value]
 
-    if cap is not None and s.pp >= cap and glob.config.anticheat and not s.user.restricted:
+    if cap is not None and s.pp >= cap and s.map.status & mapStatuses.GIVE_PP and glob.config.anticheat and not s.user.restricted:
         await s.user.restrict(reason='Exceeding PP cap', fr=glob.bot)
 
     # update stats EEEEEEE
@@ -341,7 +346,8 @@ async def scoreSubmit(request):
         if s.combo > old.max_combo:
             stats.max_combo = s.combo
         
-        stats.rscore += add
+        if s.map.status & mapStatuses.GIVE_PP:
+            stats.rscore += add
 
     stats.tscore += s.score
 
@@ -351,6 +357,20 @@ async def scoreSubmit(request):
     if s.mods & Mods.GAME_CHANGING or s.status == scoreStatuses.Failed:
         log(f'[{s.mode!r}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
         return b'error: no' # not actually erroring, score is already submitted we just want client to stop request as we cannot provide chart
+    
+    if s.map.status & mapStatuses.GIVE_PP and not s.user.restricted:
+        achs = []
+        for ach in glob.achievements:
+            if ach in s.user.achievements:
+                continue
+                
+            if ach.cond(s):
+                await s.user.unlock_ach(ach)
+                achs.append(ach)
+                
+        achievements = '/'.join([a.format for a in achs])
+    else:
+        achievements = ''
 
     charts = []
 
@@ -414,7 +434,9 @@ async def scoreSubmit(request):
             chart_format('maxCombo', None, stats.max_combo),
             chart_format('accuracy', None, round(stats.acc, 2)),
             chart_format('pp', None, stats.pp)
-        ))
+        )),
+        
+        f'achievements-new:{achievements}'
     )))
 
     if s.status == scoreStatuses.Best and s.rank == 1 and s.map.status >= mapStatuses.Ranked:

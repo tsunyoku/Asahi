@@ -324,4 +324,4 @@ async def process(user, msg):
             
             return # we still wanna end the loop even if theres no text to return
     else:
-        return 'Unknown command! Use !help for a list of commands.'
+        return f'Unknown command! Use {glob.config.prefix}help for a list of available commands.'

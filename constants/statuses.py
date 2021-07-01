@@ -8,6 +8,8 @@ class mapStatuses(IntEnum):
     Approved = 3
     Qualified = 4
     Loved = 5
+    
+    GIVE_PP = Ranked | Approved
 
 def strStatuses(status: str):
     if status == 'rank':

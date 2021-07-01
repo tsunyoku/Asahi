@@ -15,13 +15,16 @@ from objects import glob # glob = global, server-wide objects will be stored her
 from objects.player import Player # Player - player object to store stats, info etc.
 from objects.channel import Channel # Channel - channel object to store name, desc etc.
 from objects.clan import Clan
+from objects.achievement import Achievement
 from constants.countries import country_codes
+
+from endpoints.assets import assets, init_customs
 
 app = Xevel(glob.config.socket) # handler for webserver :D
 
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
 
-glob.version = Version(0, 3, 0) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 3, 1) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
@@ -31,6 +34,7 @@ RRX_PATH = Path.cwd() / 'resources/replays_rx'
 RAP_PATH = Path.cwd() / 'resources/replays_ap'
 
 MAPS_PATH = Path.cwd() / 'resources/maps'
+ACHIEVEMENTS_PATH = Path.cwd() / 'resources/achievements'
 
 @app.before_serving()
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
@@ -70,6 +74,9 @@ async def connect(): # ran before server startup, used to do things like connect
 
     if not MAPS_PATH.exists():
         MAPS_PATH.mkdir(parents=True)
+        
+    if not ACHIEVEMENTS_PATH.exists():
+        ACHIEVEMENTS_PATH.mkdir(parents=True)
 
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetchrow('SELECT name, pw, country, name FROM users WHERE id = 1')
@@ -80,6 +87,13 @@ async def connect(): # ran before server startup, used to do things like connect
     glob.bot = bot # might be useful in the future?
     if glob.config.debug:
         log(f"==== Added bot {bot.name} to player list ====", Ansi.GREEN)
+        
+    async with glob.db.transaction():
+        async for ach in glob.db.cursor('SELECT * FROM achievements'):
+            achievement = Achievement(id=ach['id'], image=ach['image'], name=ach['name'], desc=ach['descr'], cond=eval(f'lambda s: {ach["cond"]}'), custom=ach['custom'])
+            glob.achievements.append(achievement)
+            
+    init_customs() # set custom achievements list for assets proxy
 
     # add all channels to cache
     async with glob.db.transaction():
@@ -151,6 +165,7 @@ app.add_router(bancho)
 app.add_router(avatars)
 app.add_router(web)
 app.add_router(api)
+app.add_router(assets)
 
 if __name__ == '__main__':
     dc.load_extension('disc.bot')
