@@ -8,7 +8,6 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
 
 import string
 import random
-import os
 import hashlib
 import time
 import orjson
@@ -21,6 +20,7 @@ from objects.score import Score
 from constants.modes import lbModes
 from constants.statuses import mapStatuses, scoreStatuses
 from constants.mods import Mods
+from constants.flags import osuFlags
 from objects.leaderboard import Leaderboard
 from constants import regexes
 from packets import writer
@@ -437,6 +437,8 @@ async def scoreSubmit(request):
         
     if s.status == scoreStatuses.Best and s.map.status >= mapStatuses.Ranked:
         threading.Thread(target=s.map.lb.set_user_pb, args=(s.user, s,)).start()
+        
+    s.user.last_score = s
 
     log(f'[{s.mode!r}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
     return '\n'.join(charts).encode() # thank u osu
@@ -478,25 +480,19 @@ async def lastFM(request):
     flags = int(b[1:])
 
     # this is quite ugly but whatev
-    if flags & 1 << 1: # speed hack
+    if flags & osuFlags.SpeedHackDetected: # speed hack
         return await player.restrict(reason='osu!anticheat flags (speed hack)', fr=glob.bot)
-    if flags & 1 << 4: # checksum failure
-        return await player.restrict(reason='osu!anticheat flags (checksum failure)', fr=glob.bot)
-    if flags & 1 << 5: # fl tampering
+    if flags & osuFlags.FL_CHEAT: # fl tampering
         return await player.restrict(reason='osu!anticheat flags (fl cheating)', fr=glob.bot)
-    if flags & 1 << 8: # fl hack (tampering v2):
-        return await player.restrict(reason='osu!anticheat flags (fl cheating)', fr=glob.bot)
-    if flags & 1 << 9: # spin hack
+    if flags & osuFlags.SpinnerHack: # spin hack
         return await player.restrict(reason='osu!anticheat flags (spin hack)', fr=glob.bot)
-    if flags & 1 << 10: # transparent window?
-        return await player.restrict(reason='osu!anticheat flags (transparent window)', fr=glob.bot)
-    if flags & 1 << 11: # mania fast presses:
+    if flags & osuFlags.FastPress: # mania fast presses:
         return await player.restrict(reason='osu!anticheat flags (mania fast presses)', fr=glob.bot)
-    if flags & 1 << 12 or flags & 1 << 13: # autobot
+    if flags & osuFlags.AUTO_BOT: # autobot
         return await player.restrict(reason='osu!anticheat (autobot)', fr=glob.bot)
-    if flags & 1 << 14 or flags & 1 << 15 or flags & 1 << 16 or flags & 1 << 17 or flags & 1 << 18: # hqosu
+    if flags & osuFlags.HQ_RELATED: # hqosu
         return await player.restrict(reason='osu!anticheat flags (hqosu)', fr=glob.bot)
-    if flags & 1 << 20: # old aqn (enlighten crack most likely xd)
-        return await player.restrict(reason='osu!anticheat flags (old aqn)', fr=glob.bot)
+    if flags & osuFlags.AQN_RELATED: # old aqn
+        return await player.restrict(reason='osu!anticheat flags (aqn)', fr=glob.bot)
 
     return b'-3'

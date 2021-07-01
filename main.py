@@ -46,11 +46,7 @@ async def connect(): # ran before server startup, used to do things like connect
         log(f'==== Asahi failed to connect to PostgreSQL ====\n\n{error}', Ansi.LRED)
 
     try:
-        if glob.config.redis['password'] != '':
-            glob.redis = await aioredis.create_redis_pool(f"redis://{glob.config.redis['host']}", db=glob.config.redis['db'], password=glob.config.redis['password'])
-        else:
-            glob.redis = await aioredis.create_redis_pool(f"redis://{glob.config.redis['host']}", db=glob.config.redis['db'])
-
+        glob.redis = await aioredis.create_redis_pool(f"redis://{glob.config.redis['host']}", db=glob.config.redis['db'], password=glob.config.redis['password'] or None)
         if glob.config.debug:
             log('==== Asahi connected to Redis ====', Ansi.GREEN)
     except Exception as error:

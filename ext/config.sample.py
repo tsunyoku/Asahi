@@ -26,6 +26,9 @@ menu_bgs = [] # list of seasonal backgrounds to display on osu menu | you can li
 
 api_key = '' # osu api key for map info, can be obtained at https://old.ppy.sh/p/api
 
+# prefix for ingame cmds
+prefix = '!'
+
 # prefix for discord bot cmds
 bot_prefix = '!'
 
