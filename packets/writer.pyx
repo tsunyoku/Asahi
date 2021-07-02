@@ -5,7 +5,6 @@ from constants.types import osuTypes
 from objects.match import slotStatus, Teams, Match
 
 from enum import IntEnum, unique
-from functools import cache
 
 _spec = ('<b', '<B', '<h', '<H', '<i', '<I', '<f', '<q', '<Q', '<d')
 
@@ -120,7 +119,7 @@ class Packets(IntEnum):
     OSU_TOURNAMENT_JOIN_MATCH_CHANNEL = 108
     OSU_TOURNAMENT_LEAVE_MATCH_CHANNEL = 109
 
-def write_uleb128(val: int) -> bytearray:
+cpdef bytearray write_uleb128(int val):
     if val == 0:
         return bytearray(b'\x00')
 
@@ -137,7 +136,7 @@ def write_uleb128(val: int) -> bytearray:
 
     return d
 
-def write_string(s: str) -> bytearray:
+cpdef bytearray write_string(str s):
     if not s:
         return bytearray(b"\x00")
 
@@ -148,7 +147,7 @@ def write_string(s: str) -> bytearray:
 
     return d
 
-def write_i32_list(l) -> bytearray:
+cpdef bytearray write_i32_list(l):
     d = bytearray(len(l).to_bytes(2, 'little'))
 
     for i in l:
@@ -156,7 +155,12 @@ def write_i32_list(l) -> bytearray:
 
     return d
 
-def write_message(fr: str, msg: str, to: str, fromid: int) -> bytearray:
+cpdef bytearray write_message(tuple args):
+    cpdef str fr = args[0]
+    cpdef str msg = args[1]
+    cpdef str to = args[2]
+    cpdef int fromid = args[3]
+
     d = bytearray(write_string(fr))
 
     d += write_string(msg)
@@ -166,7 +170,11 @@ def write_message(fr: str, msg: str, to: str, fromid: int) -> bytearray:
 
     return d
 
-def write_channel(name: str, desc: str, p: int) -> bytearray:
+cpdef bytearray write_channel(tuple args):
+    cpdef str name = args[0]
+    cpdef str desc = args[1]
+    cpdef int p = args[2]
+
     d = bytearray(write_string(name))
 
     d += write_string(desc)
@@ -174,7 +182,10 @@ def write_channel(name: str, desc: str, p: int) -> bytearray:
 
     return d
 
-def write_match(m, send_pw) -> bytearray:
+cpdef bytearray write_match(tuple args):
+    cpdef m = args[0]
+    cpdef send_pw = args[1]
+
     if m.pw:
         if send_pw:
             pw = write_string(m.pw)
@@ -210,7 +221,11 @@ def write_match(m, send_pw) -> bytearray:
 
     return r
 
+# CURSED
 def write(pid: int, *args) -> bytes:
+    return cp_write(pid, args)
+
+cdef bytes cp_write(int pid, tuple args):
     d = bytearray(struct.pack('<Hx', pid))
 
     for a, t in args:
@@ -221,30 +236,27 @@ def write(pid: int, *args) -> bytes:
         elif t == osuTypes.i32_list:
             d += write_i32_list(a)
         elif t == osuTypes.message:
-            d += write_message(*a)
+            d += write_message(a)
         elif t == osuTypes.channel:
-            d += write_channel(*a)
+            d += write_channel(a)
         elif t == osuTypes.match:
-            d += write_match(*a)
+            d += write_match(a)
         else:
             d += struct.pack(_spec[t], a)
 
     d[3:3] = struct.pack('<I', len(d) - 3)
     return bytes(d)
 
-@cache
-def userID(id: int) -> bytes:
+cpdef bytes userID(int id):
     return write(Packets.CHO_USER_ID, (id, osuTypes.i32))
 
-@cache
-def protocolVersion(ver: int) -> bytes:
+cpdef bytes protocolVersion(int ver):
     return write(Packets.CHO_PROTOCOL_VERSION, (ver, osuTypes.i32))
 
-@cache
-def banchoPrivileges(priv: int) -> bytes:
+cpdef bytes banchoPrivileges(int priv):
     return write(Packets.CHO_PRIVILEGES, (priv, osuTypes.i32))
 
-def botPresence(player) -> bytes:
+cpdef bytes botPresence(player):
     return write(
         Packets.CHO_USER_PRESENCE,
         (player.id, osuTypes.i32),
@@ -257,7 +269,7 @@ def botPresence(player) -> bytes:
         (0, osuTypes.i32)
     )
 
-def userPresence(player) -> bytes:
+cpdef bytes userPresence(player):
     if player is glob.bot:
         return botPresence(player)
 
@@ -273,7 +285,7 @@ def userPresence(player) -> bytes:
         (player.current_stats.rank, osuTypes.i32)
     )
 
-def botStats() -> bytes:
+cpdef bytes botStats():
     return write(
         Packets.CHO_USER_STATS,
         (1, osuTypes.i32),
@@ -291,7 +303,7 @@ def botStats() -> bytes:
         (0, osuTypes.i16) # pp
     )
 
-def userStats(player) -> bytes:
+cpdef bytes userStats(player):
     if player is glob.bot:
         return botStats()
 
@@ -312,119 +324,96 @@ def userStats(player) -> bytes:
         (player.current_stats.pp, osuTypes.i16) # pp
     )
 
-def notification(msg: str) -> bytes:
+cpdef bytes notification(str msg):
     return write(Packets.CHO_NOTIFICATION, (msg, osuTypes.string))
 
-@cache
-def channelInfoEnd() -> bytes:
+cpdef bytes channelInfoEnd():
     return write(Packets.CHO_CHANNEL_INFO_END)
 
-@cache
-def restartServer(time: int) -> bytes:
+cpdef bytes restartServer(int time):
     return write(Packets.CHO_RESTART, (time, osuTypes.i32))
 
-@cache
-def menuIcon() -> bytes:
+cpdef bytes menuIcon():
     return write(Packets.CHO_MAIN_MENU_ICON, (f'{glob.config.menu_image}|{glob.config.menu_url}', osuTypes.string))
 
-def friends(friends) -> bytes:
-    return write(Packets.CHO_FRIENDS_LIST, (friends, osuTypes.i32_list)) # force just user itself for now to make sure it works
+cpdef bytes friends(friendsl):
+    return write(Packets.CHO_FRIENDS_LIST, (friendsl, osuTypes.i32_list))
 
-@cache
-def silenceEnd(unix: int) -> bytes:
+cpdef bytes silenceEnd(int unix):
     return write(Packets.CHO_SILENCE_END, (unix, osuTypes.i32))
 
-def sendMessage(fromname: str, msg: str, tarname: str, fromid: int) -> bytes:
+cpdef bytes sendMessage(str fromname, str msg, str tarname, int fromid):
     return write(Packets.CHO_SEND_MESSAGE, ((fromname, msg, tarname, fromid), osuTypes.message))
 
-@cache
-def logout(uid: int) -> bytes:
+cpdef bytes logout(int uid):
     return write(Packets.CHO_USER_LOGOUT, (uid, osuTypes.i32), (0, osuTypes.u8)) # delay for logout ????
 
-@cache
-def blockDM() -> bytes:
+cpdef bytes blockDM():
     return write(Packets.CHO_USER_DM_BLOCKED)
 
-@cache
-def spectatorJoined(uid: int) -> bytes:
+cpdef bytes spectatorJoined(int uid):
     return write(Packets.CHO_FELLOW_SPECTATOR_JOINED, (uid, osuTypes.i32))
 
-@cache
-def hostSpectatorJoined(uid: int) -> bytes:
+cpdef bytes hostSpectatorJoined(int uid):
     return write(Packets.CHO_SPECTATOR_JOINED, (uid, osuTypes.i32))
 
-@cache
-def spectatorLeft(uid: int) -> bytes:
+cpdef bytes spectatorLeft(int uid):
     return write(Packets.CHO_FELLOW_SPECTATOR_LEFT, (uid, osuTypes.i32))
 
-@cache
-def hostSpectatorLeft(uid: int) -> bytes:
+cpdef bytes hostSpectatorLeft(int uid):
     return write(Packets.CHO_SPECTATOR_LEFT, (uid, osuTypes.i32))
 
-def spectateFrames(frames: bytes) -> bytes:
+cpdef bytes spectateFrames(bytes frames):
     return write(Packets.CHO_SPECTATE_FRAMES, (frames, osuTypes.raw))
 
-def channelJoin(chan: str) -> bytes:
+cpdef bytes channelJoin(str chan):
     return write(Packets.CHO_CHANNEL_JOIN_SUCCESS, (chan, osuTypes.string))
 
-def channelInfo(chan) -> bytes:
+cpdef bytes channelInfo(chan):
     return write(Packets.CHO_CHANNEL_INFO, ((chan.name, chan.desc, chan.count), osuTypes.channel))
 
-def channelKick(chan: str) -> bytes:
+cpdef bytes channelKick(str chan):
     return write(Packets.CHO_CHANNEL_KICK, (chan, osuTypes.string))
 
-@cache
-def matchJoinFail() -> bytes:
+cpdef bytes matchJoinFail():
     return write(Packets.CHO_MATCH_JOIN_FAIL)
 
-def matchJoinSuccess(match) -> bytes:
+cpdef bytes matchJoinSuccess(match):
     return write(Packets.CHO_MATCH_JOIN_SUCCESS, ((match, True), osuTypes.match))
 
-def updateMatch(match, send_pw) -> bytes:
+cpdef bytes updateMatch(match, send_pw):
     return write(Packets.CHO_UPDATE_MATCH, ((match, send_pw), osuTypes.match))
 
-@cache
-def disposeMatch(id) -> bytes:
+cpdef bytes disposeMatch(id):
     return write(Packets.CHO_DISPOSE_MATCH, (id, osuTypes.i32))
 
-@cache
-def matchTransferHost() -> bytes:
+cpdef bytes matchTransferHost():
     return write(Packets.CHO_MATCH_TRANSFER_HOST)
 
-def matchStart(match) -> bytes:
+cpdef bytes matchStart(match):
     return write(Packets.CHO_MATCH_START, ((match, True), osuTypes.match))
 
-@cache
-def matchComplete() -> bytes:
+cpdef bytes matchComplete():
     return write(Packets.CHO_MATCH_COMPLETE)
 
-@cache
-def matchAllLoaded() -> bytes:
+cpdef bytes matchAllLoaded():
     return write(Packets.CHO_MATCH_ALL_PLAYERS_LOADED)
 
-@cache
-def matchPlayerFailed(sid) -> bytes:
+cpdef bytes matchPlayerFailed(sid):
     return write(Packets.CHO_MATCH_PLAYER_FAILED, (sid, osuTypes.i32))
 
-@cache
-def matchSkip() -> bytes:
+cpdef bytes matchSkip():
     return write(Packets.CHO_MATCH_SKIP)
 
-@cache
-def matchPlayerSkipped(uid) -> bytes:
+cpdef bytes matchPlayerSkipped(uid):
     return write(Packets.CHO_MATCH_PLAYER_SKIPPED, (uid, osuTypes.i32))
 
-@cache
-def matchTransferHost() -> bytes:
-    return write(Packets.CHO_MATCH_TRANSFER_HOST)
-
-@cache
-def versionUpdateForced() -> bytes:
+cpdef bytes versionUpdateForced():
     return write(Packets.CHO_VERSION_UPDATE_FORCED)
 
-def matchInvite(f, to) -> bytes:
+cpdef bytes matchInvite(f, to):
     msg = f'{f.name} invited you to join {f.match.embed}!'
     return write(Packets.CHO_MATCH_INVITE, ((f.name, msg, to, f.id), osuTypes.message))
 
-def newMatch(m) -> bytes:
+cpdef bytes newMatch(m):
     return write(Packets.CHO_NEW_MATCH, ((m, True), osuTypes.match))

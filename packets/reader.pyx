@@ -31,7 +31,7 @@ types = { # lambda = cursed lmfao
     osuTypes.raw: lambda rd: rd.read_raw()
 }
 
-def handle_packet(data: bytes, struct: tuple) -> dict:
+cpdef dict handle_packet(data: bytes, struct: tuple):
     rd = Reader(data)
     d = {}
     
@@ -46,19 +46,24 @@ def handle_packet(data: bytes, struct: tuple) -> dict:
         
     return d
 
-class Reader:
+cdef class Reader:
+    cpdef public bytes data
+    cpdef public int offset
+    cpdef public int pid
+    cpdef public int length
+
     def __init__(self, data: bytes):
         self.data = data
         self.offset = 0
         self.pid, self.length = self.packet_lid()
         
-    def packet_lid(self):
+    cpdef packet_lid(self):
         d = struct.unpack('<HxI', self.data[self.offset:self.offset + 7])
 
         self.offset += 7
         return d[0], d[1]
     
-    def read_i8(self):
+    cpdef read_i8(self):
         d = self.data[self.offset:self.offset + 1]
         
         self.offset += 1
@@ -68,70 +73,70 @@ class Reader:
         
         return d[0]
     
-    def read_u8(self):
+    cpdef read_u8(self):
         d = self.data[self.offset:self.offset + 1]
         
         self.offset += 1
         
         return d[0]
     
-    def read_i16(self):
+    cpdef read_i16(self):
         d = struct.unpack('<h', self.data[self.offset:self.offset + 2])
         
         self.offset += 2
         
         return d[0]
     
-    def read_u16(self):
+    cpdef read_u16(self):
         d = struct.unpack('<H', self.data[self.offset:self.offset + 2])
         
         self.offset += 2
         
         return d[0]
     
-    def read_i32(self):
+    cpdef read_i32(self):
         d = struct.unpack('<i', self.data[self.offset:self.offset + 4])
         
         self.offset += 4
         
         return d[0]
     
-    def read_u32(self):
+    cpdef read_u32(self):
         d = struct.unpack('<I', self.data[self.offset:self.offset + 4])
         
         self.offset += 4
         
         return d[0]
     
-    def read_f32(self):
+    cpdef read_f32(self):
         d = struct.unpack('<f', self.data[self.offset:self.offset + 4])
         
         self.offset += 4
         
         return d
     
-    def read_i64(self):
+    cpdef read_i64(self):
         d = struct.unpack('<q', self.data[self.offset:self.offset + 8])
         
         self.offset += 8
         
         return d[0]
     
-    def read_u64(self):
+    cpdef read_u64(self):
         d = struct.unpack('<Q', self.data[self.offset:self.offset + 8])
         
         self.offset += 8
         
         return d[0]
     
-    def read_f64(self):
+    cpdef read_f64(self):
         d = struct.unpack('<d', self.data[self.offset:self.offset + 8])
         
         self.offset += 8
         
         return d
     
-    def read_msg(self): # namedtuple = supreme
+    cpdef read_msg(self): # namedtuple = supreme
         return Message(
             fromname = self.read_string(),
             msg = self.read_string(),
@@ -139,14 +144,14 @@ class Reader:
             fromid = self.read_i32()
         )
     
-    def read_chan(self): # once again, namedtuple is base
+    cpdef read_chan(self): # once again, namedtuple is base
         return Channel(
             name = self.read_string(),
             desc = self.read_string(),
             players = self.read_i32()
         )
     
-    def read_match(self): # this is going to take a LOT of work to be functional i think
+    cpdef read_match(self): # this is going to take a LOT of work to be functional i think
         match = Match()
 
         self.data = self.data[3:]
@@ -189,7 +194,7 @@ class Reader:
     
         return match
     
-    def read_i32l(self):
+    cpdef read_i32l(self):
         l = self.read_i16()
         
         d = struct.unpack(f'<{"I" * l}', self.data[self.offset:self.offset + l * 4])
@@ -198,7 +203,7 @@ class Reader:
         
         return d
     
-    def read_i32l_4(self): # i dont think this is correct but whatev
+    cpdef read_i32l_4(self): # i dont think this is correct but whatev
         l = self.read_i32()
         
         d = struct.unpack(f'<{"I" * l}', self.data[self.offset:self.offset + l * 4])
@@ -207,7 +212,7 @@ class Reader:
         
         return d
     
-    def read_uleb128(self, val): # fuck me
+    cpdef read_uleb128(self, val): # fuck me
         s = 0
         b = 0
         a = [0, 0]
@@ -224,7 +229,7 @@ class Reader:
             
         return a
     
-    def read_string(self):
+    cpdef read_string(self):
         val = self.read_uleb128(self.data[self.offset + 1:])
         
         # i would like to report a bruh moment
@@ -238,7 +243,7 @@ class Reader:
         
         return d
     
-    def read_raw(self):
+    cpdef read_raw(self):
         d = self.data[self.offset:self.offset + self.length]
         
         self.offset += self.length
