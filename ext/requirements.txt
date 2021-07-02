@@ -9,3 +9,4 @@ aioredis
 asyncpg
 circleguard
 maniera
+cython

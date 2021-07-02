@@ -848,7 +848,7 @@ async def root_client(request: Request):
     if body[0] != 4:
         for pck, cb in pm.items():
             if body[0] == pck:
-                await cb(p, body)
+                await cb(p, bytes(body))
     
                 if glob.config.debug:
                     log(f'Packet {pck.name} handled for user {p.name}', Ansi.LMAGENTA)

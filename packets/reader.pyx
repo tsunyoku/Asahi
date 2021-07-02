@@ -31,17 +31,16 @@ types = { # lambda = cursed lmfao
     osuTypes.raw: lambda rd: rd.read_raw()
 }
 
-def handle_packet(data: bytes, struct: tuple) -> bytes:
+def handle_packet(data: bytes, struct: tuple) -> dict:
     rd = Reader(data)
     d = {}
     
     for s in struct:
         t = s[1]
+        r = types.get(t, None)
         
-        if not (r := types.get(t)):
-            print('failed lol')
-            print(t)
-            return b''
+        if not r:
+            d[s[0]] = b''
         
         d[s[0]] = r(rd)
         

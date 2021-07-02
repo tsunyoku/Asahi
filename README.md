@@ -32,12 +32,13 @@ Now, copy the config file and edit the config:
 cp ext/config.sample.py config.py
 ```
 
-We also want to compile the pp systems:
+We also want to compile the pp systems & packet handlers:
 ```bash
 chmod +x ext/osu-tools.sh
 ./ext/osu-tools.sh
 chmod +x oppai-ng/libbuild
 ./oppai-ng/libbuild
+cd packets && python3.9 setup.py build_ext --inplace && cd ..
 ```
 
 Finally, start up Asahi:

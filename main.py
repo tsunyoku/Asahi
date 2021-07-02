@@ -24,7 +24,7 @@ app = Xevel(glob.config.socket) # handler for webserver :D
 
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
 
-glob.version = Version(0, 3, 1) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 3, 2) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
@@ -60,7 +60,7 @@ async def connect(): # ran before server startup, used to do things like connect
         AVA_PATH.mkdir(parents=True)
         log('Avatars folder has been created, please set a default avatar by placing a file named "default.png" into resources/avatars!', Ansi.LRED)
 
-    for directory in (SS_PATH. R_PATH, RRX_PATH, RAP_PATH, MAPS_PATH, ACHIEVEMENTS_PATH):
+    for directory in (SS_PATH, R_PATH, RRX_PATH, RAP_PATH, MAPS_PATH, ACHIEVEMENTS_PATH):
         if not directory.exists(): directory.mkdir(parents=True)
 
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
