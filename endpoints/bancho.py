@@ -17,6 +17,7 @@ from objects import glob # glob = global, server-wide objects will be stored her
 from objects.player import Player # Player - player object to store stats, info etc.
 from objects.beatmap import Beatmap # Beatmap - object to score map info etc.
 from objects.channel import Channel
+from objects.anticheat import Anticheat
 from objects.match import slotStatus, Teams
 from constants.countries import country_codes
 from constants.types import osuTypes, teamTypes
@@ -322,16 +323,16 @@ async def create_match(user: Player, p):
 @packet(Packets.OSU_JOIN_MATCH)
 async def join_match(user: Player, p):
     d = reader.handle_packet(p, (('id', osuTypes.i32), ('pw', osuTypes.string),))
-    id = d['id']
+    _id = d['id']
     pw = d['pw']
     
-    if id >= 1000:
-        if not (menu := glob.menus.get(id)):
+    if _id >= 1000:
+        if not (menu := glob.menus.get(_id)):
             return user.enqueue(writer.matchJoinFail())
         
         return await menu.handle(user)
     
-    if not (match := glob.matches.get(id)):
+    if not (match := glob.matches.get(_id)):
         return user.enqueue(writer.matchJoinFail())
     
     if match.clan_battle:
@@ -356,16 +357,16 @@ async def leave_match(user: Player, p):
         
 @packet(Packets.OSU_MATCH_CHANGE_SLOT)
 async def change_slot(user: Player, p):
-    id = (reader.handle_packet(p, (('id', osuTypes.i32),)))['id']
+    _id = (reader.handle_packet(p, (('id', osuTypes.i32),)))['id']
     
     if not (match := user.match):
         return
     
-    if match.slots[id] != slotStatus.open:
+    if match.slots[_id] != slotStatus.open:
         return
     
     old = match.get_slot(user)
-    new = match.slots[id]
+    new = match.slots[_id]
     
     new.copy(old)
     old.reset()
@@ -384,12 +385,12 @@ async def user_ready(user: Player, p):
     
 @packet(Packets.OSU_MATCH_LOCK)
 async def lock_slot(user: Player, p):
-    id = (reader.handle_packet(p, (('id', osuTypes.i32),)))['id']
+    _id = (reader.handle_packet(p, (('id', osuTypes.i32),)))['id']
     
     if not (match := user.match) or match.clan_battle or user is not match.host:
         return
     
-    slot = match.slots[id]
+    slot = match.slots[_id]
     
     if slot.status == slotStatus.locked:
         slot.status = slotStatus.open
@@ -676,11 +677,7 @@ async def root_client(request):
         username = info[0]
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later    
         osu_ver = regexes.osu_ver.match(cinfo[0])
-
-        if glob.config.anticheat:
-            if int(osu_ver['ver']) <= 20210125:
-                request.resp_headers['cho-token'] = 'no'
-                return writer.versionUpdateForced() + writer.userID(-2)
+        client = cinfo[3].split(":")[:-1]
          
         user = await glob.db.fetchrow("SELECT id, pw, country, name, priv, freeze_timer FROM users WHERE name = $1", username)
         if not user: # ensure user actually exists before attempting to do anything else
@@ -742,6 +739,18 @@ async def root_client(request):
         # set player object
         p = await Player.login(user2)
         await p.set_stats()
+
+        if glob.config.anticheat:
+            if int(osu_ver['ver']) <= 20210125:
+                request.resp_headers['cho-token'] = 'no'
+                return writer.versionUpdateForced() + writer.userID(-2)
+
+            ban_bool, ban_message = Anticheat(cinfo[0], client[0], request.headers).perform()
+
+            if ban_bool:
+                await p.ban(ban_message, glob.bot)
+                request.resp_headers['cho-token'] = 'no'
+                return writer.userID(-3)
 
         if not p.priv & Privileges.Verified:
             if p.id == 3:
