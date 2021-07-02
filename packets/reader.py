@@ -48,7 +48,7 @@ def handle_packet(data: bytes, struct: tuple) -> bytes:
     return d
 
 class Reader:
-    def __init__(self, data):
+    def __init__(self, data: bytes):
         self.data = data
         self.offset = 0
         self.pid, self.length = self.packet_lid()

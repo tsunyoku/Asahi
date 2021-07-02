@@ -1,4 +1,4 @@
-from xevel import Router
+from xevel import Router, Request
 from cmyui import log, Ansi
 from collections import defaultdict
 from urllib.parse import unquote
@@ -32,7 +32,7 @@ ap_path = Path.cwd() / 'resources/replays_ap'
 
 web = Router(f'osu.{glob.config.domain}')
 
-def auth(name, md5, req):
+def auth(name: str, md5: str, req: Request):
     player = glob.players_name.get(name)
     if not player:
         log(f'{name} failed authentication', Ansi.LRED)
@@ -47,7 +47,7 @@ def auth(name, md5, req):
 
 if glob.config.debug:
     @web.after_request()
-    async def logRequest(resp):
+    async def logRequest(resp: Request):
         if resp.extras.get('player'):
             ret = f' | Request by {resp.extras.pop("player").name}'
         else:
@@ -62,7 +62,7 @@ if glob.config.debug:
         return resp
 
 @web.route("/web/osu-screenshot.php", ['POST'])
-async def uploadScreenshot(request):
+async def uploadScreenshot(request: Request):
     mpargs = request.args
     if not auth(mpargs['u'], mpargs['p'], request):
         return b''
@@ -83,7 +83,7 @@ async def uploadScreenshot(request):
     return name.encode()
 
 @web.route("/ss/<scr>")
-async def getScreenshot(request, scr):
+async def getScreenshot(request: Request, scr: str):
     ss = ss_path / scr
     _type = scr.split('.')[1]
 
@@ -96,15 +96,15 @@ async def getScreenshot(request, scr):
         return b'could not find screenshot'
 
 @web.route("/web/osu-getseasonal.php")
-async def seasonalBG(request):
+async def seasonalBG(request: Request):
     return orjson.dumps(glob.config.menu_bgs)
 
 @web.route("/web/bancho_connect.php")
-async def banchoConnect(request):
+async def banchoConnect(request: Request):
     return b'asahi is gamer owo'
 
 @web.route("/web/osu-getfriends.php")
-async def getFriends(request):
+async def getFriends(request: Request):
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
@@ -113,12 +113,12 @@ async def getFriends(request):
     return '\n'.join(map(str, p.friends)).encode()
 
 @web.route("/d/<mid>")
-async def mapDownload(request, mid):
+async def mapDownload(request: Request, mid: str):
     request.resp_headers['Location'] = f'https://osu.gatari.pw/d/{mid}' # reliable downloads
     return (301, b'') # redirect
 
 @web.route("/web/osu-search.php")
-async def osuSearch(request):
+async def osuSearch(request: Request):
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
@@ -137,7 +137,7 @@ async def osuSearch(request):
     return (200, ret.encode())
 
 @web.route("/web/osu-search-set.php")
-async def osuSearchSet(request):
+async def osuSearchSet(request: Request):
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
@@ -156,7 +156,7 @@ async def osuSearchSet(request):
     return (200, ret.encode())
 
 @web.route("/users", ['POST'])
-async def ingameRegistration(request):
+async def ingameRegistration(request: Request):
     start = time.time()
     mpargs = request.args
 
@@ -198,7 +198,7 @@ async def ingameRegistration(request):
     return b'ok'
 
 @web.route("/web/check-updates.php")
-async def osuUpdates(request):
+async def osuUpdates(request: Request):
     args = request.args
 
     async with glob.web.get("https://old.ppy.sh/web/check-updates.php", params=args) as resp:
@@ -210,7 +210,7 @@ async def osuUpdates(request):
     return ret
 
 @web.route("/web/osu-getbeatmapinfo.php")
-async def osuMapInfo(request): # TODO
+async def osuMapInfo(request: Request): # TODO
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
@@ -219,7 +219,7 @@ async def osuMapInfo(request): # TODO
     ...
 
 @web.route("/web/osu-osz2-getscores.php")
-async def getMapScores(request):
+async def getMapScores(request: Request):
     args = request.args
     if not auth(args['us'], args['ha'], request):
         return b''
@@ -271,7 +271,7 @@ async def getMapScores(request):
 
 # POGGG
 @web.route("/web/osu-submit-modular-selector.php", ['POST'])
-async def scoreSubmit(request):
+async def scoreSubmit(request: Request):
     mpargs = request.args
 
     s = await Score.submission(mpargs['score'], mpargs['iv'], mpargs['pass'], mpargs['osuver'])
@@ -456,7 +456,7 @@ async def scoreSubmit(request):
     return '\n'.join(charts).encode() # thank u osu
 
 @web.route("/web/osu-getreplay.php")
-async def getReplay(request):
+async def getReplay(request: Request):
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
@@ -477,7 +477,7 @@ async def getReplay(request):
     return # osu wants empty response if there's no replay
 
 @web.route("/web/lastfm.php")
-async def lastFM(request):
+async def lastFM(request: Request):
     args = request.args
     if not auth(args['us'], args['ha'], request):
         return b''

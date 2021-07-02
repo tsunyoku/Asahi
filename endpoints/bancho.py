@@ -1,5 +1,5 @@
 # external imports (some may require to be installed, install using ext/requirements.txt)
-from xevel import Router # web server :blobcowboi:
+from xevel import Router, Request # web server :blobcowboi:
 from cmyui import Ansi, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from geoip2 import database # for geoloc
 from re import compile
@@ -656,7 +656,7 @@ def root_web():
     return (BASE_MESSAGE + pl).encode()
 
 @bancho.route("/", ['POST', 'GET']) # only accept POST requests, we can assume it is for a login request but we can deny access if not
-async def root_client(request):
+async def root_client(request: Request):
     start = time.time()
     headers = request.headers # request headers, used for things such as user ip and agent
 

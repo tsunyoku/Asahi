@@ -1,5 +1,5 @@
-from objects.beatmap import Beatmap
-from objects.player import Player
+from .beatmap import Beatmap
+from .player import Player
 from constants.mods import Mods, convert
 from constants.modes import osuModes, lbModes
 from constants.statuses import scoreStatuses

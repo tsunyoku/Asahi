@@ -3,9 +3,9 @@ from objects.match import Match
 from objects.channel import Channel
 from objects.beatmap import Beatmap
 from objects.player import Player
-from constants.privs import Privileges
-from constants.types import teamTypes
-from constants.statuses import strStatuses
+from .privs import Privileges
+from .types import teamTypes
+from .statuses import strStatuses
 
 import time
 import packets

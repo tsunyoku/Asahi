@@ -4,14 +4,14 @@ from packets import writer
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from objects.player import Player
+    from .player import Player
 
 class Channel:
     def __init__(self, **cinfo):
-        self.name = cinfo.get('name')
-        self.desc = cinfo.get('desc')
-        self.auto = cinfo.get('auto', False)
-        self.perm = cinfo.get('perm', False)
+        self.name: str = cinfo.get('name')
+        self.desc: str = cinfo.get('desc')
+        self.auto: bool = cinfo.get('auto', False)
+        self.perm: bool = cinfo.get('perm', False)
         self.players: list = []
 
     def send(self, f: 'Player', msg: str, send_self: bool):

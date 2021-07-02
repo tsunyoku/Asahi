@@ -1,6 +1,6 @@
 from constants.modes import osuModes
 from constants.statuses import mapStatuses, apiStatuses
-from objects import glob
+from . import glob
 
 from cmyui import log, Ansi
 from cmyui.osu.oppai_ng import OppaiWrapper
@@ -12,32 +12,37 @@ from datetime import datetime as dt
 import asyncio
 import orjson
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .leaderboard import Leaderboard
+
 class Beatmap:
     def __init__(self, **minfo):
-        self.md5 = minfo.get('md5', '')
-        self.id = minfo.get('id', 0)
-        self.sid = minfo.get('sid', 0)
+        self.md5: str = minfo.get('md5', '')
+        self.id: int = minfo.get('id', 0)
+        self.sid: int = minfo.get('sid', 0)
 
-        self.bpm = minfo.get('bpm', 0.0)
-        self.cs = minfo.get('cs', 0.0)
-        self.ar = minfo.get('ar', 0.0)
-        self.od = minfo.get('od', 0.0)
-        self.hp = minfo.get('hp', 0.0)
-        self.sr = minfo.get('sr', 0.00)
-        self.mode = osuModes(minfo.get('mode', 0))
+        self.bpm: float = minfo.get('bpm', 0.0)
+        self.cs: float = minfo.get('cs', 0.0)
+        self.ar: float = minfo.get('ar', 0.0)
+        self.od: float = minfo.get('od', 0.0)
+        self.hp: float = minfo.get('hp', 0.0)
+        self.sr: float = minfo.get('sr', 0.00)
+        self.mode: int = osuModes(minfo.get('mode', 0))
 
-        self.artist = minfo.get('artist', '')
-        self.title = minfo.get('title', '')
-        self.diff = minfo.get('diff', '')
-        self.mapper = minfo.get('mapper', '')
+        self.artist: str = minfo.get('artist', '')
+        self.title: str = minfo.get('title', '')
+        self.diff: str = minfo.get('diff', '')
+        self.mapper: str = minfo.get('mapper', '')
 
-        self.status = mapStatuses(minfo.get('status', 0))
-        self.frozen = minfo.get('frozen', 'False') == 1
-        self.update = minfo.get('update', 0)
+        self.status: int = mapStatuses(minfo.get('status', 0))
+        self.frozen: bool = minfo.get('frozen', 'False') == 1
+        self.update: int = minfo.get('update', 0)
 
-        self.nc = minfo.get('nc', 0) # nc = next check (for status update)
+        self.nc: int = minfo.get('nc', 0) # nc = next check (for status update)
 
-        self.lb = minfo.get('lb', None)
+        self.lb: 'Leaderboard' = minfo.get('lb', None)
 
     @property
     def name(self):
@@ -203,7 +208,7 @@ class Beatmap:
         return b
 
     @classmethod
-    async def cache_set(self, sid):
+    async def cache_set(self, sid: int):
         api = 'https://old.ppy.sh/api/get_beatmaps'
         params = {'k': glob.config.api_key, 's': sid}
 
