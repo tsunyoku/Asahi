@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union, Coroutine, Optional
 
 import inspect
 
@@ -11,8 +11,8 @@ class Menu:
         self.name: str = args.get('name', '')
         self.priv: Privileges = args.get('priv', 0)
 
-        self.callback = args.get('callback', None) # ??
-        self.args = args.get('args', None)
+        self.callback: Union[Coroutine, eval] = args.get('callback', None) # ??
+        self.args: Optional[list] = args.get('args', None)
 
     @property
     def embed(self):

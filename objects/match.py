@@ -1,15 +1,15 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from objects.player import Player
-    from objects.channel import Channel
+    from .player import Player
+    from .channel import Channel
 
 from constants.modes import osuModes
 from constants.mods import Mods
 from constants.types import teamTypes, winConditions
 from objects.clan import Clan
 
-from objects import glob
+from . import glob
 from packets import writer
 
 from enum import IntEnum, unique

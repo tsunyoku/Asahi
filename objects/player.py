@@ -1,8 +1,8 @@
-from objects import glob
-from objects.channel import Channel
-from objects.beatmap import Beatmap
-from objects.clan import Clan
-from objects.match import slotStatus, Teams, Match
+from . import glob
+from .channel import Channel
+from .beatmap import Beatmap
+from .clan import Clan
+from .match import slotStatus, Teams, Match
 from packets import writer
 from constants.privs import Privileges, ClientPrivileges
 from constants.modes import osuModes

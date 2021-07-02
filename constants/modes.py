@@ -1,5 +1,5 @@
 from enum import Enum
-from constants.mods import Mods
+from .mods import Mods
 from functools import cache
 
 m_str = (
