@@ -4,6 +4,7 @@
 avatar, bancho & /web/ server & Discord bot hybrid for osu! 😎
 
 Note: This has only been tested on Ubuntu 18.04 LTS. If you would like to use it on a distro other than Ubuntu or a version greater than 18.04, you can make Asahi work by changing the minimum TLS version in the nginx config (to my belief atleast).
+Note 2: In the rare case you edit the packet reader/writer, you will need to rebuild the cython files upon any edits. You can find instructions further below on how to build them if you do change it.
 
 ## Setup
 
