@@ -17,7 +17,6 @@ from objects import glob # glob = global, server-wide objects will be stored her
 from objects.player import Player # Player - player object to store stats, info etc.
 from objects.beatmap import Beatmap # Beatmap - object to score map info etc.
 from objects.channel import Channel
-from objects.anticheat import Anticheat
 from objects.match import slotStatus, Teams
 from constants.countries import country_codes
 from constants.types import osuTypes, teamTypes
@@ -678,6 +677,11 @@ async def root_client(request: Request):
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later    
         osu_ver = regexes.osu_ver.match(cinfo[0])
         client = cinfo[3].split(":")[:-1]
+
+        if glob.config.anticheat:
+            if int(osu_ver['ver']) <= 20210125:
+                request.resp_headers['cho-token'] = 'no'
+                return writer.versionUpdateForced() + writer.userID(-2)
          
         user = await glob.db.fetchrow("SELECT id, pw, country, name, priv, freeze_timer FROM users WHERE name = $1", username)
         if not user: # ensure user actually exists before attempting to do anything else
@@ -739,18 +743,6 @@ async def root_client(request: Request):
         # set player object
         p = await Player.login(user2)
         await p.set_stats()
-
-        if glob.config.anticheat:
-            if int(osu_ver['ver']) <= 20210125:
-                request.resp_headers['cho-token'] = 'no'
-                return writer.versionUpdateForced() + writer.userID(-2)
-
-            ban_bool, ban_message = Anticheat(cinfo[0], client[0], request.headers).perform()
-
-            if ban_bool:
-                await p.ban(ban_message, glob.bot)
-                request.resp_headers['cho-token'] = 'no'
-                return writer.userID(-3)
 
         if not p.priv & Privileges.Verified:
             if p.id == 3:
