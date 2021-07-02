@@ -236,7 +236,7 @@ class Player:
 
     @property
     def safe_name(self):
-        return self.name.lower().replace(' ', '_')
+        return self.name.lower().replace(' ', '_').rstrip()
 
     @property
     def url(self):

@@ -28,37 +28,26 @@ class Menu:
         isL = isinstance(c, type(lambda:0))
         
         # FUCK ME I AM GOING TO HELL FOR EVERYTHING HERE
+        # ^^^ Old code but it has been cleaned by len4ee xd
         if inspect.iscoroutinefunction(c):
             if not self.args:
-                if not call:
-                    return await c
-                else:
-                    if isL:
-                        return await c(player)
-                    else:
-                        return await c()
-            else:
-                if not call:
-                    return await c # has args but not a function???
-                else:
-                    if isL:
-                        return await c(player)(*self.args)
-                    else:
-                        return await c(*self.args)
-        
+                if not call: return await c
+                if not isL: return await c()
+
+                return await c(player)
+
+            if not call: return await c # has args but not a function???
+            if not isL: return await c(*self.args)
+
+            return await c(player)(*self.args)
+
         if not self.args:
-            if not call:
-                return c
-            else:
-                if isL:
-                    return c(player)
-                else:
-                    return c()
-        else:
-            if not call:
-                return c # has args but not a function???
-            else:
-                if isL:
-                    return c(player)(*self.args)
-                else:
-                    return c(*self.args)
+            if not call: return c
+            if not isL: return c()
+
+            return c(player)
+
+        if not call: return c # has args but not a function???
+        if not isL: return c(*self.args)
+
+        return c(player)(*self.args)

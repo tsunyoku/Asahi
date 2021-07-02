@@ -32,21 +32,19 @@ async def get_rank(mode, uid, pp):
     rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode}', uid)
     if rank is not None:
         return rank + 1
-    else:
-        if pp > 0:
-            return 1
-        else:
-            return 0
+
+    if pp == 0: return 0
+
+    return 1
 
 async def get_country_rank(mode, uid, pp, country):
     rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode}:{country}', uid)
     if rank is not None:
         return rank + 1
-    else:
-        if pp > 0:
-            return 1
-        else:
-            return 0
+
+    if pp == 0: return 0
+        
+    return 1
 
 @api.route('/player_count')
 async def onlinePlayers(request):
@@ -137,10 +135,10 @@ async def playerStatus(request):
         return {'code': 400, 'message': 'user is restricted/banned!'}
 
     if player.map_md5:
-        if not (map := Beatmap.md5_cache(player.map_md5)):
-            map = Beatmap.md5_sql(player.map_md5)
+        if not (bmap := Beatmap.md5_cache(player.map_md5)):
+            bmap = Beatmap.md5_sql(player.map_md5)
     else:
-        map = None
+        bmap = None
 
     status = {
         'online': True,
@@ -149,15 +147,15 @@ async def playerStatus(request):
         'mode': osuModes(player.mode).name,
         'mods': convert(player.mods),
         'map': {
-            'md5': map.md5,
-            'id': map.id,
-            'set_id': map.sid,
-            'artist': map.artist,
-            'title': map.title,
-            'difficulty': map.diff,
-            'mapper': map.mapper,
-            'star_rating': map.sr
-        } if map else None
+            'md5': bmap.md5,
+            'id': bmap.id,
+            'set_id': bmap.sid,
+            'artist': bmap.artist,
+            'title': bmap.title,
+            'difficulty': bmap.diff,
+            'mapper': bmap.mapper,
+            'star_rating': bmap.sr
+        } if bmap else None
     }
 
     return {'code': 200, 'status': status}

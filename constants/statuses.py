@@ -12,26 +12,17 @@ class mapStatuses(IntEnum):
     GIVE_PP = Ranked | Approved
 
 def strStatuses(status: str):
-    if status == 'rank':
-        return mapStatuses.Ranked
-    elif status == 'love':
-        return mapStatuses.Loved
-    else:
-        return mapStatuses.Pending
+    return {
+        'rank': mapStatuses.Ranked,
+        'love': mapStatuses.Loved
+    }.get(status, mapStatuses.Pending)
 
 def apiStatuses(status: int):
-    if status in [-2, -1, 0]:
-        ns = 0
-    elif status == 1:
-        ns = 2
-    elif status == 2:
-        ns = 3
-    elif status == 3:
-        ns = 4
-    elif status == 4:
-        ns = 5
+    if status in (-2, -1, 0):
+        return 0
 
-    return ns
+    if status in (1, 2, 3, 4):
+        return status + 1
 
 class scoreStatuses(Enum):
     Failed = 0

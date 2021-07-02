@@ -85,11 +85,11 @@ async def uploadScreenshot(request):
 @web.route("/ss/<scr>")
 async def getScreenshot(request, scr):
     ss = ss_path / scr
-    type = scr.split('.')[1]
+    _type = scr.split('.')[1]
 
     if ss.exists():
         ssb = ss.read_bytes()
-        request.resp_headers['Content-Type'] = f'image/{type}'
+        request.resp_headers['Content-Type'] = f'image/{_type}'
         request.resp_headers['Content-Length'] = len(ssb)
         return ssb
     else:
@@ -122,22 +122,19 @@ async def osuSearch(request):
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
-
-    a = 0
-    argstr = f'?'
     
     args['u'] = glob.config.bancho_username
     args['h'] = glob.config.bancho_hashed_password
-    
-    for key, val in args.items():
-        if a == 0:
-            argstr += f'{key}={val}'
-            a = 1
-        else:
-            argstr += f'&{key}={val}'
-            
-    request.resp_headers['Location'] = f'https://osu.ppy.sh/web/osu-search.php{argstr}'
-    return (301, b'')
+
+    # james it was good try however someone can leak their u and h arg, sadly you need to opt to use clientsession here. 
+    #request.resp_headers['Location'] = f'https://osu.ppy.sh/web/osu-search.php{argstr}'
+    async with glob.web.get("https://osu.ppy.sh/web/osu-search-set.php", params=args) as resp:
+        if resp.status != 200:
+            return b'0'
+
+        ret = await resp.read()
+
+    return (200, ret.encode())
 
 @web.route("/web/osu-search-set.php")
 async def osuSearchSet(request):
@@ -145,30 +142,27 @@ async def osuSearchSet(request):
     if not auth(args['u'], args['h'], request):
         return b''
 
-    a = 0
-    argstr = f'?'
-
     args['u'] = glob.config.bancho_username
     args['h'] = glob.config.bancho_hashed_password
 
-    for key, val in args.items():
-        if a == 0:
-            argstr += f'{key}={val}'
-            a = 1
-        else:
-            argstr += f'&{key}={val}'
+    # james it was good try however someone can leak their u and h arg, sadly you need to opt to use clientsession here.
+    #request.resp_headers['Location'] = f'https://osu.ppy.sh/web/osu-search-set.php?{"&".join(_args)}'
+    async with glob.web.get("https://osu.ppy.sh/web/osu-search-set.php", params=args) as resp:
+        if resp.status != 200:
+            return b'0'
 
-    request.resp_headers['Location'] = f'https://osu.ppy.sh/web/osu-search-set.php{argstr}'
-    return (301, b'')
+        ret = await resp.read()
+
+    return (200, ret.encode())
 
 @web.route("/users", ['POST'])
 async def ingameRegistration(request):
     start = time.time()
     mpargs = request.args
 
-    name = mpargs['user[username]'] # what is this setup osu lol
-    email = mpargs['user[user_email]']
-    pw = mpargs['user[password]']
+    name = mpargs['user[username]'].strip() # what is this setup osu lol
+    email = mpargs['user[user_email]'].strip()
+    pw = mpargs['user[password]'].strip()
 
     if not mpargs.get('check') or not all((name, email, pw)):
         return b'missing required paramaters'
@@ -207,11 +201,7 @@ async def ingameRegistration(request):
 async def osuUpdates(request):
     args = request.args
 
-    update_args = {}
-    for key, _ in args.items():
-        update_args[key] = args[key]
-
-    async with glob.web.get("https://old.ppy.sh/web/check-updates.php", params=update_args) as resp:
+    async with glob.web.get("https://old.ppy.sh/web/check-updates.php", params=args) as resp:
         if resp.status != 200:
             return b'error checking for updates'
 
@@ -226,6 +216,7 @@ async def osuMapInfo(request): # TODO
         return b''
 
     data = request.body
+    ...
 
 @web.route("/web/osu-osz2-getscores.php")
 async def getMapScores(request):
@@ -358,6 +349,7 @@ async def scoreSubmit(request):
         log(f'[{s.mode!r}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
         return b'error: no' # not actually erroring, score is already submitted we just want client to stop request as we cannot provide chart
     
+    achievements = ''
     if s.map.status & mapStatuses.GIVE_PP and not s.user.restricted:
         achs = []
         for ach in glob.achievements:
@@ -369,8 +361,6 @@ async def scoreSubmit(request):
                 achs.append(ach)
                 
         achievements = '/'.join([a.format for a in achs])
-    else:
-        achievements = ''
 
     charts = []
 
@@ -392,7 +382,7 @@ async def scoreSubmit(request):
     if s.map.status >= mapStatuses.Ranked:
         charts.append('|'.join((
             'chartId:beatmap',
-            f'chartUrl:https://osu.ppy.sh/b/{s.map.id}',
+            f'chartUrl:https://{glob.config.domain}/b/{s.map.id}',
             'chartName:Current Score',
 
             *(( # wtaf
