@@ -3,9 +3,9 @@ from objects.match import Match
 from objects.channel import Channel
 from objects.beatmap import Beatmap
 from objects.player import Player
-from constants.privs import Privileges
-from constants.types import teamTypes
-from constants.statuses import strStatuses
+from .privs import Privileges
+from .types import teamTypes
+from .statuses import strStatuses
 
 import time
 import packets
@@ -44,7 +44,7 @@ async def help(user, args):
 async def add_priv(user, args):
     """Adds (a list of) privileges to a user"""
     if len(args) < 2:
-        return f"You haven't provided a username and privileges!"
+        return "You haven't provided a username and privileges!"
     
     name = args[0]
 
@@ -64,7 +64,7 @@ async def add_priv(user, args):
 async def rm_priv(user, args):
     """Removes (a list of) privileges from a user"""
     if len(args) < 2:
-        return f"You haven't provided a username and privileges!"
+        return "You haven't provided a username and privileges!"
 
     name = args[0]
 
@@ -85,20 +85,20 @@ async def clan_battle(user, args):
     """Battle other clans in a scrim-like multi lobby"""
     if args[0] in ('accept', 'deny'):
         if len(args) < 2:
-            return f'Please accept/deny a battle and specify the clan!'
+            return 'Please accept/deny a battle and specify the clan!'
 
         clan_name = args[1]
         clan = glob.clans.get(await glob.db.fetchval('SELECT id FROM clans WHERE name = $1', clan_name))
         
         if not clan:
-            return f'We could not find a clan by this name!'
+            return 'We could not find a clan by this name!'
 
         if not (owner := glob.players_id.get(clan.owner)):
-            return f'Clan owner offline, battle request cancelled!'
+            return 'Clan owner offline, battle request cancelled!'
         
         if args[1] == 'deny':
             owner.enqueue(packets.sendMessage(fromname=glob.bot.name, args=f'{user.name} denied your request to battle their clan {clan.name}!', tarname=owner.name, fromid=glob.bot.id))
-            return f'Battle request denied!'
+            return 'Battle request denied!'
 
         # battle was accepted, create the battle match
 
@@ -147,19 +147,19 @@ async def clan_battle(user, args):
         return
 
     if user.clan.owner != user.id:
-        return f'You must be the owner of your clan to request a battle!'
+        return 'You must be the owner of your clan to request a battle!'
 
     if len(args) < 1:
-        return f"Please provide a clan to request a battle!"
+        return "Please provide a clan to request a battle!"
 
     clan_name = args[0]
     clan = glob.clans.get(await glob.db.fetchval('SELECT id FROM clans WHERE name = $1', clan_name))
 
     if not clan:
-        return f'We could not find a clan by this name!'
+        return 'We could not find a clan by this name!'
 
     if not (owner := glob.players_id.get(clan.owner)):
-        return f'The clan owner must be online for you to request a battle!'
+        return 'The clan owner must be online for you to request a battle!'
 
     owner.enqueue(packets.sendMessage(fromname=glob.bot.name, args=f'{user.name} has invited you to a clan battle! If you wish to accept then type !battle accept {user.clan.name}, or !battle deny {user.clan.name} to deny. If you accept, a multiplayer match will be created for you and all your online clanmates to battle to the death!', tarname=owner.name, fromid=glob.bot.id))
 
@@ -172,25 +172,25 @@ async def _map(user, args):
         return 'Please provide the new status & whether we should update the map/set! (!map <rank/love/unrank> <map/set>)'
 
     status = args[0]
-    type = args[1]
+    _type = args[1]
 
-    if status not in ('love', 'rank', 'unrank') or type not in ('set', 'map'):
+    if status not in ('love', 'rank', 'unrank') or _type not in ('set', 'map'):
         return 'Invalid syntax! Command: !map <rank/love/unrank> <set/map>'
 
-    map = user.np
+    bmap = user.np
     ns = strStatuses(status)
 
-    if type == 'map':
-        map.status = ns
-        map.frozen = True
-        map.lb = None # reset lb cache in case of major status change
-        await map.save()
-        glob.cache['maps'][map.md5] = map
+    if _type == 'map':
+        bmap.status = ns
+        bmap.frozen = True
+        bmap.lb = None # reset lb cache in case of major status change
+        await bmap.save()
+        glob.cache['maps'][bmap.md5] = bmap
     else:
-        sid = await glob.db.fetchval('SELECT sid FROM maps WHERE md5 = $1', map.md5)
-        set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $1', sid)
+        sid = await glob.db.fetchval('SELECT sid FROM maps WHERE md5 = $1', bmap.md5)
+        _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $1', sid)
 
-        for m in set:
+        for m in _set:
             md5 = m['md5']
             bm = await Beatmap.from_md5(md5)
             bm.status = ns
@@ -205,7 +205,7 @@ async def _map(user, args):
 async def ban(user, args):
     """Ban a specified user for a specified reason"""
     if len(args) < 2:
-        return f'You must provide a user and a reason to ban!'
+        return 'You must provide a user and a reason to ban!'
     
     username = args[0].lower()
     reason = args[1]
@@ -215,13 +215,13 @@ async def ban(user, args):
         
     await target.ban(reason=reason, fr=user)
     
-    return f'User banned!'
+    return 'User banned!'
 
 @command(priv=Privileges.Admin, name='unban')
 async def unban(user, args):
     """Unban a specified user for a specified reason"""
     if len(args) < 2:
-        return f'You must provide a user and a reason to unban!'
+        return 'You must provide a user and a reason to unban!'
 
     username = args[0].lower()
     reason = args[1]
@@ -231,13 +231,13 @@ async def unban(user, args):
 
     await target.unban(reason=reason, fr=user)
 
-    return f'User unbanned!'
+    return 'User unbanned!'
 
 @command(priv=Privileges.Admin, name='restrict')
 async def restrict(user, args):
     """Restrict a specified user for a specified reason"""
     if len(args) < 2:
-        return f'You must provide a user and a reason to restrict!'
+        return 'You must provide a user and a reason to restrict!'
 
     username = args[0].lower()
     reason = args[1]
@@ -247,13 +247,13 @@ async def restrict(user, args):
 
     await target.restrict(reason=reason, fr=user)
 
-    return f'User restricted!'
+    return 'User restricted!'
 
 @command(priv=Privileges.Admin, name='unrestrict')
 async def unrestrict(user, args):
     """Unrestrict a specified user for a specified reason"""
     if len(args) < 2:
-        return f'You must provide a user and a reason to unrestrict!'
+        return 'You must provide a user and a reason to unrestrict!'
 
     username = args[0].lower()
     reason = args[1]
@@ -263,13 +263,13 @@ async def unrestrict(user, args):
 
     await target.unrestrict(reason=reason, fr=user)
 
-    return f'User unrestricted!'
+    return 'User unrestricted!'
 
 @command(priv=Privileges.Admin, name='freeze')
 async def freeze(user, args):
     """Freeze a specified user for a specified reason"""
     if len(args) < 2:
-        return f'You must provide a user and a reason to freeze!'
+        return 'You must provide a user and a reason to freeze!'
 
     username = args[0].lower()
     reason = args[1]
@@ -282,13 +282,13 @@ async def freeze(user, args):
 
     await target.freeze(reason=reason, fr=user)
 
-    return f'User frozen!'
+    return 'User frozen!'
 
 @command(priv=Privileges.Admin, name='unfreeze')
 async def unfreeze(user, args):
     """Unfreeze a specified user for a specified reason"""
     if len(args) < 2:
-        return f'You must provide a user and a reason to unfreeze!'
+        return 'You must provide a user and a reason to unfreeze!'
 
     username = args[0].lower()
     reason = args[1]
@@ -298,7 +298,7 @@ async def unfreeze(user, args):
 
     await target.unfreeze(reason=reason, fr=user)
 
-    return f'User unfrozen!'
+    return 'User unfrozen!'
 
 async def process(user, msg):
     start = time.time()

@@ -1,5 +1,5 @@
 # external imports (some may require to be installed, install using ext/requirements.txt)
-from xevel import Router # web server :blobcowboi:
+from xevel import Router, Request # web server :blobcowboi:
 from cmyui import Ansi, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from geoip2 import database # for geoloc
 from re import compile
@@ -322,16 +322,16 @@ async def create_match(user: Player, p):
 @packet(Packets.OSU_JOIN_MATCH)
 async def join_match(user: Player, p):
     d = reader.handle_packet(p, (('id', osuTypes.i32), ('pw', osuTypes.string),))
-    id = d['id']
+    _id = d['id']
     pw = d['pw']
     
-    if id >= 1000:
-        if not (menu := glob.menus.get(id)):
+    if _id >= 1000:
+        if not (menu := glob.menus.get(_id)):
             return user.enqueue(writer.matchJoinFail())
         
         return await menu.handle(user)
     
-    if not (match := glob.matches.get(id)):
+    if not (match := glob.matches.get(_id)):
         return user.enqueue(writer.matchJoinFail())
     
     if match.clan_battle:
@@ -356,16 +356,16 @@ async def leave_match(user: Player, p):
         
 @packet(Packets.OSU_MATCH_CHANGE_SLOT)
 async def change_slot(user: Player, p):
-    id = (reader.handle_packet(p, (('id', osuTypes.i32),)))['id']
+    _id = (reader.handle_packet(p, (('id', osuTypes.i32),)))['id']
     
     if not (match := user.match):
         return
     
-    if match.slots[id] != slotStatus.open:
+    if match.slots[_id] != slotStatus.open:
         return
     
     old = match.get_slot(user)
-    new = match.slots[id]
+    new = match.slots[_id]
     
     new.copy(old)
     old.reset()
@@ -384,12 +384,12 @@ async def user_ready(user: Player, p):
     
 @packet(Packets.OSU_MATCH_LOCK)
 async def lock_slot(user: Player, p):
-    id = (reader.handle_packet(p, (('id', osuTypes.i32),)))['id']
+    _id = (reader.handle_packet(p, (('id', osuTypes.i32),)))['id']
     
     if not (match := user.match) or match.clan_battle or user is not match.host:
         return
     
-    slot = match.slots[id]
+    slot = match.slots[_id]
     
     if slot.status == slotStatus.locked:
         slot.status = slotStatus.open
@@ -655,7 +655,7 @@ def root_web():
     return (BASE_MESSAGE + pl).encode()
 
 @bancho.route("/", ['POST', 'GET']) # only accept POST requests, we can assume it is for a login request but we can deny access if not
-async def root_client(request):
+async def root_client(request: Request):
     start = time.time()
     headers = request.headers # request headers, used for things such as user ip and agent
 
@@ -676,6 +676,7 @@ async def root_client(request):
         username = info[0]
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later    
         osu_ver = regexes.osu_ver.match(cinfo[0])
+        client = cinfo[3].split(":")[:-1]
 
         if glob.config.anticheat:
             if int(osu_ver['ver']) <= 20210125:

@@ -1,4 +1,4 @@
-from xevel import Router
+from xevel import Router, Request
 from cmyui import log, Ansi
 from collections import defaultdict
 from urllib.parse import unquote
@@ -32,7 +32,7 @@ ap_path = Path.cwd() / 'resources/replays_ap'
 
 web = Router(f'osu.{glob.config.domain}')
 
-def auth(name, md5, req):
+def auth(name: str, md5: str, req: Request):
     player = glob.players_name.get(name)
     if not player:
         log(f'{name} failed authentication', Ansi.LRED)
@@ -47,7 +47,7 @@ def auth(name, md5, req):
 
 if glob.config.debug:
     @web.after_request()
-    async def logRequest(resp):
+    async def logRequest(resp: Request):
         if resp.extras.get('player'):
             ret = f' | Request by {resp.extras.pop("player").name}'
         else:
@@ -62,7 +62,7 @@ if glob.config.debug:
         return resp
 
 @web.route("/web/osu-screenshot.php", ['POST'])
-async def uploadScreenshot(request):
+async def uploadScreenshot(request: Request):
     mpargs = request.args
     if not auth(mpargs['u'], mpargs['p'], request):
         return b''
@@ -83,28 +83,28 @@ async def uploadScreenshot(request):
     return name.encode()
 
 @web.route("/ss/<scr>")
-async def getScreenshot(request, scr):
+async def getScreenshot(request: Request, scr: str):
     ss = ss_path / scr
-    type = scr.split('.')[1]
+    _type = scr.split('.')[1]
 
     if ss.exists():
         ssb = ss.read_bytes()
-        request.resp_headers['Content-Type'] = f'image/{type}'
+        request.resp_headers['Content-Type'] = f'image/{_type}'
         request.resp_headers['Content-Length'] = len(ssb)
         return ssb
     else:
         return b'could not find screenshot'
 
 @web.route("/web/osu-getseasonal.php")
-async def seasonalBG(request):
+async def seasonalBG(request: Request):
     return orjson.dumps(glob.config.menu_bgs)
 
 @web.route("/web/bancho_connect.php")
-async def banchoConnect(request):
+async def banchoConnect(request: Request):
     return b'asahi is gamer owo'
 
 @web.route("/web/osu-getfriends.php")
-async def getFriends(request):
+async def getFriends(request: Request):
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
@@ -113,62 +113,56 @@ async def getFriends(request):
     return '\n'.join(map(str, p.friends)).encode()
 
 @web.route("/d/<mid>")
-async def mapDownload(request, mid):
+async def mapDownload(request: Request, mid: str):
     request.resp_headers['Location'] = f'https://osu.gatari.pw/d/{mid}' # reliable downloads
     return (301, b'') # redirect
 
 @web.route("/web/osu-search.php")
-async def osuSearch(request):
+async def osuSearch(request: Request):
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
-
-    a = 0
-    argstr = f'?'
     
     args['u'] = glob.config.bancho_username
     args['h'] = glob.config.bancho_hashed_password
-    
-    for key, val in args.items():
-        if a == 0:
-            argstr += f'{key}={val}'
-            a = 1
-        else:
-            argstr += f'&{key}={val}'
-            
-    request.resp_headers['Location'] = f'https://osu.ppy.sh/web/osu-search.php{argstr}'
-    return (301, b'')
+
+    # james it was good try however someone can leak their u and h arg, sadly you need to opt to use clientsession here. 
+    #request.resp_headers['Location'] = f'https://osu.ppy.sh/web/osu-search.php{argstr}'
+    async with glob.web.get("https://osu.ppy.sh/web/osu-search-set.php", params=args) as resp:
+        if resp.status != 200:
+            return b'0'
+
+        ret = await resp.read()
+
+    return (200, ret.encode())
 
 @web.route("/web/osu-search-set.php")
-async def osuSearchSet(request):
+async def osuSearchSet(request: Request):
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
 
-    a = 0
-    argstr = f'?'
-
     args['u'] = glob.config.bancho_username
     args['h'] = glob.config.bancho_hashed_password
 
-    for key, val in args.items():
-        if a == 0:
-            argstr += f'{key}={val}'
-            a = 1
-        else:
-            argstr += f'&{key}={val}'
+    # james it was good try however someone can leak their u and h arg, sadly you need to opt to use clientsession here.
+    #request.resp_headers['Location'] = f'https://osu.ppy.sh/web/osu-search-set.php?{"&".join(_args)}'
+    async with glob.web.get("https://osu.ppy.sh/web/osu-search-set.php", params=args) as resp:
+        if resp.status != 200:
+            return b'0'
 
-    request.resp_headers['Location'] = f'https://osu.ppy.sh/web/osu-search-set.php{argstr}'
-    return (301, b'')
+        ret = await resp.read()
+
+    return (200, ret.encode())
 
 @web.route("/users", ['POST'])
-async def ingameRegistration(request):
+async def ingameRegistration(request: Request):
     start = time.time()
     mpargs = request.args
 
-    name = mpargs['user[username]'] # what is this setup osu lol
-    email = mpargs['user[user_email]']
-    pw = mpargs['user[password]']
+    name = mpargs['user[username]'].strip() # what is this setup osu lol
+    email = mpargs['user[user_email]'].strip()
+    pw = mpargs['user[password]'].strip()
 
     if not mpargs.get('check') or not all((name, email, pw)):
         return b'missing required paramaters'
@@ -204,14 +198,10 @@ async def ingameRegistration(request):
     return b'ok'
 
 @web.route("/web/check-updates.php")
-async def osuUpdates(request):
+async def osuUpdates(request: Request):
     args = request.args
 
-    update_args = {}
-    for key, _ in args.items():
-        update_args[key] = args[key]
-
-    async with glob.web.get("https://old.ppy.sh/web/check-updates.php", params=update_args) as resp:
+    async with glob.web.get("https://old.ppy.sh/web/check-updates.php", params=args) as resp:
         if resp.status != 200:
             return b'error checking for updates'
 
@@ -220,15 +210,16 @@ async def osuUpdates(request):
     return ret
 
 @web.route("/web/osu-getbeatmapinfo.php")
-async def osuMapInfo(request): # TODO
+async def osuMapInfo(request: Request): # TODO
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
 
     data = request.body
+    ...
 
 @web.route("/web/osu-osz2-getscores.php")
-async def getMapScores(request):
+async def getMapScores(request: Request):
     args = request.args
     if not auth(args['us'], args['ha'], request):
         return b''
@@ -280,7 +271,7 @@ async def getMapScores(request):
 
 # POGGG
 @web.route("/web/osu-submit-modular-selector.php", ['POST'])
-async def scoreSubmit(request):
+async def scoreSubmit(request: Request):
     mpargs = request.args
 
     s = await Score.submission(mpargs['score'], mpargs['iv'], mpargs['pass'], mpargs['osuver'])
@@ -358,6 +349,7 @@ async def scoreSubmit(request):
         log(f'[{s.mode!r}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
         return b'error: no' # not actually erroring, score is already submitted we just want client to stop request as we cannot provide chart
     
+    achievements = ''
     if s.map.status & mapStatuses.GIVE_PP and not s.user.restricted:
         achs = []
         for ach in glob.achievements:
@@ -369,8 +361,6 @@ async def scoreSubmit(request):
                 achs.append(ach)
                 
         achievements = '/'.join([a.format for a in achs])
-    else:
-        achievements = ''
 
     charts = []
 
@@ -392,7 +382,7 @@ async def scoreSubmit(request):
     if s.map.status >= mapStatuses.Ranked:
         charts.append('|'.join((
             'chartId:beatmap',
-            f'chartUrl:https://osu.ppy.sh/b/{s.map.id}',
+            f'chartUrl:https://{glob.config.domain}/b/{s.map.id}',
             'chartName:Current Score',
 
             *(( # wtaf
@@ -466,7 +456,7 @@ async def scoreSubmit(request):
     return '\n'.join(charts).encode() # thank u osu
 
 @web.route("/web/osu-getreplay.php")
-async def getReplay(request):
+async def getReplay(request: Request):
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
@@ -487,7 +477,7 @@ async def getReplay(request):
     return # osu wants empty response if there's no replay
 
 @web.route("/web/lastfm.php")
-async def lastFM(request):
+async def lastFM(request: Request):
     args = request.args
     if not auth(args['us'], args['ha'], request):
         return b''

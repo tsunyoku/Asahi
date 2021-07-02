@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from objects.channel import Channel
-    from objects.match import Match
+    from .channel import Channel
+    from .match import Match
 
 class Clan:
     def __init__(self, **cinfo):

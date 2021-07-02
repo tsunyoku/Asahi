@@ -1,5 +1,5 @@
-from objects.beatmap import Beatmap
-from objects.player import Player
+from .beatmap import Beatmap
+from .player import Player
 from constants.mods import Mods, convert
 from constants.modes import osuModes, lbModes
 from constants.statuses import scoreStatuses
@@ -235,7 +235,8 @@ class Score:
             cmd.append(f'-c {self.combo}') # max combo
             cmd.append(f'-X {self.miss}') # miss count
 
-            cmd.append(f'-D {self.n50}') # 50s equivalent for catch?
+            cmd.append(f'-D {self.n50}') # 50s equivalent for catch? 
+            # hey note from len4ee here 50s for ctb is droplets xd
 
             for mod in re.findall('.{1,2}', self.readable_mods):
                 if mod != 'NM': # will confuse osu-tools xd

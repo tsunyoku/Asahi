@@ -60,23 +60,8 @@ async def connect(): # ran before server startup, used to do things like connect
         AVA_PATH.mkdir(parents=True)
         log('Avatars folder has been created, please set a default avatar by placing a file named "default.png" into resources/avatars!', Ansi.LRED)
 
-    if not SS_PATH.exists():
-        SS_PATH.mkdir(parents=True)
-
-    if not R_PATH.exists():
-        R_PATH.mkdir(parents=True)
-
-    if not RRX_PATH.exists():
-        RRX_PATH.mkdir(parents=True)
-    
-    if not RAP_PATH.exists():
-        RAP_PATH.mkdir(parents=True)
-
-    if not MAPS_PATH.exists():
-        MAPS_PATH.mkdir(parents=True)
-        
-    if not ACHIEVEMENTS_PATH.exists():
-        ACHIEVEMENTS_PATH.mkdir(parents=True)
+    for directory in (SS_PATH. R_PATH, RRX_PATH, RAP_PATH, MAPS_PATH, ACHIEVEMENTS_PATH):
+        if not directory.exists(): directory.mkdir(parents=True)
 
     # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetchrow('SELECT name, pw, country, name FROM users WHERE id = 1')

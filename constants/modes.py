@@ -1,5 +1,5 @@
 from enum import Enum
-from constants.mods import Mods
+from .mods import Mods
 from functools import cache
 
 m_str = (
@@ -31,9 +31,9 @@ class osuModes(Enum):
     @property
     @cache
     def table(self):
-        if self.value in [4, 5, 6]:
+        if self.value in (4, 5, 6):
             return 'scores_rx'
-        elif self.value in [0, 1, 2, 3]:
+        elif self.value in (0, 1, 2, 3):
             return 'scores'
         else:
             return 'scores_ap'
@@ -41,11 +41,11 @@ class osuModes(Enum):
     @property
     @cache
     def as_vn(self):
-        if self.value in [0, 4, 7]:
+        if self.value in (0, 4, 7):
             return 0
-        elif self.value in [1, 5]:
+        elif self.value in (1, 5):
             return 1
-        elif self.value in [2, 6]:
+        elif self.value in (2, 6):
             return 2
         else:
             return self.value

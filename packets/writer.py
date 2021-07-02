@@ -142,8 +142,9 @@ def write_string(s: str) -> bytearray:
         return bytearray(b"\x00")
 
     d = bytearray(b"\x0B")
-    d += write_uleb128(len(s.encode()))
-    d += s.encode()
+    byte = data.encode("utf-8", "ignore")
+    d += write_uleb128(len(byte))
+    d += byte
 
     return d
 

@@ -48,7 +48,7 @@ def handle_packet(data: bytes, struct: tuple) -> bytes:
     return d
 
 class Reader:
-    def __init__(self, data):
+    def __init__(self, data: bytes):
         self.data = data
         self.offset = 0
         self.pid, self.length = self.packet_lid()
@@ -200,7 +200,7 @@ class Reader:
         return d
     
     def read_i32l_4(self): # i dont think this is correct but whatev
-        l = self.read_i16()
+        l = self.read_i32()
         
         d = struct.unpack(f'<{"I" * l}', self.data[self.offset:self.offset + l * 4])
         
