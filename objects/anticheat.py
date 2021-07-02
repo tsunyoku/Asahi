@@ -40,3 +40,5 @@ class Anticheat:
 		if self.version[:3] != "b20":
 			# They use some weird shit.
 			return True, "Tried to use weird/custom client."
+
+		return False, ""
