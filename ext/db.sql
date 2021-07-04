@@ -513,7 +513,7 @@ CREATE TABLE public.punishments (
                                     type text NOT NULL,
                                     reason text NOT NULL,
                                     target integer NOT NULL,
-                                    from integer NOT NULL,
+                                    `from` integer NOT NULL,
                                     time integer not NULL
 );
 
