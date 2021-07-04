@@ -50,7 +50,11 @@ class Beatmap:
 
     @property
     def url(self):
-        return f'https://osu.{glob.config.domain}/b/{self.id}'
+        return f'https://osu.{glob.config.domain}/beatmaps/{self.id}'
+    
+    @property
+    def set_url(self):
+        return f'https://osu.{glob.config.domain}/beatmapsets/{self.sid}'
 
     @property
     def embed(self):

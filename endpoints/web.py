@@ -314,7 +314,7 @@ async def scoreSubmit(request: Request):
     
     cap = glob.config.pp_caps[s.mode.value]
 
-    if cap is not None and s.pp >= cap and s.map.status & mapStatuses.GIVE_PP and glob.config.anticheat and not s.user.restricted:
+    if cap is not None and s.pp >= cap and s.map.status & mapStatuses.GIVE_PP and glob.config.anticheat and not s.user.restricted: # ugly
         await s.user.restrict(reason='Exceeding PP cap', fr=glob.bot)
 
     # update stats EEEEEEE
@@ -377,7 +377,7 @@ async def scoreSubmit(request: Request):
     if s.map.status >= mapStatuses.Ranked:
         charts.append('|'.join((
             'chartId:beatmap',
-            f'chartUrl:https://{glob.config.domain}/b/{s.map.id}',
+            f'chartUrl:{s.map.set_url}',
             'chartName:Current Score',
 
             *(( # wtaf
