@@ -1,14 +1,27 @@
 import time
 import asyncio
+import asyncpg
 
 from constants.privs import Privileges
 from objects.player import Player
 from packets import writer
 from . import glob
+from cmyui import log
+
+# WHY DO YOU HAVE TO BE SO SHIT ASYNCPG
+db_donor = None
+db_frozen = None
+
+async def prepare_tasks():
+    # separate conns for tasks or asyncpg throws a temper tantrum
+    global db_donor
+    global db_frozen
+    db_donor = await asyncpg.connect(user=glob.config.postgres['user'], password=glob.config.postgres['password'], database=glob.config.postgres['db'], host=glob.config.postgres['host'])
+    db_frozen = await asyncpg.connect(user=glob.config.postgres['user'], password=glob.config.postgres['password'], database=glob.config.postgres['db'], host=glob.config.postgres['host'])
 
 async def expired_donor():
     while True: # this sux
-        donors = await glob.db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Supporter} > 1')
+        donors = await db_donor.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Supporter} > 0')
         
         for user in donors:
             if user['donor_end'] < time.time(): # donor expired
@@ -27,7 +40,7 @@ async def expired_donor():
         
 async def freeze_timers():
     while True: # this sux v2
-        frozen = await glob.db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Frozen} > 1')
+        frozen = await db_frozen.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Frozen} > 0')
         
         for user in frozen:
             if user['freeze_timer'] < time.time(): # freeze timer passed

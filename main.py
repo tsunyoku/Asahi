@@ -22,7 +22,7 @@ from constants.countries import country_codes
 
 from endpoints.assets import assets, init_customs
 
-from objects.tasks import expired_donor, freeze_timers
+from objects.tasks import expired_donor, freeze_timers, prepare_tasks
 
 app = Xevel(glob.config.socket) # handler for webserver :D
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
@@ -118,6 +118,8 @@ async def connect(): # ran before server startup, used to do things like connect
 
             if glob.config.debug:
                 log(f'==== Added clan {clan.name} to clan list ====', Ansi.GREEN)
+                
+    await prepare_tasks() # make new db conn for donor/freeze tasks
 
     log(f'==== Asahi v{glob.version} started ====', Ansi.GREEN)
 
