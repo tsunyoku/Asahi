@@ -90,7 +90,6 @@ async def getScreenshot(request: Request, scr: str):
     if ss.exists():
         ssb = ss.read_bytes()
         request.resp_headers['Content-Type'] = f'image/{_type}'
-        request.resp_headers['Content-Length'] = len(ssb)
         return ssb
     else:
         return b'could not find screenshot'
@@ -126,15 +125,13 @@ async def osuSearch(request: Request):
     args['u'] = glob.config.bancho_username
     args['h'] = glob.config.bancho_hashed_password
 
-    # james it was good try however someone can leak their u and h arg, sadly you need to opt to use clientsession here. 
-    #request.resp_headers['Location'] = f'https://osu.ppy.sh/web/osu-search.php{argstr}'
     async with glob.web.get("https://osu.ppy.sh/web/osu-search-set.php", params=args) as resp:
         if resp.status != 200:
-            return b'0'
+            return (resp.status, b'0')
 
         ret = await resp.read()
 
-    return (200, ret.encode())
+    return ret.encode()
 
 @web.route("/web/osu-search-set.php")
 async def osuSearchSet(request: Request):
@@ -145,15 +142,13 @@ async def osuSearchSet(request: Request):
     args['u'] = glob.config.bancho_username
     args['h'] = glob.config.bancho_hashed_password
 
-    # james it was good try however someone can leak their u and h arg, sadly you need to opt to use clientsession here.
-    #request.resp_headers['Location'] = f'https://osu.ppy.sh/web/osu-search-set.php?{"&".join(_args)}'
     async with glob.web.get("https://osu.ppy.sh/web/osu-search-set.php", params=args) as resp:
         if resp.status != 200:
-            return b'0'
+            return (resp.status, b'0')
 
         ret = await resp.read()
 
-    return (200, ret.encode())
+    return ret.encode()
 
 @web.route("/users", ['POST'])
 async def ingameRegistration(request: Request):

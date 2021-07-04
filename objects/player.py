@@ -71,6 +71,10 @@ class Player:
         self.frozen: bool = False
         
         self.freeze_timer: int = uinfo.get('freeze_timer', 0)
+        
+        self.registered_at: int = uinfo.get('registered_at', 0)
+        self.silence_end: int = uinfo.get('silence_end', 0)
+        self.donor_end: int = uinfo.get('donor_end', 0)
 
     @property
     def full_name(self):

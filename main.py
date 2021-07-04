@@ -9,6 +9,8 @@ from aiohttp import ClientSession
 from discord.ext import commands
 import asyncpg
 import aioredis
+import uvloop
+import asyncio
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
@@ -20,21 +22,21 @@ from constants.countries import country_codes
 
 from endpoints.assets import assets, init_customs
 
+from objects.tasks import expired_donor, freeze_timers
+
 app = Xevel(glob.config.socket) # handler for webserver :D
-
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
-
 glob.version = Version(0, 3, 2) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
-
 R_PATH = Path.cwd() / 'resources/replays'
 RRX_PATH = Path.cwd() / 'resources/replays_rx'
 RAP_PATH = Path.cwd() / 'resources/replays_ap'
-
 MAPS_PATH = Path.cwd() / 'resources/maps'
 ACHIEVEMENTS_PATH = Path.cwd() / 'resources/achievements'
+
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 @app.before_serving()
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
@@ -155,4 +157,6 @@ app.add_router(assets)
 if __name__ == '__main__':
     dc.load_extension('disc.bot')
     app.add_task((dc.start, glob.config.token))
+    app.add_task(expired_donor)
+    app.add_task(freeze_timers)
     app.start()

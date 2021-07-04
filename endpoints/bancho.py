@@ -27,6 +27,9 @@ from constants import regexes
 from packets import writer, reader
 from packets.writer import Packets
 
+if glob.config.server_migration:
+    import bcrypt
+
 bancho = Router({f'c.{glob.config.domain}', f'c4.{glob.config.domain}', f'ce.{glob.config.domain}'}) # handler for webserver :D
 rdr = database.Reader('ext/geoloc.mmdb')
 
@@ -683,7 +686,7 @@ async def root_client(request: Request):
                 request.resp_headers['cho-token'] = 'no'
                 return writer.versionUpdateForced() + writer.userID(-2)
          
-        user = await glob.db.fetchrow("SELECT id, pw, country, name, priv, freeze_timer FROM users WHERE name = $1", username)
+        user = await glob.db.fetchrow("SELECT * FROM users WHERE name = $1", username)
         if not user: # ensure user actually exists before attempting to do anything else
             if glob.config.debug:
                 log(f'User {username} does not exist.', Ansi.LRED)
@@ -691,27 +694,45 @@ async def root_client(request: Request):
             request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
             return writer.userID(-1)
 
-        bcache = glob.cache['pw'] # get our cached pws to potentially enhance speed
-        user_pw = user['pw'].encode('ISO-8859-1').decode('unicode-escape').encode('ISO-8859-1') # this is cursed SHUT UP
-        if user_pw in bcache:
-            if pw != bcache[user_pw]: # compare provided md5 with the stored (cached) pw to ensure they have provided the correct password
+        # if server is migrated then passwords are previously stored as bcrypt
+        # lets check if we need to convert and do so if needed
+        if glob.config.server_migration and ('$' in user['pw'] and len(user['pw'] == 60)):
+            user_pw = user['pw'].encode()
+            if not bcrypt.checkpw(pw, user_pw):
                 if glob.config.debug:
                     log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
 
                 request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
                 return writer.userID(-1)
-        else:
-            k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'')
-            try:
-                k.verify(pw, user_pw)
-            except Exception as e:
-                if glob.config.debug:
-                    log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
-
-                request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
-                return writer.userID(-1)
-
-            bcache[user_pw] = pw # cache pw for future
+            else: # correct password, we allow the user to continue but lets convert the password to our new format first
+                k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'')
+                new_pw = k.derive(pw).decode('unicode-escape')
+                await glob.db.execute(f'UPDATE users SET pw = $1 WHERE id = $2', new_pw, user['id'])
+                
+                # add to cache for the future
+                glob.cache['pw'][user_pw] = new_pw
+        else: # password is already converted or db already has correct formats
+            bcache = glob.cache['pw'] # get our cached pws to potentially enhance speed
+            user_pw = user['pw'].encode('ISO-8859-1').decode('unicode-escape').encode('ISO-8859-1') # this is cursed SHUT UP
+            if user_pw in bcache:
+                if pw != bcache[user_pw]: # compare provided md5 with the stored (cached) pw to ensure they have provided the correct password
+                    if glob.config.debug:
+                        log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
+    
+                    request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
+                    return writer.userID(-1)
+            else:
+                k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'')
+                try:
+                    k.verify(pw, user_pw)
+                except Exception as e:
+                    if glob.config.debug:
+                        log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
+    
+                    request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
+                    return writer.userID(-1)
+    
+                bcache[user_pw] = pw # cache pw for future
 
         if user['priv'] & Privileges.Banned:
             request.resp_headers['cho-token'] = 'no'
@@ -760,7 +781,7 @@ async def root_client(request: Request):
         data += writer.channelInfoEnd() # no clue what this does either
         data += writer.menuIcon() # set main menu icon
         data += writer.friends(p.friends) # send user friend list
-        data += writer.silenceEnd(0) # force to 0 for now since silences arent a thing
+        data += writer.silenceEnd(p.silence_end)
 
         # get channels from cache and send to user
         for chan in glob.channels.values():
@@ -818,12 +839,18 @@ async def root_client(request: Request):
             
         if p.frozen and not p.restricted:
             if p.freeze_timer.timestamp() < start: # freeze timer has expired lol
+                await p.remove_priv(Privileges.Frozen)
                 await p.restrict(reason='Expired freeze timer')
                 data += writer.sendMessage(fromname=glob.bot.name, msg=f'Your freeze timer has expired and you have not submitted any liveplay, you have been restricted as a result!', tarname=p.name, fromid=glob.bot.id)
             else:
                 reason = await glob.db.fetchval("SELECT reason FROM punishments WHERE type = 'freeze' AND target = $1 ORDER BY time DESC LIMIT 1", p.id)
                 data += writer.sendMessage(fromname=glob.bot.name, msg=f'Your account is currently frozen for reason "{reason}"! If you do not provide a liveplay by {p.freeze_timer.strftime("%d/%m/%Y %H:%M:%S")}, you will be autorestricted.', tarname=p.name, fromid=glob.bot.id)
 
+        if p.priv & Privileges.Supporter and p.donor_end < start:
+            log(f"Removing {p.name}'s expired donor.")
+            await p.remove_priv(Privileges.Supporter)
+            data += writer.sendMessage(fromname=glob.bot.name, msg=f'Your supporter has expired! Your support perks have been removed.', tarname=p.name, fromid=glob.bot.id)
+    
         elapsed = (time.time() - start) * 1000
         data += writer.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed:.2f}ms') # send notification as indicator they've logged in i guess
         log(f'{p.name} successfully logged in.', Ansi.LBLUE)

@@ -61,3 +61,7 @@ pp_caps = (
 # obviously, if you don't want to provide these then you can just edit the code to use a beatmap mirror instead
 bancho_username = ''
 bancho_hashed_password = '' # md5 hash of your password, you can generate an md5 hash here: https://www.md5hashgenerator.com/
+
+# if you have switched to asahi from another source with asahi's migrator, you will need to enable this.
+# other server sources use bcrypt, while we dont: this will handle conversion from bcrypt to our format for you if it is enabled.
+server_migration = False
