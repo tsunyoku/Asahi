@@ -48,7 +48,7 @@ async def get_country_rank(mode, uid, pp, country):
 
 @api.route('/player_count')
 async def onlinePlayers(request):
-    return {'code': 200, 'online': len(glob.players) - 1}
+    return {'online': len(glob.players) - 1}
 
 @api.route('/player')
 async def user(request):
@@ -58,28 +58,30 @@ async def user(request):
     username = args.get('username', None)
 
     if not username and not id:
-        return {'code': 400, 'message': 'you must specify either a username or id!'}
+        return (400, {'message': 'you must specify either a username or id!'})
 
     if username:
         id = await glob.db.fetchval('SELECT id FROM users WHERE name = $1', username)
 
     if not id:
-        return {'code': 400, 'message': 'user could not be found! please check the username/id you specified and try again'}
+        return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
 
     info = await glob.db.fetchrow('SELECT id, name, country FROM users WHERE id = $1', id)
 
     if not info:
-        return {'code': 400, 'message': 'user could not be found! please check the username/id you specified and try again'}
+        return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
 
     stats_db = await glob.db.fetchrow('SELECT * FROM stats WHERE id = $1', id)
     
     if stats_db['priv'] & Privileges.Disallowed:
-        return {'code': 400, 'message': 'user is restricted/banned!'}
+        return (400, {'message': 'user is restricted/banned!'})
 
     info = dict(info)
     stats_db = dict(stats_db)
 
     stats = {}
+    
+    # cleaner way soonTM
 
     for mode in ('std', 'taiko', 'catch', 'mania'):
         stats[mode] = {}
@@ -110,7 +112,7 @@ async def user(request):
                 'country_rank': await get_country_rank(f'{mode}_{s}', id, stats_db[f'pp_{mode}_{s}'], info['country'].upper())
             }
 
-    return {'code': 200, 'info': info, 'stats': stats}
+    return {'info': info, 'stats': stats}
 
 @api.route("/player_status")
 async def playerStatus(request):
@@ -120,19 +122,19 @@ async def playerStatus(request):
     username = args.get('username', None)
 
     if not id and not username:
-        return {'code': 400, 'message': 'you must specify either a username or id!'}
+        return (400, {'message': 'you must specify either a username or id!'})
 
     if username:
         id = await glob.db.fetchval('SELECT id FROM users WHERE name = $1', username)
 
     if not id:
-        return {'code': 400, 'message': 'user could not be found! please check the username/id you specified and try again'}
+        return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
 
     if not (player := glob.players_id.get(id)):
-        return {'code': 200, 'status': {'online': False}}
+        return {'status': {'online': False}}
     
     if player.priv & Privileges.Disallowed:
-        return {'code': 400, 'message': 'user is restricted/banned!'}
+        return (400, {'message': 'user is restricted/banned!'})
 
     if player.map_md5:
         if not (bmap := Beatmap.md5_cache(player.map_md5)):
@@ -158,7 +160,7 @@ async def playerStatus(request):
         } if bmap else None
     }
 
-    return {'code': 200, 'status': status}
+    return {'status': status}
 
 @api.route("/get_replay")
 async def getReplay(request):
@@ -168,7 +170,7 @@ async def getReplay(request):
     rx = int(args.get('rx', 0))
 
     if not sid:
-        return {'code': 400, 'message': 'please specify a score id!'}
+        return (400, {'message': 'please specify a score id!'})
 
     BASE_DIR = Path.cwd() / 'resources'
 
@@ -185,12 +187,16 @@ async def getReplay(request):
     file = REPLAY_PATH / f'{sid}.osr'
 
     if not file.exists():
-        return {'code': 400, 'message': "replay couldn't be found. please check the score id and try again!"}
+        return (400, {'message': "replay couldn't be found. please check the score id and try again!"})
 
     raw = file.read_bytes()
 
     # get score from sql
-    score = await glob.db.fetchrow(f'SELECT t.*, t.mode m, users.name, maps.* FROM {table} t LEFT OUTER JOIN users ON users.id = t.uid LEFT OUTER JOIN maps ON maps.md5 = t.md5 WHERE t.id = $1', sid)
+    score = await glob.db.fetchrow(
+        f'SELECT t.*, t.mode m, users.name, maps.* FROM {table} t '
+        'LEFT OUTER JOIN users ON users.id = t.uid LEFT OUTER JOIN maps ON maps.md5 = t.md5 WHERE t.id = $1', 
+        sid
+    )
 
     hash = hashlib.md5(
         (f'{score["n100"] + score["n300"]}p{score["n50"]}o'
@@ -204,7 +210,7 @@ async def getReplay(request):
 
     rp = bytearray() # headers timeee
 
-    rp += struct.pack('<Bi', score["m"], 20210523) # osuver once im not lazy (score sub provides it so easy solution lol)
+    rp += struct.pack('<Bi', score["m"], score["osuver"] or 20210520.2) # not all scores will have osuver so lets just send latest (as of this code) version
     rp += writer.write_string(score["md5"])
 
     rp += writer.write_string(score["name"])

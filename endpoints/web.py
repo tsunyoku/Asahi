@@ -321,6 +321,9 @@ async def scoreSubmit(request: Request):
     stats = s.user.stats[s.mode.value]
     old = copy.copy(stats) # we need a copy of the old stats for submission chart
 
+    elapsed = mpargs['st' if s.passed else 'ft'] # timewarp check with this soon?
+    stats.playtime += int(elapsed) // 1000
+    stats.tscore += s.score
     stats.pc += 1
 
     if s.status == scoreStatuses.Best and s.map.status >= mapStatuses.Ranked:
@@ -335,9 +338,17 @@ async def scoreSubmit(request: Request):
         if s.map.status & mapStatuses.GIVE_PP:
             stats.rscore += add
 
-    stats.tscore += s.score
-
     await s.user.update_stats(s.mode, s.mode.table, s.mode.as_vn)
+    
+    if not s.user.restricted:
+        s.map.plays += 1
+        if s.passed:
+            s.map.passes += 1
+            
+        await glob.db.execute(
+            'UPDATE maps SET plays = $1, passes = $2 WHERE md5 = $3', 
+            s.map.plays, s.map.passes, s.map.md5
+        )
 
     # sub charts bruh
     if s.mods & Mods.GAME_CHANGING or s.status == scoreStatuses.Failed:

@@ -7,7 +7,7 @@ from constants.grades import Grade
 from objects import glob
 
 from base64 import b64decode
-from py3rijndael import RijndaelCbc, ZeroPadding
+from py3rijndael import RijndaelCbc, Pkcs7Padding
 from pathlib import Path
 from cmyui.osu.oppai_ng import OppaiWrapper
 from maniera.calculator import Maniera
@@ -49,6 +49,8 @@ class Score:
         self.time: int = None
 
         self.old_best: Score = None
+        
+        self.osuver: int = None
 
     @classmethod
     async def sql(self, sid: int, table: str, sort: str, t: int, ensure: bool = False):
@@ -100,26 +102,30 @@ class Score:
             s.rank = await s.calc_lb(table, sort, t)
         else:
             s.rank = 0
+            
+        s.osuver = score['osuver']
 
         return s
 
     @classmethod
     async def submission(self, base: str, iv: str, pw: str, ver: str):
-        iv = b64decode(iv).decode('latin_1')
-        d = b64decode(base).decode('latin_1')
-        key = f'osu!-scoreburgr---------{ver}'
-        a = RijndaelCbc(key, iv, ZeroPadding(32), 32)
+        a = RijndaelCbc( # much better fuck one liners
+            key=f'osu!-scoreburgr---------{ver}',
+            iv=b64decode(iv),
+            padding=Pkcs7Padding(32),
+            block_size=32
+        )
 
-        data = a.decrypt(d).decode().split(':')
+        data = a.decrypt(b64decode(base)).decode().split(':')
 
         s = self()
 
         s.map = await Beatmap.from_md5(data[0])
 
-        # i need to find a faster way to do this some day
-        for o in glob.players.values():
-            if o.pw == pw:
-                s.user = o
+        user = data[1].rstrip()
+        if (u := glob.players.get(user)): # faster i think?
+            if u.pw == pw:
+                s.user = u
         
         if not s.user:
             return s # even if user isnt found, may be related to connection and we want to tell the client to retry
@@ -152,10 +158,12 @@ class Score:
         
         if s.user.restricted:
             s.rank = 0
+            
+        s.osuver = float(re.sub("[^0-9]", "", ver)) # lol
 
         return s
 
-    def analyse(self):
+    def analyse(self): # sadly no async because threading lol
         # BIG NOTE: THIS IS MORE OF A PREVENTATIVE MEASURE TO STOP BLATANT CHEATERS. SOME VERY GOOD LEGIT PLAYERS COULD GET FLAGGED BY THIS SO PLEASE BE AWARE
         # however: 9 times out of 10 this shouldn't false ban, most players getting e.g sub 60 ur will be relax cheats. but maybe you have umbre playing on your server, i don't know.
 

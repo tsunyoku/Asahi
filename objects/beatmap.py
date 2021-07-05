@@ -43,6 +43,9 @@ class Beatmap:
         self.nc: int = minfo.get('nc', 0) # nc = next check (for status update)
 
         self.lb: 'Leaderboard' = minfo.get('lb', None)
+        
+        self.plays: int = minfo.get('plays', 0)
+        self.passes: int = minfo.get('passes', 0)
 
     @property
     def name(self):
@@ -295,6 +298,17 @@ class Beatmap:
 
     async def save(self):
         try:
-            await glob.db.execute('INSERT INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, update, nc) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)', self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc)
+            await glob.db.execute(
+                'INSERT INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, update, nc, plays, passes) '
+                'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)',
+                self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, 
+                self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc,
+                self.plays, self.passes
+            )
         except Exception: # sadly there is no good way to update on duplicate like there is with mysql
-            await glob.db.execute('UPDATE maps SET id = $1, sid = $2, bpm = $3, cs = $4, ar = $5, od = $6, hp = $7, sr = $8, mode = $9, artist = $10, title = $11, diff = $12, mapper = $13, status = $14, frozen = $15, update = $16, nc = $17 WHERE md5 = $18', self.id, self.sid, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc, self.md5)
+            await glob.db.execute(
+                'UPDATE maps SET id = $1, sid = $2, bpm = $3, cs = $4, ar = $5, od = $6, hp = $7, sr = $8, mode = $9, artist = $10, '
+                'title = $11, diff = $12, mapper = $13, status = $14, frozen = $15, update = $16, nc = $17, plays = $18, passes = $19 WHERE md5 = $20', 
+                self.id, self.sid, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, 
+                self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc, self.plays, self.passes, self.md5
+            )

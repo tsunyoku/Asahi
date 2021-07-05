@@ -29,6 +29,7 @@ class Stats:
     country_rank: int
     pp: int
     max_combo: int
+    playtime: int
 
 class Player:
     def __init__(self, **uinfo):
@@ -161,7 +162,7 @@ class Player:
 
     async def set_stats(self):
         for mode in osuModes:
-            stat = dict(await glob.db.fetchrow('SELECT rscore_{0} rscore, acc_{0} acc, pc_{0} pc, tscore_{0} tscore, pp_{0} pp, mc_{0} max_combo FROM stats WHERE id = $1'.format(mode.name), self.id))
+            stat = dict(await glob.db.fetchrow('SELECT rscore_{0} rscore, acc_{0} acc, pc_{0} pc, tscore_{0} tscore, pp_{0} pp, mc_{0} max_combo, pt_{0} playtime FROM stats WHERE id = $1'.format(mode.name), self.id))
 
             if not self.restricted:
                 stat['rank'] = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}', self.id)
@@ -226,7 +227,7 @@ class Player:
             else:
                 stats.country_rank += 1
 
-        await glob.db.execute('UPDATE stats SET rscore_{0} = $1, acc_{0} = $2, pc_{0} = $3, tscore_{0} = $4, pp_{0} = $5, mc_{0} = $6 WHERE id = $7'.format(mode_name), stats.rscore, stats.acc, stats.pc, stats.tscore, stats.pp, stats.max_combo, self.id)
+        await glob.db.execute('UPDATE stats SET rscore_{0} = $1, acc_{0} = $2, pc_{0} = $3, tscore_{0} = $4, pp_{0} = $5, mc_{0} = $6, pt_{0} = $7 WHERE id = $8'.format(mode_name), stats.rscore, stats.acc, stats.pc, stats.tscore, stats.pp, stats.max_combo, stats.playtime, self.id)
 
         self.enqueue(writer.userStats(self))
         

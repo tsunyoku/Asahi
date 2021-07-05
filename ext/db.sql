@@ -143,7 +143,15 @@ CREATE TABLE public.stats (
     mc_taiko_rx integer DEFAULT 0 NOT NULL,
     mc_catch integer DEFAULT 0 NOT NULL,
     mc_catch_rx integer DEFAULT 0 NOT NULL,
-    mc_mania integer DEFAULT 0 NOT NULL
+    mc_mania integer DEFAULT 0 NOT NULL,
+    pt_std integer DEFAULT 0 NOT NULL,
+    pt_std_rx integer DEFAULT 0 NOT NULL,
+    pt_std_ap integer DEFAULT 0 NOT NULL,
+    pt_taiko integer DEFAULT 0 NOT NULL,
+    pt_taiko_rx integer DEFAULT 0 NOT NULL,
+    pt_catch integer DEFAULT 0 NOT NULL,
+    pt_catch_rx integer DEFAULT 0 NOT NULL,
+    pt_mania integer DEFAULT 0 NOT NULL
 );
 
 
@@ -318,7 +326,9 @@ CREATE TABLE public.maps (
     status integer NOT NULL,
     frozen integer NOT NULL,
     update bigint NOT NULL,
-    nc bigint DEFAULT 0 NOT NULL
+    nc bigint DEFAULT 0 NOT NULL,
+    plays integer DEFAULT 0 NOT NULL,
+    passes integer DEFAULT 0 NOT NULL
 );
 
 
@@ -365,7 +375,8 @@ CREATE TABLE public.scores (
     "time" bigint NOT NULL,
     uid integer NOT NULL,
     readable_mods text NOT NULL,
-    fc integer NOT NULL
+    fc integer NOT NULL,
+    osuver double precision DEFAULT 0 NOT NULL
 );
 
 
@@ -412,7 +423,8 @@ CREATE TABLE public.scores_rx (
     "time" bigint NOT NULL,
     uid integer NOT NULL,
     readable_mods text NOT NULL,
-    fc integer NOT NULL
+    fc integer NOT NULL,
+    osuver double precision DEFAULT 0 NOT NULL
 );
 
 
@@ -459,7 +471,8 @@ CREATE TABLE public.scores_ap (
     "time" bigint NOT NULL,
     uid integer NOT NULL,
     readable_mods text NOT NULL,
-    fc integer NOT NULL
+    fc integer NOT NULL,
+    osuver double precision DEFAULT 0 NOT NULL
 );
 
 
