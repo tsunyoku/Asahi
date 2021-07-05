@@ -772,7 +772,7 @@ async def root_client(request: Request):
             a = cinfo[3][:-1].split(':')
             adapters = {'osu_md5': a[0], 'mac_address': a[1], 'uninstall_id': a[2], 'disk_serial': a[3], 'ip': ip}
 
-            checks = Anticheat(osuver=cinfo[0], adapters=adapters, player=p)
+            checks = Anticheat(osuver=cinfo[0], adapters=adapters, player=p, headers=headers)
             
             # we want to check multi stuff before any cheats just in case
             await checks.multi_check()

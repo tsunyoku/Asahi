@@ -7,6 +7,7 @@ class Anticheat:
         self.ver: int = info.get('osuver', None)
         self.adapters: dict = info.get('adapters', None)
         self.player: Player = info.get('player', None)
+        self.headers: dict = info.get('headers', None)
         
         self.stream: str = ''
         
@@ -61,7 +62,7 @@ class Anticheat:
             )
 
     async def client_check(self):
-        if any(v in self.ver for v in ('ainu', 'skooter')) or not osu_ver.match(self.ver):
+        if any(v in self.ver for v in ('ainu', 'skooter')) or 'ainu' in self.headers or not osu_ver.match(self.ver):
             return await self.player.restrict(reason='Modified client', fr=glob.bot)
 
         int_ver = self.ver.replace('b', '') # not int if cuttingedge, but we want stream anyways
