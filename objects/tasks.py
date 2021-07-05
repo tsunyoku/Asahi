@@ -8,21 +8,21 @@ from packets import writer
 from . import glob
 from cmyui import log
 
-# WHY DO YOU HAVE TO BE SO SHIT ASYNCPG
-db_donor = None
-db_frozen = None
+donors = None
+frozen = None
 
-async def prepare_tasks():
-    # separate conns for tasks or asyncpg throws a temper tantrum
-    global db_donor
-    global db_frozen
-    db_donor = await asyncpg.connect(user=glob.config.postgres['user'], password=glob.config.postgres['password'], database=glob.config.postgres['db'], host=glob.config.postgres['host'])
-    db_frozen = await asyncpg.connect(user=glob.config.postgres['user'], password=glob.config.postgres['password'], database=glob.config.postgres['db'], host=glob.config.postgres['host'])
+async def prepare_tasks(): # we'll use a separate connection just in case because asyncpg hates us
+    db = await asyncpg.connect(user=glob.config.postgres['user'], password=glob.config.postgres['password'], database=glob.config.postgres['db'], host=glob.config.postgres['host'])
+
+    global donors
+    global frozen
+    donors = await db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Supporter} > 0')
+    frozen = await db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Frozen} > 0')
+
+    await db.close()
 
 async def expired_donor():
-    while True: # this sux
-        donors = await db_donor.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Supporter} > 0')
-        
+    while True: # this sux   
         for user in donors:
             if user['donor_end'] < time.time(): # donor expired
                 log(f"Removing {user['name']}'s expired donor.")
@@ -39,9 +39,7 @@ async def expired_donor():
         await asyncio.sleep(600) # run every 10 mins
         
 async def freeze_timers():
-    while True: # this sux v2
-        frozen = await db_frozen.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Frozen} > 0')
-        
+    while True: # this sux v2  
         for user in frozen:
             if user['freeze_timer'] < time.time(): # freeze timer passed
                 log(f'Restricting {user["name"]} as their freeze timer expired.')
