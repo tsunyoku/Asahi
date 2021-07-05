@@ -62,7 +62,7 @@ class Anticheat:
 
     async def client_check(self):
         if any(v in self.ver for v in ('ainu', 'skooter')) or not osu_ver.match(self.ver):
-            return await self.player.restrict(reason='Modified client')
+            return await self.player.restrict(reason='Modified client', fr=glob.bot)
 
         int_ver = self.ver.replace('b', '') # not int if cuttingedge, but we want stream anyways
         extra_ver = int_ver.split('.')[1] # jfc
