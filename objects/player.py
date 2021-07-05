@@ -478,6 +478,9 @@ class Player:
         
         log(f'{self.name} has been frozen for {reason}.', Ansi.LBLUE)
         
+    async def flag(self, reason, fr):
+        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'flag', reason, self.id, fr.id, time.time())
+        
     async def unfreeze(self, reason, fr):
         if not self.frozen:
             return # ?

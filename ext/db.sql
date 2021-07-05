@@ -32,6 +32,15 @@ CREATE TABLE public.channels (
     perm integer DEFAULT 1 NOT NULL
 );
 
+CREATE TABLE public.user_hashes(
+    uid integer NOT NULL,
+    mac_address text NOT NULL,
+    uninstall_id text NOT NULL,
+    disk_serial text NOT NULL,
+    ip text NOT NULL,
+    occurrences integer DEFAULT 1 NOT NULL,
+    PRIMARY KEY (uid, mac_address, uninstall_id, disk_serial, ip)
+);
 
 ALTER TABLE public.channels OWNER TO tsunyoku;
 

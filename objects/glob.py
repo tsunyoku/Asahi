@@ -22,7 +22,9 @@ packets_restricted = {} # packet dict for packets that restricted players *can* 
 cache = {
     'pw': {}, # store encrypted pws for speed hours
     'maps': {}, # map cache cus xd
-    'unsub': [] # unsubmitted maps xd
+    'unsub': [], # unsubmitted maps xd
+    'vers': {},
+    'latest_ver': {}
 }
 
 players = {} # player dict | player[token] = player

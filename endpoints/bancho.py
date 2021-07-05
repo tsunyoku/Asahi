@@ -17,6 +17,7 @@ from objects import glob # glob = global, server-wide objects will be stored her
 from objects.player import Player # Player - player object to store stats, info etc.
 from objects.beatmap import Beatmap # Beatmap - object to score map info etc.
 from objects.channel import Channel
+from objects.anticheat import Anticheat
 from objects.match import slotStatus, Teams
 from constants.countries import country_codes
 from constants.types import osuTypes, teamTypes
@@ -678,13 +679,6 @@ async def root_client(request: Request):
 
         username = info[0]
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later    
-        osu_ver = regexes.osu_ver.match(cinfo[0])
-        client = cinfo[3].split(":")[:-1]
-
-        if glob.config.anticheat:
-            if int(osu_ver['ver']) <= 20210125:
-                request.resp_headers['cho-token'] = 'no'
-                return writer.versionUpdateForced() + writer.userID(-2)
          
         user = await glob.db.fetchrow("SELECT * FROM users WHERE name = $1", username)
         if not user: # ensure user actually exists before attempting to do anything else
@@ -773,7 +767,22 @@ async def root_client(request: Request):
             await glob.db.execute("UPDATE users SET country = $1 WHERE id = $2", p.country_iso.lower(), p.id) # set country code in db
             await p.add_priv(Privileges.Verified) # verify user
             log(f'{p.name} has been successfully verified.', Ansi.LBLUE)
+            
+        if glob.config.anticheat:
+            a = cinfo[3][:-1].split(':')
+            adapters = {'osu_md5': a[0], 'mac_address': a[1], 'uninstall_id': a[2], 'disk_serial': a[3], 'ip': ip}
 
+            checks = Anticheat(osuver=cinfo[0], adapters=adapters, player=p)
+            
+            # we want to check multi stuff before any cheats just in case
+            await checks.multi_check()
+            
+            client = await checks.client_check()
+            if not client: # skip version check for modified clients lol
+                if await checks.version_check(): # client needs updating
+                    request.resp_headers['cho-token'] = 'no'
+                    return writer.versionUpdateForced() + writer.userID(-2)
+                
         data = bytearray(writer.userID(p.id)) # initiate login by providing the user's id
         data += writer.protocolVersion(19) # no clue what this does
         data += writer.banchoPrivileges(p.client_priv | ClientPrivileges.Supporter)
@@ -790,10 +799,6 @@ async def root_client(request: Request):
                 data += writer.channelJoin(chan.name) # only join user to channel if the channel is meant for purpose
 
             data += writer.channelInfo(chan) # regardless of whether the channel should be auto-joined we should make the client aware of it
-
-        if glob.config.anticheat and not osu_ver:
-            await p.restrict(reason='Missing osu! version', fr=glob.bot)
-            data += writer.notification('Cheat advantages are not allowed! Your account has been restricted.')
 
         # add user to cache?
         glob.players[p.token] = p
