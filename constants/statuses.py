@@ -14,7 +14,9 @@ class mapStatuses(IntEnum):
 def strStatuses(status: str):
     return {
         'rank': mapStatuses.Ranked,
-        'love': mapStatuses.Loved
+        'love': mapStatuses.Loved,
+        'ranked': mapStatuses.Ranked, # because people are stupid
+        'loved': mapStatuses.Loved # because people are stupid
     }.get(status, mapStatuses.Pending)
 
 def apiStatuses(status: int):

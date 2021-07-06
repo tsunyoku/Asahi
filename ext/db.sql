@@ -42,6 +42,15 @@ CREATE TABLE public.user_hashes(
     PRIMARY KEY (uid, mac_address, uninstall_id, disk_serial, ip)
 );
 
+CREATE TABLE public.requests(
+    id SERIAL,
+    requester text NOT NULL,
+    map integer NOT NULL,
+    status integer NOT NULL,
+    mode integer DEFAULT 0 NOT NULL,
+    UNIQUE (map)
+);
+
 ALTER TABLE public.channels OWNER TO tsunyoku;
 
 --

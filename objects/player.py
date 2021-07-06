@@ -11,6 +11,7 @@ from constants.types import teamTypes
 from typing import Optional, TYPE_CHECKING
 from dataclasses import dataclass
 from cmyui import log, Ansi
+from cmuyi.discord import Webhook, Embed
 from datetime import datetime, timedelta
 
 import queue
@@ -434,8 +435,6 @@ class Player:
 
         for chan in self.channels:
             self.leave_chan(chan)
-            
-    # TODO: ban/unban, restrict/unrestrict webhooks
 
     async def ban(self, reason, fr):
         if self.priv & Privileges.Banned:
@@ -456,6 +455,16 @@ class Player:
             
             stat.rank = 0
             stat.country_rank = 0
+
+        if (wh_url := glob.config.webhooks['anticheat']):
+            wh = Webhook(url=wh_url)
+            embed = Embed(title=f'')
+            
+            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
+            embed.add_field(name='New banned user', value=f'{self.name} has been banned by {fr.name} for {reason}.', inline=True)
+            
+            wh.add_embed(embed)
+            await wh.post()
             
         log(f'{self.name} has been banned for {reason}.', Ansi.LBLUE)
         
@@ -475,12 +484,34 @@ class Player:
         
         if self.token:
             self.enqueue(writer.restartServer(0))
+
+        if (wh_url := glob.config.webhooks['anticheat']):
+            wh = Webhook(url=wh_url)
+            embed = Embed(title=f'')
+    
+            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
+            embed.add_field(name='New frozen user', value=f'{self.name} has been frozen by {fr.name} for {reason}.', inline=True)
+    
+            wh.add_embed(embed)
+            await wh.post()
         
         log(f'{self.name} has been frozen for {reason}.', Ansi.LBLUE)
         
     async def flag(self, reason, fr):
         await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'flag', reason, self.id, fr.id, time.time())
+
+        if (wh_url := glob.config.webhooks['anticheat']):
+            wh = Webhook(url=wh_url)
+            embed = Embed(title=f'')
         
+            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
+            embed.add_field(name='New flagged user', value=f'{self.name} has been flagged by {fr.name} for {reason}.', inline=True)
+        
+            wh.add_embed(embed)
+            await wh.post()
+        
+        log(f'{self.name} has been logged for {reason}.', Ansi.LBLUE)
+
     async def unfreeze(self, reason, fr):
         if not self.frozen:
             return # ?
@@ -495,6 +526,16 @@ class Player:
         
         if self.token:
             self.enqueue(writer.restartServer(0))
+
+        if (wh_url := glob.config.webhooks['anticheat']):
+            wh = Webhook(url=wh_url)
+            embed = Embed(title=f'')
+    
+            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
+            embed.add_field(name='New unfrozen user', value=f'{self.name} has been unfrozen by {fr.name} for {reason}.', inline=True)
+    
+            wh.add_embed(embed)
+            await wh.post()
         
         log(f'{self.name} has been unfrozen for {reason}.', Ansi.LBLUE)
         
@@ -502,7 +543,17 @@ class Player:
         await self.remove_priv(Privileges.Banned)
 
         await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'unban', reason, self.id, fr.id, time.time())
-    
+
+        if (wh_url := glob.config.webhooks['anticheat']):
+            wh = Webhook(url=wh_url)
+            embed = Embed(title=f'')
+        
+            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
+            embed.add_field(name='New unbanned user', value=f'{self.name} has been unbanned by {fr.name} for {reason}.', inline=True)
+        
+            wh.add_embed(embed)
+            await wh.post()
+
         log(f'{self.name} has been unbanned for {reason}.', Ansi.LBLUE)
         
     async def restrict(self, reason, fr):
@@ -527,6 +578,16 @@ class Player:
             stat.rank = 0
             stat.country_rank = 0
 
+        if (wh_url := glob.config.webhooks['anticheat']):
+            wh = Webhook(url=wh_url)
+            embed = Embed(title=f'')
+    
+            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
+            embed.add_field(name='New restricted user', value=f'{self.name} has been restricted by {fr.name} for {reason}.', inline=True)
+    
+            wh.add_embed(embed)
+            await wh.post()
+
         log(f'{self.name} has been restricted for {reason}.', Ansi.LBLUE)
 
     async def unrestrict(self, reason, fr):
@@ -538,6 +599,16 @@ class Player:
             self.enqueue(writer.restartServer(0)) # force relog if they're online
 
             await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'unrestrict', reason, self.id, fr.id, time.time())
+
+        if (wh_url := glob.config.webhooks['anticheat']):
+            wh = Webhook(url=wh_url)
+            embed = Embed(title=f'')
+    
+            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
+            embed.add_field(name='New unrestricted user', value=f'{self.name} has been unrestricted by {fr.name} for {reason}.', inline=True)
+    
+            wh.add_embed(embed)
+            await wh.post()
 
         log(f'{self.name} has been unrestricted for {reason}.', Ansi.LBLUE)
         

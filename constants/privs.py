@@ -21,6 +21,23 @@ class Privileges(IntFlag):
     Manager = Admin | Developer | Owner
     Master = Normal | Verified | Supporter | Nominator | Admin | Developer | Owner
     Disallowed = Restricted | Banned
+    
+def strPrivs(priv: str):
+    return {
+        'normal': Privileges.Normal,
+        'verified': Privileges.Verified,
+        'supporter': Privileges.Supporter,
+        'nominator': Privileges.Nominator,
+        'admin': Privileges.Admin,
+        'developer': Privileges.Developer,
+        'owner': Privileges.Owner,
+        'restricted': Privileges.Restricted,
+        'banned': Privileges.Banned,
+        'whitelisted': Privileges.Whitelisted,
+        'frozen': Privileges.Frozen,
+        'manager': Privileges.Manager,
+        'master': Privileges.Master
+    }.get(priv.lower())
 
 class ClientPrivileges(IntFlag):
     Player = 1 << 0

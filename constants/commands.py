@@ -3,12 +3,15 @@ from objects.match import Match
 from objects.channel import Channel
 from objects.beatmap import Beatmap
 from objects.player import Player
-from .privs import Privileges
+from cmyui import log, Ansi
+from cmyui.discord import Webhook, Embed
+from packets import writer
+from .privs import Privileges, strPrivs
 from .types import teamTypes
-from .statuses import strStatuses
+from .modes import osuModes
+from .statuses import strStatuses, mapStatuses
 
 import time
-import packets
 
 cmds = []
 
@@ -51,7 +54,7 @@ async def add_priv(user, args):
     priv = Privileges(await glob.db.fetchval("SELECT priv FROM users WHERE name = $1", name))
     new_privs = Privileges(0)
     for npriv in args[1:]:
-        if not (new_priv := privs.get(npriv.lower())):
+        if not (new_priv := strPrivs(npriv)):
             return f'Privilege {npriv} not found.'
 
         priv |= new_priv
@@ -71,7 +74,7 @@ async def rm_priv(user, args):
     priv = Privileges(await glob.db.fetchval("SELECT priv FROM users WHERE name = $1", name))
     new_privs = Privileges(0)
     for npriv in args[1:]:
-        if not (new_priv := privs.get(npriv.lower())):
+        if not (new_priv := strPrivs(npriv)):
             return f'Privilege {npriv} not found.'
 
         priv &= ~new_priv
@@ -97,13 +100,13 @@ async def clan_battle(user, args):
             return 'Clan owner offline, battle request cancelled!'
         
         if args[1] == 'deny':
-            owner.enqueue(packets.sendMessage(fromname=glob.bot.name, args=f'{user.name} denied your request to battle their clan {clan.name}!', tarname=owner.name, fromid=glob.bot.id))
+            owner.enqueue(writer.sendMessage(fromname=glob.bot.name, args=f'{user.name} denied your request to battle their clan {clan.name}!', tarname=owner.name, fromid=glob.bot.id))
             return 'Battle request denied!'
 
         # battle was accepted, create the battle match
 
-        user.enqueue(packets.sendMessage(fromname=glob.bot.name, args=f'Request accepted! Creating match...', tarname=user.name, fromid=glob.bot.id))
-        owner.enqueue(packets.sendMessage(fromname=glob.bot.name, args=f'{user.name} accepted your request to battle their clan {user.clan.name}! Creating match...', tarname=owner.name, fromid=glob.bot.id))
+        user.enqueue(writer.sendMessage(fromname=glob.bot.name, args=f'Request accepted! Creating match...', tarname=user.name, fromid=glob.bot.id))
+        owner.enqueue(writer.sendMessage(fromname=glob.bot.name, args=f'{user.name} accepted your request to battle their clan {user.clan.name}! Creating match...', tarname=owner.name, fromid=glob.bot.id))
 
         match = Match()
 
@@ -122,7 +125,7 @@ async def clan_battle(user, args):
         glob.channels[f'#multi_{match.id}'] = mp_chan
         match.chat = mp_chan
 
-        # get list of potential clan members we should expect (TODO: if a clan member logs in after this point, add to list)
+        # get list of potential clan members we should expect
         online1 = []
         for m in clan.members:
             if (e := glob.players_id.get(m)):
@@ -139,10 +142,10 @@ async def clan_battle(user, args):
         glob.clan_battles[match.clan_2] = b_info
 
         for u in online1:
-            u.enqueue(packets.sendMessage(fromname=glob.bot.name, args=f'Your clan has initiated in a clan battle against the clan {user.clan.name}! Please join the battle here: {match.embed}', tarname=u.name, fromid=glob.bot.id)) 
+            u.enqueue(writer.sendMessage(fromname=glob.bot.name, args=f'Your clan has initiated in a clan battle against the clan {user.clan.name}! Please join the battle here: {match.embed}', tarname=u.name, fromid=glob.bot.id)) 
 
         for u in online2:
-            u.enqueue(packets.sendMessage(fromname=glob.bot.name, args=f'Your clan has initiated in a clan battle against the clan {clan.name}! Please join the battle here: {match.embed}', tarname=u.name, fromid=glob.bot.id))
+            u.enqueue(writer.sendMessage(fromname=glob.bot.name, args=f'Your clan has initiated in a clan battle against the clan {clan.name}! Please join the battle here: {match.embed}', tarname=u.name, fromid=glob.bot.id))
 
         return
 
@@ -161,7 +164,7 @@ async def clan_battle(user, args):
     if not (owner := glob.players_id.get(clan.owner)):
         return 'The clan owner must be online for you to request a battle!'
 
-    owner.enqueue(packets.sendMessage(fromname=glob.bot.name, args=f'{user.name} has invited you to a clan battle! If you wish to accept then type !battle accept {user.clan.name}, or !battle deny {user.clan.name} to deny. If you accept, a multiplayer match will be created for you and all your online clanmates to battle to the death!', tarname=owner.name, fromid=glob.bot.id))
+    owner.enqueue(writer.sendMessage(fromname=glob.bot.name, args=f'{user.name} has invited you to a clan battle! If you wish to accept then type !battle accept {user.clan.name}, or !battle deny {user.clan.name} to deny. If you accept, a multiplayer match will be created for you and all your online clanmates to battle to the death!', tarname=owner.name, fromid=glob.bot.id))
 
     return f'Clan battle request sent to {clan.name} clan!'
 
@@ -187,8 +190,7 @@ async def _map(user, args):
         await bmap.save()
         glob.cache['maps'][bmap.md5] = bmap
     else:
-        sid = await glob.db.fetchval('SELECT sid FROM maps WHERE md5 = $1', bmap.md5)
-        _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $1', sid)
+        _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $1', bmap.sid)
 
         for m in _set:
             md5 = m['md5']
@@ -198,8 +200,111 @@ async def _map(user, args):
             bm.lb = None # reset lb cache in case of major status change
             await bm.save()
             glob.cache['maps'][bm.md5] = bm
+    
+    if (wh_url := glob.config.webhooks['maps']):
+        wh = Webhook(url=wh_url)
+        embed = Embed(title='')
+        
+        embed.set_author(url=f'https://{glob.config.domain}/u/{user.id}', name=user.name, icon_url=f'https://a.{glob.config.domain}/{user.id}')
+        embed.set_image(url=f'https://assets.ppy.sh/beatmaps/{bmap.id}/covers/card.jpg')
+        embed.add_field(name=f'New {ns.lower()} map', value=f'{bmap.embed} is now {ns.lower()}!', inline=True)
+        
+        wh.add_embed(embed)
+        await wh.post()
 
     return 'Status updated!'
+
+@command(priv=Privileges.Nominator, name='requests', elapsed=False)
+async def reqs(user, args):
+    """View all map status requests on the server"""
+    if (requests := await glob.db.fetch(f'SELECT * FROM requests')):
+        ret = []
+        for req in requests:
+            _map = await Beatmap.bid_fetch(req['map'])
+            
+            if not _map:
+                continue # broken map we'll just skip to next one
+                
+            mode = repr(osuModes(req['mode']))
+            status = mapStatuses(req['status'])
+                
+            ret.append(f'Request #{req["id"]}: {req["requester"]} requested {_map.embed} to be {status.name.lower()} (Mode: {mode})')
+            
+        return '\n'.join(ret)
+    
+    return 'No requests to read!'
+
+@command(priv=Privileges.Nominator, name='accept')
+async def a_req(user, args):
+    """Accept a map status request"""
+    if len(args) < 2:
+        return 'You must provide the request ID and status to set!'
+    
+    request = await glob.db.fetchrow('SELECT * FROM requests WHERE id = $1', int(args[0]))
+    _map = await Beatmap.bid_fetch(request['map'])
+    ns = strStatuses(args[1])
+    
+    # TODO: better management for ranking only certain difficulties
+    _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $1', _map.sid)
+    
+    for m in _set:
+        bm = await Beatmap.from_md5(m['md5'])
+        bm.status = ns
+        bm.frozen = True
+        bm.lb = None # reset lb cache in case of major status change
+        await bm.save()
+        glob.cache['maps'][bm.md5] = bm
+
+    if (wh_url := glob.config.webhooks['maps']):
+        wh = Webhook(url=wh_url)
+        embed = Embed(title='')
+
+        embed.set_author(url=f'https://{glob.config.domain}/u/{user.id}', name=user.name, icon_url=f'https://a.{glob.config.domain}/{user.id}')
+        embed.set_image(url=f'https://assets.ppy.sh/beatmaps/{_map.id}/covers/card.jpg')
+        embed.add_field(name=f'New {ns.lower()} map', value=f'{_map.embed} is now {ns.lower()}!', inline=True)
+
+        wh.add_embed(embed)
+        await wh.post()
+        
+    if (rq := glob.players_name.get(request['requester'])):
+        rq.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your request to {mapStatuses(request["status"]).name.lower()} {_map.embed} was accepted by {user.name}! It is now {ns.name.lower()}.', tarname=rq.name, fromid=glob.bot.id))
+    
+    await glob.db.execute('DELETE FROM requests WHERE id = $1', int(args[0]))
+
+    return 'Map status updated!'
+
+@command(priv=Privileges.Nominator, name='deny')
+async def d_req(user, args):
+    """Deny a map status request"""
+    if len(args) < 1:
+        return 'You must provide the request ID to deny!'
+    
+    request = await glob.db.fetchrow('SELECT * FROM requests WHERE id = $1', int(args[0]))
+    _map = await Beatmap.bid_fetch(request['map'])
+    ns = mapStatuses(request['status'])
+
+    if (rq := glob.players_name.get(request['requester'])):
+        rq.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your request to {ns.name.lower()} {_map.embed} was denied by {user.name}!', tarname=rq.name, fromid=glob.bot.id))
+
+    await glob.db.execute('DELETE FROM requests WHERE id = $1', int(args[0]))
+
+    return 'Request denied!'
+
+@command(name='request')
+async def req(user, args):
+    """Request a map status change"""
+    if len(args) < 1:
+        return 'You must provide what status you want the map to be!'
+    
+    if not (_map := user.np):
+        return 'Please /np the map you want to request first!'
+    
+    try:
+        await glob.db.execute('INSERT INTO requests (requester, map, status, mode) VALUES ($1, $2, $3, $4)', user.name, user.np.id, int(strStatuses(args[0])), user.mode_vn)
+    except Exception:
+        return "Someone has already requested this map's status to be changed! Your request has not been sent."
+
+    return 'Request sent!'
 
 @command(priv=Privileges.Admin, name='ban')
 async def ban(user, args):

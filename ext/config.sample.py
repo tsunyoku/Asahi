@@ -39,7 +39,9 @@ token = ''
 anticheat = True
 
 webhooks = { # you can leave the urls empty if you don't want to use them!
-    'logs': '', # server-related logs
+    'logs': '', # server-related logs (user registers etc.) - if you dont want a channel flooded with new registered/verified users then just leave this empty
+    'maps': '', # now-ranked channel
+    'requests': '', # channel to send nominators rank requests
     'anticheat': '' # anticheat-related logs (user bans/flags from client/replay checks, pp cap or hardware matches) - only used if anticheat option is enabled
 }
 

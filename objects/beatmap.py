@@ -300,7 +300,7 @@ class Beatmap:
         try:
             await glob.db.execute(
                 'INSERT INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, update, nc, plays, passes) '
-                'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)',
+                'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)',
                 self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, 
                 self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc,
                 self.plays, self.passes

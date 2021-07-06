@@ -504,7 +504,7 @@ async def lastFM(request: Request):
         return await player.restrict(reason='osu!anticheat flags (fl cheating)', fr=glob.bot)
     if flags & osuFlags.SpinnerHack: # spin hack
         return await player.restrict(reason='osu!anticheat flags (spin hack)', fr=glob.bot)
-    if flags & osuFlags.FastPress: # mania fast presses:
+    if flags & osuFlags.FastPress: # mania fast presses
         return await player.restrict(reason='osu!anticheat flags (mania fast presses)', fr=glob.bot)
     if flags & osuFlags.AUTO_BOT: # autobot
         return await player.restrict(reason='osu!anticheat (autobot)', fr=glob.bot)
