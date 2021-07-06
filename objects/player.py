@@ -11,7 +11,7 @@ from constants.types import teamTypes
 from typing import Optional, TYPE_CHECKING
 from dataclasses import dataclass
 from cmyui import log, Ansi
-from cmuyi.discord import Webhook, Embed
+from cmyui.discord import Webhook, Embed
 from datetime import datetime, timedelta
 
 import queue
