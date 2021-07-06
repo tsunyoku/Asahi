@@ -20,6 +20,12 @@ SET default_tablespace = '';
 
 SET default_with_oids = false;
 
+CREATE TABLE public.user_achievements(
+    id SERIAL,
+    uid integer NOT NULL,
+    ach integer NOT NULL
+);
+
 --
 -- Name: channels; Type: TABLE; Schema: public; Owner: tsunyoku
 --
