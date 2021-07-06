@@ -510,7 +510,7 @@ class Player:
             wh.add_embed(embed)
             await wh.post()
         
-        log(f'{self.name} has been logged for {reason}.', Ansi.LBLUE)
+        log(f'{self.name} has been flagged for {reason}.', Ansi.LBLUE)
 
     async def unfreeze(self, reason, fr):
         if not self.frozen:
