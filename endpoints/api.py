@@ -6,8 +6,8 @@ from datetime import datetime
 from objects import glob
 
 from objects.beatmap import Beatmap
-from constants.mods import convert
-from constants.modes import osuModes
+from constants.mods import convert, Mods
+from constants.modes import osuModes, lbModes
 from constants.privs import Privileges
 from packets import writer
 
@@ -66,14 +66,14 @@ async def user(request):
     if not id:
         return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
 
-    info = await glob.db.fetchrow('SELECT id, name, country FROM users WHERE id = $1', id)
+    info = await glob.db.fetchrow('SELECT id, name, country, priv FROM users WHERE id = $1', id)
 
     if not info:
         return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
 
     stats_db = await glob.db.fetchrow('SELECT * FROM stats WHERE id = $1', id)
     
-    if stats_db['priv'] & Privileges.Disallowed:
+    if info['priv'] & Privileges.Disallowed:
         return (400, {'message': 'user is restricted/banned!'})
 
     info = dict(info)
@@ -161,6 +161,37 @@ async def playerStatus(request):
     }
 
     return {'status': status}
+
+@api.route("/get_leaderboard")
+async def getLb(request):
+    args = request.args
+    
+    mode = int(args.get('mode', 0))
+    rx = int(args.get('rx', 0))
+    
+    if rx == 0: rx = Mods.NOMOD
+    elif rx == 1: rx = Mods.RELAX
+    elif rx == 2: rx = Mods.AUTOPILOT
+    
+    lb_mode = lbModes(mode, rx)
+    lb = await glob.redis.zrangebyscore(f'asahi:leaderboard:{lb_mode.name}')
+    lb.reverse() # redis returns backwards??
+    
+    ret = []
+    
+    for rank, uid in enumerate(lb):
+        info = await glob.db.fetchrow('SELECT users.name, users.country, stats.pp_{0} pp, stats.acc_{0} acc FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.id = $1'.format(lb_mode.name), int(uid))
+        
+        ret.append({
+            'rank': rank + 1,
+            'uid': int(uid),
+            'name': info['name'],
+            'country': info['country'],
+            'pp': info['pp'],
+            'acc': info['acc']
+        })
+        
+    return ret
 
 @api.route("/get_replay")
 async def getReplay(request):
