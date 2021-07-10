@@ -441,24 +441,11 @@ async def scoreSubmit(request: Request):
     )))
 
     if s.status == scoreStatuses.Best and s.rank == 1 and s.map.status >= mapStatuses.Ranked:
-        # announce #1 to announce channel cus they achieved #1
-
-        perf = ''
-        prev = ''
-
-        if s.map.status != mapStatuses.Loved:
-            perf = f' worth {round(s.pp):,}pp'
-
-        prev1 = await glob.db.fetchrow(f'SELECT users.name FROM users LEFT OUTER JOIN {s.mode.table} t ON t.uid = users.id WHERE t.md5 = $1 AND t.mode = $2 AND t.status = 2 AND users.priv & 1 > 0 AND t.uid != $3 AND t.id != $4 ORDER BY t.{s.mode.sort} DESC LIMIT 1', s.map.md5, s.mode.as_vn, s.user.id, s.id)
-
-        if prev1:
-            prev = f' (Previous #1: [https://{glob.config.domain}/u/{prev1["name"]} {prev1["name"]}])'
-
-        msg = f'[{s.mode!r}] {s.user.embed} achieved #1 on {s.map.embed} +{s.readable_mods}{perf}{prev}'
-        chan = glob.channels['#announce']
-        chan.send(glob.bot, msg, True)
+        if s.rank == 1: # announce #1 to announce channel cus they achieved #1
+            loop = asyncio.get_event_loop()
+            loop.create_task(s.announce_n1())
         
-    if s.status == scoreStatuses.Best and s.map.status >= mapStatuses.Ranked:
+        # update lb cache
         threading.Thread(target=s.map.lb.set_user_pb, args=(s.user, s,)).start()
         
     s.user.last_score = s
