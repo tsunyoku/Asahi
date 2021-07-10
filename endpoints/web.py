@@ -272,16 +272,12 @@ async def scoreSubmit(request: Request):
     s = await Score.submission(mpargs['score'], mpargs['iv'], mpargs['pass'], mpargs['osuver'])
 
     if not s:
-        print('no score object')
         return b'error: no'
     elif not s.user:
-        print('no player')
         return b'' # player not online, make client make resubmit attempts
     elif not s.map:
-        print('no map')
         return b'error: beatmap' # map unsubmitted
     elif s.mods & Mods.UNRANKED:
-        print('unranked mods')
         return b'error: no'
 
     if s.mode != s.user.mode or s.mods != s.user.mods:
@@ -314,7 +310,7 @@ async def scoreSubmit(request: Request):
         f.write_bytes(replay)
         
         if glob.config.anticheat:
-            threading.Thread(target=s.analyse).start() # todo async task
+            threading.Thread(target=s.analyse).start() # TODO: async task
     
     cap = glob.config.pp_caps[s.mode.value]
 
