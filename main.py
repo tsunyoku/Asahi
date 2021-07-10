@@ -24,7 +24,7 @@ from endpoints.assets import assets, init_customs
 
 from objects.tasks import expired_donor, freeze_timers, prepare_tasks
 
-app = Xevel(glob.config.socket) # handler for webserver :D
+app = Xevel(glob.config.socket, loop=asyncio.get_event_loop()) # handler for webserver :D
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
 glob.version = Version(0, 3, 5) # set Asahi version, mainly for future updater but also for tracking
 

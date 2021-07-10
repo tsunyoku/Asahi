@@ -162,7 +162,7 @@ class Score:
 
         return s
 
-    def analyse(self): # sadly no async because threading lol
+    async def analyse(self):
         # BIG NOTE: THIS IS MORE OF A PREVENTATIVE MEASURE TO STOP BLATANT CHEATERS. SOME VERY GOOD LEGIT PLAYERS COULD GET FLAGGED BY THIS SO PLEASE BE AWARE
         # however: 9 times out of 10 this shouldn't false ban, most players getting e.g sub 60 ur will be relax cheats. but maybe you have umbre playing on your server, i don't know.
 
@@ -174,18 +174,20 @@ class Score:
             rx = 0
 
         url = f'https://api.{glob.config.domain}/get_replay?id={self.id}&rx={rx}'
-        r = requests.get(url, stream=True)
+        
+        async with glob.web.get(url) as resp:
+            rp = await resp.read()
 
         cg = Circleguard(glob.config.api_key)
-        replay = ReplayString(r.raw.read())
+        replay = ReplayString(rp)
 
         # TODO: compare replay against bancho leaderboards
 
         if (ur := cg.ur(replay)) < 60:
-            asyncio.run(self.user.freeze(reason=f'potential relax (ur: {ur:.2f})', fr=glob.bot))
+            await self.user.freeze(reason=f'potential relax (ur: {ur:.2f})', fr=glob.bot)
 
         if (ft := cg.frametime(replay)) < 14: # TODO: check for false positives in frametime
-            asyncio.run(self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f})', fr=glob.bot))
+            await self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f})', fr=glob.bot)
 
     def calc_lb_format(self, user):
         if self.mode.value > 3:

@@ -65,7 +65,7 @@ class Leaderboard:
         pb = await self.get_personal(user)
 
         if pb:
-            base.append(pb.calc_lb_format())
+            base.append(pb.calc_lb_format(user))
         else:
             base.append('')
 

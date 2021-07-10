@@ -13,6 +13,7 @@ import time
 import orjson
 import copy
 import threading
+import asyncio
 
 from objects import glob
 from objects.beatmap import Beatmap
@@ -310,7 +311,8 @@ async def scoreSubmit(request: Request):
         f.write_bytes(replay)
         
         if glob.config.anticheat:
-            threading.Thread(target=s.analyse).start() # TODO: async task
+            loop = asyncio.get_event_loop()
+            loop.create_task(s.analyse())
     
     cap = glob.config.pp_caps[s.mode.value]
 

@@ -848,7 +848,8 @@ async def root_client(request: Request):
                     b2[add].append(p)
                 
         if p.restricted:
-            data += writer.sendMessage(fromname=glob.bot.name, msg='Your account is currently restricted!', tarname=p.name, fromid=glob.bot.id)
+            reason = await glob.db.fetchval("SELECT reason FROM punishments WHERE type = 'restrict' AND target = $1 ORDER BY time DESC LIMIT 1", p.id)
+            data += writer.sendMessage(fromname=glob.bot.name, msg=f'Your account is currently restricted for reason "{reason}"!', tarname=p.name, fromid=glob.bot.id)
             
         if p.frozen and not p.restricted:
             if p.freeze_timer.timestamp() < start: # freeze timer has expired lol
