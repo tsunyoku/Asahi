@@ -272,12 +272,16 @@ async def scoreSubmit(request: Request):
     s = await Score.submission(mpargs['score'], mpargs['iv'], mpargs['pass'], mpargs['osuver'])
 
     if not s:
+        print('no score object')
         return b'error: no'
     elif not s.user:
+        print('no player')
         return b'' # player not online, make client make resubmit attempts
     elif not s.map:
+        print('no map')
         return b'error: beatmap' # map unsubmitted
     elif s.mods & Mods.UNRANKED:
+        print('unranked mods')
         return b'error: no'
 
     if s.mode != s.user.mode or s.mods != s.user.mods:
@@ -310,7 +314,7 @@ async def scoreSubmit(request: Request):
         f.write_bytes(replay)
         
         if glob.config.anticheat:
-            threading.Thread(target=s.analyse).start()
+            threading.Thread(target=s.analyse).start() # todo async task
     
     cap = glob.config.pp_caps[s.mode.value]
 
@@ -321,7 +325,11 @@ async def scoreSubmit(request: Request):
     stats = s.user.stats[s.mode.value]
     old = copy.copy(stats) # we need a copy of the old stats for submission chart
 
-    elapsed = mpargs['st' if s.passed else 'ft'] # timewarp check with this soon?
+    elapsed = mpargs.get('st' if s.passed else 'ft') # timewarp check with this soon?
+    
+    if not elapsed:
+        await s.user.restrict('Modified client', fr=glob.bot) # its really only old version, but its supposed to be blocked on login. if it isnt present it must be modified to seem like a new version
+
     stats.playtime += int(elapsed) // 1000
     stats.tscore += s.score
     stats.pc += 1
@@ -378,10 +386,9 @@ async def scoreSubmit(request: Request):
     charts.append(
         f'beatmapId:{s.map.id}|'
         f'beatmapSetId:{s.map.sid}|'
-        # temp hardcode these values below because yea xd
-        'beatmapPlaycount:0|'
-        'beatmapPasscount:0|'
-        'approvedDate:0'
+        f'beatmapPlaycount:{s.map.plays}|'
+        f'beatmapPasscount:{s.map.passes}|'
+        f'approvedDate:{s.map.update}'
     )
 
     # score-specific ranking
@@ -414,7 +421,7 @@ async def scoreSubmit(request: Request):
     charts.append('|'.join((
         'chartId:overall',
         f'chartUrl:https://{glob.config.domain}/u/{s.user.id}',
-        'chartName:Global Stats',
+        'chartName:Overall Stats',
 
         *((
             chart_format('rank', old.rank, stats.rank),

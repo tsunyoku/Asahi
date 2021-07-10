@@ -22,22 +22,12 @@ class Privileges(IntFlag):
     Master = Normal | Verified | Supporter | Nominator | Admin | Developer | Owner
     Disallowed = Restricted | Banned
     
-def strPrivs(priv: str):
-    return {
-        'normal': Privileges.Normal,
-        'verified': Privileges.Verified,
-        'supporter': Privileges.Supporter,
-        'nominator': Privileges.Nominator,
-        'admin': Privileges.Admin,
-        'developer': Privileges.Developer,
-        'owner': Privileges.Owner,
-        'restricted': Privileges.Restricted,
-        'banned': Privileges.Banned,
-        'whitelisted': Privileges.Whitelisted,
-        'frozen': Privileges.Frozen,
-        'manager': Privileges.Manager,
-        'master': Privileges.Master
-    }.get(priv.lower())
+    @classmethod
+    def get(self, name):
+        if name in self.__members__:
+            return self[name]
+        else:
+            return None
 
 class ClientPrivileges(IntFlag):
     Player = 1 << 0

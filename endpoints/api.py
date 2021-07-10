@@ -137,8 +137,7 @@ async def playerStatus(request):
         return (400, {'message': 'user is restricted/banned!'})
 
     if player.map_md5:
-        if not (bmap := Beatmap.md5_cache(player.map_md5)):
-            bmap = Beatmap.md5_sql(player.map_md5)
+        bmap = await Beatmap.from_md5(player.map_md5)
     else:
         bmap = None
 
@@ -241,7 +240,7 @@ async def getReplay(request):
 
     rp = bytearray() # headers timeee
 
-    rp += struct.pack('<Bi', score["m"], score["osuver"] or 20210520.2) # not all scores will have osuver so lets just send latest (as of this code) version
+    rp += struct.pack('<Bi', score["m"], score["osuver"] or 20210520) # not all scores will have osuver so lets just send latest (as of this code) version
     rp += writer.write_string(score["md5"])
 
     rp += writer.write_string(score["name"])

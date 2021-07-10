@@ -122,8 +122,7 @@ class Score:
 
         s.map = await Beatmap.from_md5(data[0])
 
-        user = data[1].rstrip()
-        if (u := glob.players.get(user)): # faster i think?
+        if (u := glob.players_name.get(data[1].rstrip())): # faster i think?
             if u.pw == pw:
                 s.user = u
         
@@ -272,11 +271,11 @@ class Score:
         lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = $1 AND t.mode = $2 AND t.status = 2 AND users.priv & 1 > 0 AND t.{self.mode.sort} > $3', self.map.md5, mode, t)
         self.rank = lb['r'] + 1 if lb else 1
 
-        score = await glob.db.fetchrow(f'SELECT id, pp FROM {self.mode.table} WHERE uid = $1 AND md5 = $2 AND mode = $3 AND status = 2', self.user.id, self.map.md5, mode)
+        score = await glob.db.fetchrow(f'SELECT id, pp, score FROM {self.mode.table} WHERE uid = $1 AND md5 = $2 AND mode = $3 AND status = 2', self.user.id, self.map.md5, mode)
         if score: # they already have a (best) submitted score
             self.old_best = await Score.sql(score['id'], self.mode.table, self.mode.sort, t)
 
-            if self.pp > score['pp']:
+            if (self.pp == score['pp'] and self.score > score['score']) or self.pp > score['pp']: # allow scores to overwrite if they have higher score but same pp
                 self.status = scoreStatuses.Best
                 self.old_best.status = scoreStatuses.Submitted
             else:

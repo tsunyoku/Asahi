@@ -6,7 +6,7 @@ from objects.player import Player
 from cmyui import log, Ansi
 from cmyui.discord import Webhook, Embed
 from packets import writer
-from .privs import Privileges, strPrivs
+from .privs import Privileges
 from .types import teamTypes
 from .modes import osuModes
 from .statuses import strStatuses, mapStatuses
@@ -54,7 +54,7 @@ async def add_priv(user, args):
     priv = Privileges(await glob.db.fetchval("SELECT priv FROM users WHERE name = $1", name))
     new_privs = Privileges(0)
     for npriv in args[1:]:
-        if not (new_priv := strPrivs(npriv)):
+        if not (new_priv := Privileges.get(npriv)):
             return f'Privilege {npriv} not found.'
 
         priv |= new_priv
@@ -74,7 +74,7 @@ async def rm_priv(user, args):
     priv = Privileges(await glob.db.fetchval("SELECT priv FROM users WHERE name = $1", name))
     new_privs = Privileges(0)
     for npriv in args[1:]:
-        if not (new_priv := strPrivs(npriv)):
+        if not (new_priv := Privileges.get(npriv)):
             return f'Privilege {npriv} not found.'
 
         priv &= ~new_priv
@@ -418,14 +418,14 @@ async def process(user, msg):
 
             cb = c['cb']
             o = await cb(user, args[1:])
+            
+            elapsed = ''
 
             if c['elapsed']:
-                elapsed = f'| Time Elapsed: {(time.time() - start) * 1000:.2f}ms'
-            else:
-                elapsed = ''
+                elapsed = f' | Time Elapsed: {(time.time() - start) * 1000:.2f}ms'
 
             if o:
-                return f'{o} {elapsed}'
+                return f'{o}{elapsed}'
             
             return # we still wanna end the loop even if theres no text to return
     else:
