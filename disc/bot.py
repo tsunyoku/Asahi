@@ -5,7 +5,7 @@ from random import choice
 
 from objects import glob
 
-class asahiBot(commands.Cog):
+class asahiBot(commands.Cog): # TODO: actually start this
     def __init__(self, bot):
         self.bot = bot
 

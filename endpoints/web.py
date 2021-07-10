@@ -360,7 +360,7 @@ async def scoreSubmit(request: Request):
         return b'error: no' # not actually erroring, score is already submitted we just want client to stop request as we cannot provide chart
     
     achievements = ''
-    if s.map.status & mapStatuses.GIVE_PP and not s.user.restricted:
+    if s.map.status & mapStatuses.GIVE_PP and not s.user.restricted: # TODO: hush-hush etc. achievements
         achs = []
         for ach in glob.achievements:
             if ach in s.user.achievements:
