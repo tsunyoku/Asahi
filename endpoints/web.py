@@ -440,7 +440,7 @@ async def scoreSubmit(request: Request):
         f'achievements-new:{achievements}'
     )))
 
-    if s.status == scoreStatuses.Best and s.rank == 1 and s.map.status >= mapStatuses.Ranked:
+    if s.status == scoreStatuses.Best and s.map.status >= mapStatuses.Ranked:
         if s.rank == 1: # announce #1 to announce channel cus they achieved #1
             loop = asyncio.get_event_loop()
             loop.create_task(s.announce_n1())
