@@ -3,6 +3,7 @@ from objects.match import Match
 from objects.channel import Channel
 from objects.beatmap import Beatmap
 from objects.player import Player
+from objects.menu import Menu
 from cmyui import log, Ansi
 from cmyui.discord import Webhook, Embed
 from packets import writer
@@ -18,13 +19,23 @@ cmds = []
 def command(priv: Privileges = Privileges.Normal, name: str = None, elapsed: bool = True):
     def wrapper(cmd_cb):
         if name is not None:
-            cmds.append({
-                'name': name, 
-                'priv': priv, 
-                'elapsed': elapsed, 
-                'cb': cmd_cb, 
-                'desc': cmd_cb.__doc__
-            })
+            if not isinstance(name, list):
+                cmds.append({
+                    'name': name, 
+                    'priv': priv, 
+                    'elapsed': elapsed, 
+                    'cb': cmd_cb, 
+                    'desc': cmd_cb.__doc__
+                })
+            else:
+                for n in name:
+                    cmds.append({
+                        'name': n,
+                        'priv': priv,
+                        'elapsed': elapsed,
+                        'cb': cmd_cb,
+                        'desc': cmd_cb.__doc__
+                    }) 
         else:
             log(f'Tried to add command with no name!', Ansi.LRED)
         
@@ -43,7 +54,7 @@ async def help(user, args):
     cmd_list = '\n'.join(allowed_cmds)
     return f'List of available commands:\n\n{cmd_list}'
 
-@command(priv=Privileges.Owner, name='add_priv')
+@command(priv=Privileges.Owner, name='addpriv')
 async def add_priv(user, args):
     """Adds (a list of) privileges to a user"""
     if len(args) < 2:
@@ -63,7 +74,7 @@ async def add_priv(user, args):
     await glob.db.execute("UPDATE users SET priv = $1 WHERE name = $2", int(priv), name)
     return f"Added privilege(s) {new_privs} to {name}."
 
-@command(priv=Privileges.Owner, name='rm_priv')
+@command(priv=Privileges.Owner, name='rmpriv')
 async def rm_priv(user, args):
     """Removes (a list of) privileges from a user"""
     if len(args) < 2:
@@ -206,20 +217,20 @@ async def _map(user, args):
         embed = Embed(title='')
         
         embed.set_author(url=f'https://{glob.config.domain}/u/{user.id}', name=user.name, icon_url=f'https://a.{glob.config.domain}/{user.id}')
-        embed.set_image(url=f'https://assets.ppy.sh/beatmaps/{bmap.id}/covers/card.jpg')
-        embed.add_field(name=f'New {ns.lower()} map', value=f'{bmap.embed} is now {ns.lower()}!', inline=True)
+        embed.set_image(url=f'https://assets.ppy.sh/beatmaps/{bmap.sid}/covers/card.jpg')
+        embed.add_field(name=f'New {ns.name.lower()} map', value=f'[{bmap.name}]({bmap.url}) is now {ns.name.lower()}!', inline=True)
         
         wh.add_embed(embed)
         await wh.post()
 
     return 'Status updated!'
 
-@command(priv=Privileges.Nominator, name='requests', elapsed=False)
+@command(priv=Privileges.Nominator, name=['requests', 'reqs'], elapsed=False)
 async def reqs(user, args):
     """View all map status requests on the server"""
     if (requests := await glob.db.fetch(f'SELECT * FROM requests')):
         ret = []
-        for req in requests:
+        for idx, req in enumerate(requests):
             _map = await Beatmap.bid_fetch(req['map'])
             
             if not _map:
@@ -227,70 +238,24 @@ async def reqs(user, args):
                 
             mode = repr(osuModes(req['mode']))
             status = mapStatuses(req['status'])
+            
+            # despite them being saved in cache, these are context based so we cant reuse them, hence destroy arg also
+            rank = Menu(id=_map.id + 1, name='Rank', callback=a_req, args=(user, (req['id'], 'rank')), destroy=True) # CURSED CALLBACK
+            glob.menus[_map.id + 1] = rank
                 
-            ret.append(f'Request #{req["id"]}: {req["requester"]} requested {_map.embed} to be {status.name.lower()} (Mode: {mode})')
+            love = Menu(id=_map.id + 2, name='Love', callback=a_req, args=(user, (req['id'], 'love')), destroy=True) # CURSED CALLBACK
+            glob.menus[_map.id + 2] = love
+
+            deny = Menu(id=_map.id + 3, name='Deny', callback=d_req, args=(user, (req['id'],)), destroy=True) # CURSED CALLBACK
+            glob.menus[_map.id + 3] = deny
+                
+            ret.append(f'Request #{idx + 1}: {req["requester"]} requested {_map.embed} to be {status.name.lower()} (Mode: {mode}) | {rank.embed}  {love.embed}  {deny.embed}')
             
         return '\n'.join(ret)
     
     return 'No requests to read!'
 
-@command(priv=Privileges.Nominator, name='accept')
-async def a_req(user, args):
-    """Accept a map status request"""
-    if len(args) < 2:
-        return 'You must provide the request ID and status to set!'
-    
-    request = await glob.db.fetchrow('SELECT * FROM requests WHERE id = $1', int(args[0]))
-    _map = await Beatmap.bid_fetch(request['map'])
-    ns = strStatuses(args[1])
-    
-    # TODO: better management for ranking only certain difficulties
-    _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $1', _map.sid)
-    
-    for m in _set:
-        bm = await Beatmap.from_md5(m['md5'])
-        bm.status = ns
-        bm.frozen = True
-        bm.lb = None # reset lb cache in case of major status change
-        await bm.save()
-        glob.cache['maps'][bm.md5] = bm
-
-    if (wh_url := glob.config.webhooks['maps']):
-        wh = Webhook(url=wh_url)
-        embed = Embed(title='')
-
-        embed.set_author(url=f'https://{glob.config.domain}/u/{user.id}', name=user.name, icon_url=f'https://a.{glob.config.domain}/{user.id}')
-        embed.set_image(url=f'https://assets.ppy.sh/beatmaps/{_map.id}/covers/card.jpg')
-        embed.add_field(name=f'New {ns.lower()} map', value=f'{_map.embed} is now {ns.lower()}!', inline=True)
-
-        wh.add_embed(embed)
-        await wh.post()
-        
-    if (rq := glob.players_name.get(request['requester'])):
-        rq.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your request to {mapStatuses(request["status"]).name.lower()} {_map.embed} was accepted by {user.name}! It is now {ns.name.lower()}.', tarname=rq.name, fromid=glob.bot.id))
-    
-    await glob.db.execute('DELETE FROM requests WHERE id = $1', int(args[0]))
-
-    return 'Map status updated!'
-
-@command(priv=Privileges.Nominator, name='deny')
-async def d_req(user, args):
-    """Deny a map status request"""
-    if len(args) < 1:
-        return 'You must provide the request ID to deny!'
-    
-    request = await glob.db.fetchrow('SELECT * FROM requests WHERE id = $1', int(args[0]))
-    _map = await Beatmap.bid_fetch(request['map'])
-    ns = mapStatuses(request['status'])
-
-    if (rq := glob.players_name.get(request['requester'])):
-        rq.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your request to {ns.name.lower()} {_map.embed} was denied by {user.name}!', tarname=rq.name, fromid=glob.bot.id))
-
-    await glob.db.execute('DELETE FROM requests WHERE id = $1', int(args[0]))
-
-    return 'Request denied!'
-
-@command(name='request')
+@command(name=['request', 'req'])
 async def req(user, args):
     """Request a map status change"""
     if len(args) < 1:
@@ -299,10 +264,26 @@ async def req(user, args):
     if not (_map := user.np):
         return 'Please /np the map you want to request first!'
     
+    if _map.status == mapStatuses.Ranked:
+        return 'This map is already ranked!'
+    
+    ns = strStatuses(args[0])
+    
     try:
-        await glob.db.execute('INSERT INTO requests (requester, map, status, mode) VALUES ($1, $2, $3, $4)', user.name, user.np.id, int(strStatuses(args[0])), user.mode_vn)
+        await glob.db.execute('INSERT INTO requests (requester, map, status, mode) VALUES ($1, $2, $3, $4)', user.name, user.np.id, int(ns), user.mode_vn)
     except Exception:
         return "Someone has already requested this map's status to be changed! Your request has not been sent."
+
+    if (wh_url := glob.config.webhooks['requests']):
+        wh = Webhook(url=wh_url)
+        embed = Embed(title='')
+
+        embed.set_author(url=f'https://{glob.config.domain}/u/{user.id}', name=user.name, icon_url=f'https://a.{glob.config.domain}/{user.id}')
+        embed.set_image(url=f'https://assets.ppy.sh/beatmaps/{_map.sid}/covers/card.jpg')
+        embed.add_field(name=f'New request', value=f'{user.name} requested [{_map.name}]({_map.url}) to be {ns.name.lower()}', inline=True)
+
+        wh.add_embed(embed)
+        await wh.post()
 
     return 'Request sent!'
 
@@ -404,6 +385,64 @@ async def unfreeze(user, args):
     await target.unfreeze(reason=reason, fr=user)
 
     return 'User unfrozen!'
+
+#####################
+
+async def a_req(user, args):
+    """Accept a map status request"""
+    if len(args) < 2:
+        return 'You must provide the request ID and status to set!'
+
+    request = await glob.db.fetchrow('SELECT * FROM requests WHERE id = $1', int(args[0]))
+    _map = await Beatmap.bid_fetch(request['map'])
+    ns = strStatuses(args[1])
+
+    # TODO: better management for ranking only certain difficulties
+    _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $1', _map.sid)
+
+    for m in _set:
+        bm = await Beatmap.from_md5(m['md5'])
+        bm.status = ns
+        bm.frozen = True
+        bm.lb = None # reset lb cache in case of major status change
+        await bm.save()
+        glob.cache['maps'][bm.md5] = bm
+
+    if (wh_url := glob.config.webhooks['maps']):
+        wh = Webhook(url=wh_url)
+        embed = Embed(title='')
+
+        embed.set_author(url=f'https://{glob.config.domain}/u/{user.id}', name=user.name, icon_url=f'https://a.{glob.config.domain}/{user.id}')
+        embed.set_image(url=f'https://assets.ppy.sh/beatmaps/{_map.sid}/covers/card.jpg')
+        embed.add_field(name=f'New {ns.name.lower()} map', value=f'[{_map.name}]({_map.url}) is now {ns.name.lower()}!', inline=True)
+
+        wh.add_embed(embed)
+        await wh.post()
+
+    if (rq := glob.players_name.get(request['requester'])):
+        rq.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your request to make {_map.embed} {mapStatuses(request["status"]).name.lower()} was accepted by {user.name}! It is now {ns.name.lower()}.', tarname=rq.name, fromid=glob.bot.id))
+
+    await glob.db.execute('DELETE FROM requests WHERE id = $1', int(args[0]))
+
+    return 'Map status updated!'
+
+async def d_req(user, args):
+    """Deny a map status request"""
+    if len(args) < 1:
+        return 'You must provide the request ID to deny!'
+
+    request = await glob.db.fetchrow('SELECT * FROM requests WHERE id = $1', int(args[0]))
+    _map = await Beatmap.bid_fetch(request['map'])
+    ns = mapStatuses(request['status'])
+
+    if (rq := glob.players_name.get(request['requester'])):
+        rq.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your request to make {_map.embed} {ns.name.lower()} was denied by {user.name}!', tarname=rq.name, fromid=glob.bot.id))
+
+    await glob.db.execute('DELETE FROM requests WHERE id = $1', int(args[0]))
+
+    return 'Request denied!'
+
+#####################
 
 async def process(user, msg):
     start = time.time()

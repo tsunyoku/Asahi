@@ -77,15 +77,12 @@ class Leaderboard:
             for s in scores:
                 score = await Score.sql(s['id'], self.mode.table, self.mode.sort, s['s'], ensure=True)
 
-                if score.user.id is not user.id:
-                    score.user.name = score.user.full_name
-
                 scrs.append(score)
-
-        s = [s.calc_lb_format() for s in scrs]
 
         if sc != scrs:
             sc = scrs
+
+        s = [s.calc_lb_format(user) for s in scrs]
 
         return '\n'.join(base + s).encode()
 

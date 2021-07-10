@@ -121,17 +121,17 @@ async def osuSearch(request: Request):
     args = request.args
     if not auth(args['u'], args['h'], request):
         return b''
-    
+
     args['u'] = glob.config.bancho_username
     args['h'] = glob.config.bancho_hashed_password
 
-    async with glob.web.get("https://osu.ppy.sh/web/osu-search-set.php", params=args) as resp:
+    async with glob.web.get("https://osu.ppy.sh/web/osu-search.php", params=args) as resp:
         if resp.status != 200:
             return (resp.status, b'0')
 
         ret = await resp.read()
 
-    return ret.encode()
+    return (resp.status, ret)
 
 @web.route("/web/osu-search-set.php")
 async def osuSearchSet(request: Request):
@@ -148,7 +148,7 @@ async def osuSearchSet(request: Request):
 
         ret = await resp.read()
 
-    return ret.encode()
+    return (resp.status, ret)
 
 @web.route("/users", ['POST'])
 async def ingameRegistration(request: Request):

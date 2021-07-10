@@ -121,7 +121,7 @@ async def send_pm(user: Player, p):
                 user.enqueue(writer.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
         elif m := regexes.np_regex.match(msg):
             user.np = await Beatmap.bid_fetch(int(m['bid']))
-            np = await user.np.np_msg()
+            np = await user.np.np_msg(user)
             user.enqueue(writer.sendMessage(fromname = target.name, msg = np, tarname = user.name, fromid = target.id))
     else:
         target.enqueue(writer.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
@@ -333,7 +333,15 @@ async def join_match(user: Player, p):
         if not (menu := glob.menus.get(_id)):
             return user.enqueue(writer.matchJoinFail())
         
-        return await menu.handle(user)
+        ret = await menu.handle(user)
+
+        # if we don't return a join failure also, its gonna think we are still in lobby
+        if isinstance(ret, str): # return string message?
+            user.enqueue(writer.sendMessage(fromname = glob.bot.name, msg = ret, tarname = user.name, fromid = glob.bot.id))
+            return user.enqueue(writer.matchJoinFail())
+
+        user.enqueue(writer.matchJoinFail())
+        return ret
     
     if not (match := glob.matches.get(_id)):
         return user.enqueue(writer.matchJoinFail())

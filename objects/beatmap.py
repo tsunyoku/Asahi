@@ -1,6 +1,7 @@
 from constants.modes import osuModes
 from constants.statuses import mapStatuses, apiStatuses
 from . import glob
+from .menu import Menu
 
 from cmyui import log, Ansi
 from cmyui.osu.oppai_ng import OppaiWrapper
@@ -83,12 +84,23 @@ class Beatmap:
 
         return # not in cache, return nothing so we know to get from sql/api
 
-    async def np_msg(self):
+    async def np_msg(self, user):
         pp = {}
         for acc in (95, 98, 99, 100):
             pp[acc] = await self.calc_acc(acc)
 
-        return f'{self.embed}  // 95%: {pp[95]}pp | 98%: {pp[98]}pp | 99%: {pp[99]}pp | 100%: {pp[100]}pp // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od}'
+        from constants.commands import req
+        if not (request_rank := glob.menus.get(self.sid + 1)):
+            request_rank = Menu(id=self.sid + 1, name='Request to get Ranked', callback=req, args=(user, ('rank',)))
+            glob.menus[self.sid + 1] = request_rank
+
+        if not (request_love := glob.menus.get(self.sid + 2)):
+            request_love = Menu(id=self.sid + 2, name='Request to get Loved', callback=req, args=(user, ('love',)))
+            glob.menus[self.sid + 2] = request_love
+
+        return f'{self.embed}  // 95%: {pp[95]}pp | 98%: {pp[98]}pp | 99%: {pp[99]}pp | 100%: {pp[100]}pp' \
+               f' // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od} | ' \
+               f'{request_rank.embed}  {request_love.embed}'
 
     async def calc_acc(self, acc: float):
         path = Path.cwd() / f'resources/maps/{self.id}.osu'

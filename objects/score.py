@@ -187,13 +187,18 @@ class Score:
         if (ft := cg.frametime(replay)) < 14: # TODO: check for false positives in frametime
             asyncio.run(self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f})', fr=glob.bot))
 
-    def calc_lb_format(self):
+    def calc_lb_format(self, user):
         if self.mode.value > 3:
             val = self.pp
         else:
             val = self.score
 
-        return f'{self.id}|{self.user.name}|{val}|{self.combo}|{self.n50}|{self.n100}|{self.n300}|{self.miss}|{self.katu}|{self.geki}|{int(self.fc)}|{self.mods}|{self.user.id}|{self.rank}|{self.time}|1'
+        if user.id == self.user.id:
+            nm = self.user.name
+        else:
+            nm = self.user.full_name
+
+        return f'{self.id}|{nm}|{val}|{self.combo}|{self.n50}|{self.n100}|{self.n300}|{self.miss}|{self.katu}|{self.geki}|{int(self.fc)}|{self.mods}|{self.user.id}|{self.rank}|{self.time}|1'
 
     async def calc_lb(self, table, sort, value):
         lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.mode = $2 AND {table}.status = 2 AND users.priv & 1 > 0 AND {table}.{sort} > $3', self.map.md5, self.mode.value, value)

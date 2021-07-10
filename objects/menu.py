@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING, Union, Coroutine, Optional
+from . import glob
 
 import inspect
 
@@ -13,6 +14,8 @@ class Menu:
 
         self.callback: Union[Coroutine, eval] = args.get('callback', None) # ??
         self.args: Optional[list] = args.get('args', None)
+        
+        self.destroy: bool = args.get('destroy', False) # one-time usage
 
     @property
     def embed(self):
@@ -20,15 +23,16 @@ class Menu:
 
     async def handle(self, player):
         # user has clicked on menu, we now return the callback
+        
+        if self.destroy:
+            del glob.menus[self.id] # remove object from known list if its a one-time use 
 
         if not (c := self.callback):
             return
 
         call = callable(c)
-        isL = isinstance(c, type(lambda:0))
-        
-        # FUCK ME I AM GOING TO HELL FOR EVERYTHING HERE
-        # ^^^ Old code but it has been cleaned by len4ee xd
+        isL = c.__name__ == '<lambda>'
+
         if inspect.iscoroutinefunction(c):
             if not self.args:
                 if not call: return await c
