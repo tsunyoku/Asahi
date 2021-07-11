@@ -66,8 +66,12 @@ class Anticheat:
             return await self.player.restrict(reason='Modified client', fr=glob.bot)
 
         int_ver = self.ver.replace('b', '') # not int if cuttingedge, but we want stream anyways
-        extra_ver = int_ver.split('.')[1] # jfc
-        release_ver = extra_ver[1:]
+        try:
+            extra_ver = int_ver.split('.')[1] # jfc
+            release_ver = extra_ver[1:]
+        except IndexError: # no extra ver
+            extra_ver = 0
+            release_ver = int_ver[8:] # version has to be 8 in length
 
         if not release_ver:
             release_ver = 'stable40'
