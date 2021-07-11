@@ -11,3 +11,4 @@ circleguard
 maniera
 cython
 uvloop
+plazy
