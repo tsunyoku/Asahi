@@ -97,9 +97,11 @@ class Beatmap:
         if not (request_love := glob.menus.get(self.sid + 2)):
             request_love = Menu(id=self.sid + 2, name='Request to get Loved', callback=req, args=(user, ('love',)))
             glob.menus[self.sid + 2] = request_love
+            
+        # TODO: rank/unrank/rank menus for nominators
 
         return f'{self.embed}  // 95%: {pp[95]}pp | 98%: {pp[98]}pp | 99%: {pp[99]}pp | 100%: {pp[100]}pp' \
-               f' // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od} | ' \
+               f' // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od} // ' \
                f'{request_rank.embed}  {request_love.embed}'
 
     async def calc_acc(self, acc: float):

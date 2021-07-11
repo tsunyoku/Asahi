@@ -8,7 +8,7 @@ from objects import glob
 class asahiBot(commands.Cog): # TODO: actually start this
     def __init__(self, bot):
         self.bot = bot
-
+ 
     @tasks.loop(minutes=1)
     async def set_status(self):
         statuses = [
@@ -25,7 +25,7 @@ class asahiBot(commands.Cog): # TODO: actually start this
     async def on_ready(self):
         if glob.config.debug:
             log('==== Asahi Discord bot started ====', Ansi.GREEN)
-        
+
         await self.set_status.start()
 
 def setup(bot):

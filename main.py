@@ -11,6 +11,8 @@ import asyncpg
 import aioredis
 import uvloop
 import asyncio
+import os
+import plazy
 
 # internal imports
 from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
@@ -157,7 +159,12 @@ app.add_router(api)
 app.add_router(assets)
 
 if __name__ == '__main__':
-    dc.load_extension('disc.bot')
+    filter = lambda x: True if x.endswith('.py') else False # load all available cogs
+    files = plazy.list_files(root='disc', filter_func=filter, is_include_root=True)
+    for file in files:
+            cog_name = file.replace('/', '.')
+            dc.load_extension(cog_name[:-3])
+
     app.add_task((dc.start, glob.config.token))
     app.add_task(expired_donor)
     app.add_task(freeze_timers)

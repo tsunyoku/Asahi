@@ -26,6 +26,10 @@ CREATE TABLE public.user_achievements(
     ach integer NOT NULL
 );
 
+CREATE TABLE public.discord(
+    whitelist bigint[]
+);
+
 --
 -- Name: channels; Type: TABLE; Schema: public; Owner: tsunyoku
 --
