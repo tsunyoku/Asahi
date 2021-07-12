@@ -28,5 +28,10 @@ class asahiBot(commands.Cog): # TODO: actually start this
 
         await self.set_status.start()
 
+    @commands.Cog.listener()
+    async def on_command_error(self, ctx, error):
+        if isinstance(error, commands.errors.CommandNotFound):
+            pass
+
 def setup(bot):
     bot.add_cog(asahiBot(bot))

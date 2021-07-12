@@ -6,12 +6,12 @@ from datetime import datetime
 from objects import glob
 
 from objects.beatmap import Beatmap
+from objects.player import Player
 from constants.mods import convert, Mods
 from constants.modes import osuModes, lbModes
 from constants.privs import Privileges
 from packets import writer
 
-import time
 import hashlib
 import struct
 
@@ -270,3 +270,79 @@ async def getReplay(request):
     request.resp_headers['Content-Disposition'] = f'attachment; filename={name}.osr'
 
     return bytes(rp)
+
+@api.route('/player_scores')
+async def playerScores(req):
+    args = req.args
+    
+    _type = args.get('type')
+    mode = int(args.get('mode', 0))
+    rx = int(args.get('rx', 0))
+    
+    uid = int(args.get('id', 0))
+    username = args.get('username')
+    
+    limit = int(args.get('limit', 5))
+
+    if not uid and not username:
+        return (400, {'message': 'you must specify either a username or id!'})
+    
+    if not (user := await Player.from_sql(uid or username)):
+        return (400, {'message': "user couldn't be found!"})
+
+    if not _type:
+        return (400, {'message': 'please provide a return type (recent/top)'})
+
+    if rx == 0: rx = Mods.NOMOD
+    elif rx == 1: rx = Mods.RELAX
+    elif rx == 2: rx = Mods.AUTOPILOT
+    
+    mode = lbModes(mode, rx)
+    
+    query = [
+        'SELECT id, md5, score, pp, acc, combo, mods, '
+        'n300, n100, n50, miss, geki, katu, '
+        'grade, status, mode, time, fc '
+        f'FROM {mode.table} WHERE uid = $1 AND mode = $2'
+    ]
+    
+    if _type == 'best':
+        query.append('AND status = 2')
+        sort = 'pp'
+    else:
+        sort = 'time'
+        
+    query.append(f'ORDER BY {sort} DESC LIMIT $3')
+
+    scores = await glob.db.fetch(' '.join(query), uid, mode.as_vn, limit)
+    
+    for idx, score in enumerate(scores):
+        score = dict(score) # stupid psql records
+        bmap = await Beatmap.from_md5(score.pop('md5'))
+        score['map'] = {
+            'md5': bmap.md5,
+            'id': bmap.id,
+            'set_id': bmap.sid,
+            'artist': bmap.artist,
+            'title': bmap.title,
+            'difficulty': bmap.diff,
+            'mapper': bmap.mapper,
+            'star_rating': bmap.sr
+        } if bmap else None
+        
+        scores[idx] = score # stupid psql pt 2
+        
+    uinfo = {
+        'id': user.id,
+        'name': user.name,
+        'country': user.country_iso,
+        'clan': {
+            'id': user.clan.id,
+            'name': user.clan.name,
+            'tag': user.clan.tag
+        } if user.clan else None
+    }
+    
+    return {'player': uinfo, 'scores': scores}
+
+    

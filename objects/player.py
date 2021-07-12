@@ -152,6 +152,10 @@ class Player:
             priv=Privileges(user['priv']),
             freeze_timer=datetime.fromtimestamp(user['freeze_timer'])
         )
+
+        clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = $1', p.id)
+        if clan:
+            p.clan = glob.clans.get(clan)
         
         if p.priv & Privileges.Disallowed:
             p.restricted = True
