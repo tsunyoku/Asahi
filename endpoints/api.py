@@ -1,5 +1,6 @@
 from xevel import Router
 from cmyui import log, Ansi
+from cmyui.osu.oppai_ng import OppaiWrapper
 from pathlib import Path
 from datetime import datetime
 
@@ -317,6 +318,18 @@ async def playerScores(req):
     for idx, score in enumerate(scores):
         score = dict(score) # stupid psql records
         bmap = await Beatmap.from_md5(score.pop('md5'))
+        
+        if mode.as_vn <= 1:
+            with OppaiWrapper('oppai-ng/liboppai.so') as ezpp:
+                ezpp.set_mode(mode.as_vn)
+                ezpp.set_mods(score['mods'])
+                
+                ezpp.calculate(Path.cwd() / f'resources/maps/{bmap.id}.osu')
+                
+                modded_sr = ezpp.get_sr()
+        else:
+            modded_sr = bmap.sr # TODO
+
         score['map'] = {
             'md5': bmap.md5,
             'id': bmap.id,
@@ -325,7 +338,8 @@ async def playerScores(req):
             'title': bmap.title,
             'difficulty': bmap.diff,
             'mapper': bmap.mapper,
-            'star_rating': bmap.sr
+            'nomod_sr': bmap.sr,
+            'modded_sr': modded_sr
         } if bmap else None
         
         scores[idx] = score # stupid psql pt 2
