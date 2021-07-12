@@ -299,22 +299,20 @@ async def playerScores(req):
     
     mode = lbModes(mode, rx)
     
-    query = [
-        'SELECT id, md5, score, pp, acc, combo, mods, '
-        'n300, n100, n50, miss, geki, katu, '
-        'grade, status, mode, time, fc '
-        f'FROM {mode.table} WHERE uid = $1 AND mode = $2'
-    ]
+    query = ('SELECT id, md5, score, pp, acc, combo, mods, '
+            'n300, n100, n50, miss, geki, katu, '
+            'grade, status, mode, time, fc '
+            f'FROM {mode.table} WHERE uid = $1 AND mode = $2')
     
     if _type == 'best':
-        query.append('AND status = 2')
+        query += ' AND status = 2'
         sort = 'pp'
     else:
         sort = 'time'
         
-    query.append(f'ORDER BY {sort} DESC LIMIT $3')
+    query += f' ORDER BY {sort} DESC LIMIT $3'
 
-    scores = await glob.db.fetch(' '.join(query), uid, mode.as_vn, limit)
+    scores = await glob.db.fetch(query, uid, mode.as_vn, limit)
     
     for idx, score in enumerate(scores):
         score = dict(score) # stupid psql records
