@@ -6,9 +6,8 @@ geoip2
 orjson
 py3rijndael
 aioredis
-asyncpg
+fatfucksql
 circleguard
 maniera
 cython
-uvloop
 plazy

@@ -102,9 +102,8 @@ class Player:
         )
 
         p.friends = []
-        async with glob.db.transaction():
-            async for user in glob.db.cursor("SELECT user2 FROM friends WHERE user1 = $1", p.id):
-                p.friends.append(user['user2'])
+        async for user in glob.db.iter("SELECT user2 FROM friends WHERE user1 = $1", p.id):
+            p.friends.append(user['user2'])
 
         clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = $1', p.id)
         if clan:

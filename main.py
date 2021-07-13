@@ -7,7 +7,7 @@ from cmyui import Ansi, Version, log # import console logger (cleaner than print
 from pathlib import Path
 from aiohttp import ClientSession
 from discord.ext import commands
-import asyncpg
+from fatFuckSQL import fatFuckSQL
 import aioredis
 import uvloop
 import asyncio
@@ -38,7 +38,8 @@ RAP_PATH = Path.cwd() / 'resources/replays_ap'
 MAPS_PATH = Path.cwd() / 'resources/maps'
 ACHIEVEMENTS_PATH = Path.cwd() / 'resources/achievements'
 
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+# commented because it breaks subprocess
+#asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 @app.before_serving()
 async def connect(): # ran before server startup, used to do things like connecting to mysql :D
@@ -47,7 +48,7 @@ async def connect(): # ran before server startup, used to do things like connect
     glob.web = ClientSession() # aiohttp session for external web requests
 
     try:
-        glob.db = await asyncpg.connect(user=glob.config.postgres['user'], password=glob.config.postgres['password'], database=glob.config.postgres['db'], host=glob.config.postgres['host']) # connect to db using config :p
+        glob.db = await fatFuckSQL.connect(**glob.config.postgres) # connect to db using config :p
         if glob.config.debug:
             log('==== Asahi connected to PostgreSQL ====', Ansi.GREEN)
     except Exception as error:
@@ -77,23 +78,21 @@ async def connect(): # ran before server startup, used to do things like connect
     if glob.config.debug:
         log(f"==== Added bot {bot.name} to player list ====", Ansi.GREEN)
         
-    async with glob.db.transaction():
-        async for ach in glob.db.cursor('SELECT * FROM achievements'):
-            achievement = Achievement(id=ach['id'], image=ach['image'], name=ach['name'], desc=ach['descr'], cond=eval(f'lambda s: {ach["cond"]}'), custom=ach['custom'])
-            glob.achievements.append(achievement)
+    async for ach in glob.db.iter('SELECT * FROM achievements'):
+        achievement = Achievement(id=ach['id'], image=ach['image'], name=ach['name'], desc=ach['descr'], cond=eval(f'lambda s: {ach["cond"]}'), custom=ach['custom'])
+        glob.achievements.append(achievement)
             
     init_customs() # set custom achievements list for assets proxy
 
     # add all channels to cache
-    async with glob.db.transaction():
-        async for chan in glob.db.cursor('SELECT * FROM channels'):
-            # "perm" may be confusing to some, i dont even really know how to explain it:
-            # if it's true, the channel won't delete after all it's users has left
-            # if it's false, the channel is deleted after all active users in the channel have left the channel
-            channel = Channel(name=chan['name'], desc=chan['descr'], auto=chan['auto'], perm=chan['perm'])
-            glob.channels[channel.name] = channel
-            if glob.config.debug:
-                log(f'==== Added channel {channel.name} to channel list ====', Ansi.GREEN)
+    async for chan in glob.db.iter('SELECT * FROM channels'):
+        # "perm" may be confusing to some, i dont even really know how to explain it:
+        # if it's true, the channel won't delete after all it's users has left
+        # if it's false, the channel is deleted after all active users in the channel have left the channel
+        channel = Channel(name=chan['name'], desc=chan['descr'], auto=chan['auto'], perm=chan['perm'])
+        glob.channels[channel.name] = channel
+        if glob.config.debug:
+            log(f'==== Added channel {channel.name} to channel list ====', Ansi.GREEN)
     
     # add announce channel to cache
     announce = Channel(name='#announce', desc='#1 scores and public announcements will be posted here', auto=True, perm=True)
@@ -108,18 +107,17 @@ async def connect(): # ran before server startup, used to do things like connect
         log(f'==== Added channel #lobby to channel list ====', Ansi.GREEN)
 
     # add all clans to cache
-    async with glob.db.transaction():
-        async for c in glob.db.cursor('SELECT * FROM clans'):
-            clan = Clan(id=c['id'], name=c['name'], tag=c['tag'], owner=c['owner'])
-            clan_chan = Channel(name='#clan', desc=f'Clan chat for clan {clan.name}', auto=0, perm=1)
-            clan.chan = clan_chan
-            glob.clans[clan.id] = clan
+    async for c in glob.db.iter('SELECT * FROM clans'):
+        clan = Clan(id=c['id'], name=c['name'], tag=c['tag'], owner=c['owner'])
+        clan_chan = Channel(name='#clan', desc=f'Clan chat for clan {clan.name}', auto=0, perm=1)
+        clan.chan = clan_chan
+        glob.clans[clan.id] = clan
 
-            async for id in glob.db.cursor('SELECT id FROM users WHERE clan = $1', clan.id):
-                clan.members.append(id['id'])
+        async for id in glob.db.iter('SELECT id FROM users WHERE clan = $1', clan.id):
+            clan.members.append(id['id'])
 
-            if glob.config.debug:
-                log(f'==== Added clan {clan.name} to clan list ====', Ansi.GREEN)
+        if glob.config.debug:
+            log(f'==== Added clan {clan.name} to clan list ====', Ansi.GREEN)
                 
     await prepare_tasks() # make new db conn for donor/freeze tasks
 
