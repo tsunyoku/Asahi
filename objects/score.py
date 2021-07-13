@@ -207,7 +207,7 @@ class Score:
 
     def calc_lb_format(self, user):
         if self.mode.value > 3:
-            val = self.pp
+            val = round(self.pp)
         else:
             val = self.score
 

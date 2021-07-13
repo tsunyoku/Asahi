@@ -44,6 +44,8 @@ class Beatmap:
         self.nc: int = minfo.get('nc', 0) # nc = next check (for status update)
 
         self.lb: 'Leaderboard' = minfo.get('lb', None)
+        self.lb_rx: 'Leaderboard' = minfo.get('lb_rx', None)
+        self.lb_ap: 'Leaderboard' = minfo.get('lb_ap', None)
         
         self.plays: int = minfo.get('plays', 0)
         self.passes: int = minfo.get('passes', 0)
@@ -82,7 +84,7 @@ class Beatmap:
         if (bmap := glob.cache['maps'].get(md5)):
             return bmap
 
-        return # not in cache, return nothing so we know to get from sql/api
+        return # not in cache, return nothing so we know to get from sql/api    
 
     async def np_msg(self, user):
         pp = {}

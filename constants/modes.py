@@ -57,6 +57,16 @@ class osuModes(Enum):
             return 'pp'
         else:
             return 'score'
+        
+    @property
+    @cache
+    def leaderboard(self):
+        if self.value in (4, 5, 6):
+            return 'lb_rx'
+        elif self.value in (0, 1, 2, 3):
+            return 'lb'
+        else:
+            return 'lb_ap'
 
 def lbModes(mode: int, mods: int):
     if mods & Mods.RELAX:

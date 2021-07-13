@@ -259,9 +259,11 @@ async def getMapScores(request: Request):
     if not bmap.frozen and bmap.nc < time.time():
         await bmap.check_status()
 
-    if not (lb := bmap.lb):
+    if not (lb := getattr(bmap, mode.leaderboard)):
         lb = Leaderboard(bmap, mode)
-        bmap.lb = lb
+
+        mlb = getattr(bmap, mode.leaderboard)
+        mlb = lb
         
     return await lb.return_leaderboard(player, lbm, mods)
 
@@ -446,7 +448,8 @@ async def scoreSubmit(request: Request):
             loop.create_task(s.announce_n1())
         
         # update lb cache
-        threading.Thread(target=s.map.lb.set_user_pb, args=(s.user, s,)).start()
+        lb = getattr(s.map, s.mode.leaderboard)
+        threading.Thread(target=lb, args=(s.user, s,)).start()
         
     s.user.last_score = s
 
