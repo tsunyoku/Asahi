@@ -279,7 +279,7 @@ async def start_spec(user: Player, p):
     if tid == 1:
         return
     
-    if not (target := glob.player_id.get(tid)):
+    if not (target := glob.players_id.get(tid)):
         return
     
     target.add_spectator(user)
