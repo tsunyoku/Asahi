@@ -15,7 +15,6 @@ import asyncio
 import orjson
 
 from typing import TYPE_CHECKING
-from functools import lru_cache
 
 if TYPE_CHECKING:
     from .leaderboard import Leaderboard
@@ -88,7 +87,6 @@ class Beatmap:
 
         return # not in cache, return nothing so we know to get from sql/api    
 
-    @lru_cache
     async def np_msg(self, user):
         pp = {}
         for acc in (95, 98, 99, 100):
