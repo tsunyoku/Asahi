@@ -190,18 +190,16 @@ class Score:
             await self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f})', fr=glob.bot)
             
     async def announce_n1(self):
-        perf = ''
-        prev = ''
+        msg = f'[{self.mode!r}] {self.user.embed} achieved #1 on {self.map.embed} +{self.readable_mods}'
 
         if self.map.status != mapStatuses.Loved:
-            perf = f' worth {round(self.pp):,}pp'
+            msg += f' worth {round(self.pp):,}pp'
 
         prev1 = await glob.db.fetchrow(f'SELECT users.name FROM users LEFT OUTER JOIN {self.mode.table} t ON t.uid = users.id WHERE t.md5 = $1 AND t.mode = $2 AND t.status = 2 AND users.priv & 1 > 0 AND t.uid != $3 AND t.id != $4 ORDER BY t.{self.mode.sort} DESC LIMIT 1', self.map.md5, self.mode.as_vn, self.user.id, self.id)
 
         if prev1:
-            prev = f' (Previous #1: [https://{glob.config.domain}/u/{prev1["name"]} {prev1["name"]}])'
+            msg += f' (Previous #1: [https://{glob.config.domain}/u/{prev1["name"]} {prev1["name"]}])'
 
-        msg = f'[{self.mode!r}] {self.user.embed} achieved #1 on {self.map.embed} +{self.readable_mods}{perf}{prev}'
         chan = glob.channels['#announce']
         chan.send(glob.bot, msg, True)
 
