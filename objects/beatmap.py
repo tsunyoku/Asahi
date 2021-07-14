@@ -1,5 +1,6 @@
 from constants.modes import osuModes
 from constants.statuses import mapStatuses, apiStatuses
+from constants.privs import Privileges
 from . import glob
 from .menu import Menu
 
@@ -14,6 +15,7 @@ import asyncio
 import orjson
 
 from typing import TYPE_CHECKING
+from functools import lru_cache
 
 if TYPE_CHECKING:
     from .leaderboard import Leaderboard
@@ -86,25 +88,50 @@ class Beatmap:
 
         return # not in cache, return nothing so we know to get from sql/api    
 
+    @lru_cache
     async def np_msg(self, user):
         pp = {}
         for acc in (95, 98, 99, 100):
             pp[acc] = await self.calc_acc(acc)
 
-        from constants.commands import req
-        if not (request_rank := glob.menus.get(self.sid + 1)):
-            request_rank = Menu(id=self.sid + 1, name='Request to get Ranked', callback=req, args=(user, ('rank',)))
-            glob.menus[self.sid + 1] = request_rank
+        msg = (f'{self.embed}  // 95%: {pp[95]}pp | 98%: {pp[98]}pp | 99%: {pp[99]}pp | 100%: {pp[100]}pp'
+              f' // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od}')
 
-        if not (request_love := glob.menus.get(self.sid + 2)):
-            request_love = Menu(id=self.sid + 2, name='Request to get Loved', callback=req, args=(user, ('love',)))
-            glob.menus[self.sid + 2] = request_love
-            
-        # TODO: rank/unrank/rank menus for nominators
+        # CURSED 1-100 REAL FAST
+        if not user.priv & Privileges.Staff:
+            if self.status < mapStatuses.Ranked:
+                from constants.commands import req
+                _id_reqr = self.sid + 1
+                _id_reql = self.sid + 2
 
-        return f'{self.embed}  // 95%: {pp[95]}pp | 98%: {pp[98]}pp | 99%: {pp[99]}pp | 100%: {pp[100]}pp' \
-               f' // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od} // ' \
-               f'{request_rank.embed}  {request_love.embed}'
+                request_rank = Menu(id=_id_reqr, name='Request to get Ranked', callback=req, args=(user, ('rank',)), destroy=True)
+                glob.menus[_id_reqr] = request_rank
+        
+                request_love = Menu(id=self.sid + 2, name='Request to get Loved', callback=req, args=(user, ('love',)), destroy=True)
+                glob.menus[self.sid + 2] = request_love
+                    
+                msg += f' // {request_rank.embed}  {request_love.embed}'
+        else:
+            from constants.commands import _map
+            if self.status < mapStatuses.Ranked:
+                _id_rank = self.sid + self.id + 1
+                _id_love = self.sid + self.id + 2
+    
+                rank = Menu(id=_id_rank, name='Rank', callback=_map, args=(user, ('rank', 'set',)), destroy=True)
+                glob.menus[_id_rank] = rank
+
+                love = Menu(id=_id_love, name='Love', callback=_map, args=(user, ('love', 'set',)), destroy=True)
+                glob.menus[_id_love] = love
+                    
+                msg += f' // {rank.embed}  {love.embed}'
+            else:
+                _id_unrank = self.sid + self.id + 3
+                unrank = Menu(id=_id_unrank, name='Unrank', callback=_map, args=(user, ('unrank', 'set',)), destroy=True)
+                glob.menus[_id_unrank] = unrank
+                    
+                msg += f' // {unrank.embed}'
+
+        return msg
 
     async def calc_acc(self, acc: float):
         path = Path.cwd() / f'resources/maps/{self.id}.osu'

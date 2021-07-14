@@ -121,7 +121,12 @@ async def send_pm(user: Player, p):
                 user.enqueue(writer.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
         elif m := regexes.np_regex.match(msg):
             user.np = await Beatmap.bid_fetch(int(m['bid']))
-            np = await user.np.np_msg(user)
+
+            try: # lru_cache moment
+                np = await user.np.np_msg(user)
+            except RuntimeError:
+                np = user.np.np_msg(user)
+
             user.enqueue(writer.sendMessage(fromname = target.name, msg = np, tarname = user.name, fromid = target.id))
     else:
         target.enqueue(writer.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))

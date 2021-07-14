@@ -198,6 +198,7 @@ async def _map(user, args):
         bmap.status = ns
         bmap.frozen = True
         bmap.lb = None # reset lb cache in case of major status change
+        bmap.np_msg.cache_clear() # np cache cus statuses
         await bmap.save()
         glob.cache['maps'][bmap.md5] = bmap
     else:
@@ -209,6 +210,7 @@ async def _map(user, args):
             bm.status = ns
             bm.frozen = True
             bm.lb = None # reset lb cache in case of major status change
+            bm.np_msg.cache_clear() # np cache cus statuses
             await bm.save()
             glob.cache['maps'][bm.md5] = bm
     
@@ -419,6 +421,7 @@ async def a_req(user, args):
         bm.status = ns
         bm.frozen = True
         bm.lb = None # reset lb cache in case of major status change
+        bm.np_msg.cache_clear() # np cache cus statuses
         await bm.save()
         glob.cache['maps'][bm.md5] = bm
 
