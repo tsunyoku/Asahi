@@ -62,7 +62,7 @@ async def add_priv(user, args):
     
     name = args[0]
 
-    priv = Privileges(await glob.db.fetchval("SELECT priv FROM users WHERE name = $1", name))
+    priv = Privileges(await glob.db.fetchval("SELECT priv FROM users WHERE name = %s", [name]))
     new_privs = Privileges(0)
     for npriv in args[1:]:
         if not (new_priv := Privileges.get(npriv)):
@@ -71,7 +71,12 @@ async def add_priv(user, args):
         priv |= new_priv
         new_privs |= new_priv
 
-    await glob.db.execute("UPDATE users SET priv = $1 WHERE name = $2", int(priv), name)
+    if not (user := glob.players_name.get(name)):
+        user = await Player.from_sql(name)
+        
+    for priv in new_privs:
+        await user.add_priv(priv)
+
     return f"Added privilege(s) {new_privs} to {name}."
 
 @command(priv=Privileges.Owner, name='rmpriv')
@@ -82,7 +87,7 @@ async def rm_priv(user, args):
 
     name = args[0]
 
-    priv = Privileges(await glob.db.fetchval("SELECT priv FROM users WHERE name = $1", name))
+    priv = Privileges(await glob.db.fetchval("SELECT priv FROM users WHERE name = %s", [name]))
     new_privs = Privileges(0)
     for npriv in args[1:]:
         if not (new_priv := Privileges.get(npriv)):
@@ -91,7 +96,12 @@ async def rm_priv(user, args):
         priv &= ~new_priv
         new_privs |= new_priv
 
-    await glob.db.execute("UPDATE users SET priv = $1 WHERE name = $2", int(priv), name)
+    if not (user := glob.players_name.get(name)):
+        user = await Player.from_sql(name)
+
+    for priv in new_privs:
+        await user.remove_priv(priv)
+
     return f"Removed privilege(s) {new_privs} from {name}."
 
 @command(name='battle')
@@ -102,7 +112,7 @@ async def clan_battle(user, args):
             return 'Please accept/deny a battle and specify the clan!'
 
         clan_name = args[1]
-        clan = glob.clans.get(await glob.db.fetchval('SELECT id FROM clans WHERE name = $1', clan_name))
+        clan = glob.clans.get(await glob.db.fetchval('SELECT id FROM clans WHERE name = %s', [clan_name]))
         
         if not clan:
             return 'We could not find a clan by this name!'
@@ -167,7 +177,7 @@ async def clan_battle(user, args):
         return "Please provide a clan to request a battle!"
 
     clan_name = args[0]
-    clan = glob.clans.get(await glob.db.fetchval('SELECT id FROM clans WHERE name = $1', clan_name))
+    clan = glob.clans.get(await glob.db.fetchval('SELECT id FROM clans WHERE name = %s', [clan_name]))
 
     if not clan:
         return 'We could not find a clan by this name!'
@@ -201,7 +211,7 @@ async def _map(user, args):
         await bmap.save()
         glob.cache['maps'][bmap.md5] = bmap
     else:
-        _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $1', bmap.sid)
+        _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = %s', [bmap.sid])
 
         for m in _set:
             md5 = m['md5']
@@ -270,7 +280,7 @@ async def req(user, args):
     ns = strStatuses(args[0])
     
     try:
-        await glob.db.execute('INSERT INTO requests (requester, map, status, mode) VALUES ($1, $2, $3, $4)', user.name, user.np.id, int(ns), user.mode_vn)
+        await glob.db.execute('INSERT INTO requests (requester, map, status, mode) VALUES (%s, %s, %s, %s)', [user.name, user.np.id, int(ns), user.mode_vn])
     except Exception:
         return "Someone has already requested this map's status to be changed! Your request has not been sent."
 
@@ -407,12 +417,12 @@ async def a_req(user, args):
     if len(args) < 2:
         return 'You must provide the request ID and status to set!'
 
-    request = await glob.db.fetchrow('SELECT * FROM requests WHERE id = $1', int(args[0]))
+    request = await glob.db.fetchrow('SELECT * FROM requests WHERE id = %s', [int(args[0])])
     _map = await Beatmap.bid_fetch(request['map'])
     ns = strStatuses(args[1])
 
     # TODO: better management for ranking only certain difficulties
-    _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $1', _map.sid)
+    _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $s', [_map.sid])
 
     for m in _set:
         bm = await Beatmap.from_md5(m['md5'])
@@ -436,7 +446,7 @@ async def a_req(user, args):
     if (rq := glob.players_name.get(request['requester'])):
         rq.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your request to make {_map.embed} {mapStatuses(request["status"]).name.lower()} was accepted by {user.name}! It is now {ns.name.lower()}.', tarname=rq.name, fromid=glob.bot.id))
 
-    await glob.db.execute('DELETE FROM requests WHERE id = $1', int(args[0]))
+    await glob.db.execute('DELETE FROM requests WHERE id = %s', [int(args[0])])
 
     return 'Map status updated!'
 
@@ -445,14 +455,14 @@ async def d_req(user, args):
     if len(args) < 1:
         return 'You must provide the request ID to deny!'
 
-    request = await glob.db.fetchrow('SELECT * FROM requests WHERE id = $1', int(args[0]))
+    request = await glob.db.fetchrow('SELECT * FROM requests WHERE id = %s', [int(args[0])])
     _map = await Beatmap.bid_fetch(request['map'])
     ns = mapStatuses(request['status'])
 
     if (rq := glob.players_name.get(request['requester'])):
         rq.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your request to make {_map.embed} {ns.name.lower()} was denied by {user.name}!', tarname=rq.name, fromid=glob.bot.id))
 
-    await glob.db.execute('DELETE FROM requests WHERE id = $1', int(args[0]))
+    await glob.db.execute('DELETE FROM requests WHERE id = %s', [int(args[0])])
 
     return 'Request denied!'
 

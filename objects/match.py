@@ -214,7 +214,7 @@ class Match:
         clan1_retry = []
         for m in self.clan_1_users:
             if m.id not in ignore:
-                score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = $1 AND md5 = $2 ORDER BY time DESC LIMIT 1', m.id, self.bmd5)
+                score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', [m.id, self.bmd5])
                 if not score:
                     clan1_retry.append(m.id)
                 else:
@@ -224,7 +224,7 @@ class Match:
         clan2_retry = []
         for m in self.clan_2_users:
             if m.id not in ignore:
-                score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = $1 AND md5 = $2 ORDER BY time DESC LIMIT 1', m.id, self.bmd5)
+                score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', [m.id, self.bmd5])
                 if not score:
                     clan2_retry.append(m.id)
                 else:
@@ -233,14 +233,14 @@ class Match:
         # retry those that missed
         for uid in clan1_retry:
             if uid not in ignore:
-                score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = $1 AND md5 = $2 ORDER BY time DESC LIMIT 1', m.id, self.bmd5)
+                score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', [m.id, self.bmd5])
                 if score:
                     clan1_scores.append(score)
                     clan1_retry.remove(uid)
 
         for uid in clan2_retry:
             if uid not in ignore:
-                score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = $1 AND md5 = $2 ORDER BY time DESC LIMIT 1', m.id, self.bmd5)
+                score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', [m.id, self.bmd5])
                 if score:
                     clan2_scores.append(score)
                     clan2_retry.remove(uid)
@@ -255,14 +255,14 @@ class Match:
         while True:
             for uid in clan1_retry:
                 if uid not in ignore:
-                    score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = $1 AND md5 = $2 ORDER BY time DESC LIMIT 1', m.id, self.bmd5)
+                    score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', [m.id, self.bmd5])
                     if score:
                         clan1_scores.append(score)
                         clan1_retry.remove(uid)
 
             for uid in clan2_retry:
                 if uid not in ignore:
-                    score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = $1 AND md5 = $2 ORDER BY time DESC LIMIT 1', m.id, self.bmd5)
+                    score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', [m.id, self.bmd5])
                     if score:
                         clan2_scores.append(score)
                         clan2_retry.remove(uid)
@@ -298,7 +298,7 @@ class Match:
             del glob.clan_battles[self.clan_2]
             self.clan_1.battle = None
             self.clan_2.battle = None
-            await glob.db.execute('UPDATE clans SET score = score + 50 WHERE id = $1', self.clan_1.id)
+            await glob.db.execute('UPDATE clans SET score = score + 50 WHERE id = %s', [self.clan_1.id])
             return
         elif self.clan_2_wins >= 5:
             self.chat.send(glob.bot, f'{self.clan_2.name} wins!\n\nFinal Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})\n\nCongratulations! {self.clan_2.name} will receive their extra clan points soon.', False)
@@ -308,7 +308,7 @@ class Match:
             del glob.clan_battles[self.clan_2]
             self.clan_1.battle = None
             self.clan_2.battle = None
-            await glob.db.execute('UPDATE clans SET score = score + 50 WHERE id = $1', self.clan_2.id)
+            await glob.db.execute('UPDATE clans SET score = score + 50 WHERE id = %s', [self.clan_2.id])
             return
 
         if self.host in self.clan_1_users:

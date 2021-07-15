@@ -20,46 +20,39 @@ class Anticheat:
         disk = self.adapters['disk_serial']
         ip = self.adapters['ip']
         
-        mac_check = await glob.db.fetchval('SELECT uid FROM user_hashes WHERE mac_address = $1 AND uid != $2', mac, self.player.id)
+        mac_check = await glob.db.fetchval('SELECT uid FROM user_hashes WHERE mac_address = %s AND uid != %s', [mac, self.player.id])
         if mac_check:
             og = await Player.from_sql(mac_check)
             
             await self.player.ban(reason=f'Multiaccount of user {og.name}', fr=glob.bot)
             await og.ban(reason=f'Multiaccounting (user {self.player.name})', fr=glob.bot)
 
-        uid_check = await glob.db.fetchval('SELECT uid FROM user_hashes WHERE uninstall_id = $1 AND uid != $2', uninstall, self.player.id)
+        uid_check = await glob.db.fetchval('SELECT uid FROM user_hashes WHERE uninstall_id = %s AND uid != %s', [uninstall, self.player.id])
         if uid_check:
             og = await Player.from_sql(uid_check)
 
             await self.player.ban(reason=f'Multiaccount of user {og.name}', fr=glob.bot)
             await og.restrict(reason=f'Multiaccounting (user {self.player.name})', fr=glob.bot)
 
-        disk_check = await glob.db.fetchval('SELECT uid FROM user_hashes WHERE disk_serial = $1 AND uid != $2', disk, self.player.id)
+        disk_check = await glob.db.fetchval('SELECT uid FROM user_hashes WHERE disk_serial = %s AND uid != %s', [disk, self.player.id])
         if disk_check and disk != 'runningunderwine':
             og = await Player.from_sql(disk_check)
 
             await self.player.ban(reason=f'Multiaccount of user {og.name}', fr=glob.bot)
             await og.restrict(reason=f'Multiaccounting (user {self.player.name})', fr=glob.bot)
 
-        ip_check = await glob.db.fetchval('SELECT uid FROM user_hashes WHERE ip = $1 AND uid != $2', ip, self.player.id)
+        ip_check = await glob.db.fetchval('SELECT uid FROM user_hashes WHERE ip = %s AND uid != %s', [ip, self.player.id])
         if ip_check:
             og = await Player.from_sql(ip_check)
 
             await self.player.flag(reason=f'Flagged with same IP as {og.name}', fr=glob.bot)
             await og.flag(reason=f'Flagged with same IP as {self.player.name}', fr=glob.bot)
             
-        try:
-            await glob.db.execute(
-                f'INSERT INTO user_hashes ("uid", "mac_address", "uninstall_id", "disk_serial", "ip") '
-                'VALUES ($1, $2, $3, $4, $5)',
-                self.player.id, mac, uninstall, disk, ip
-            )
-        except Exception:
-            await glob.db.execute(
-                f'UPDATE user_hashes SET occurrences = occurrences + 1 WHERE '
-                'mac_address = $1 AND uninstall_id = $2 AND disk_serial = $3 AND ip = $4 AND uid = $5',
-                mac, uninstall, disk, ip, self.player.id
-            )
+        await glob.db.execute(
+            f'INSERT INTO user_hashes ("uid", "mac_address", "uninstall_id", "disk_serial", "ip") '
+            'VALUES (%s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE occurrences = occurrences + 1',
+            [self.player.id, mac, uninstall, disk, ip]
+        )
 
     async def client_check(self):
         if any(v in self.ver for v in ('ainu', 'skooter')) or 'ainu' in self.headers or not osu_ver.match(self.ver):

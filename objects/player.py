@@ -102,10 +102,10 @@ class Player:
         )
 
         p.friends = []
-        async for user in glob.db.iter("SELECT user2 FROM friends WHERE user1 = $1", p.id):
+        async for user in glob.db.iter("SELECT user2 FROM friends WHERE user1 = %s", [p.id]):
             p.friends.append(user['user2'])
 
-        clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = $1', p.id)
+        clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = %s', [p.id])
         if clan:
             p.clan = glob.clans.get(clan)
             
@@ -115,7 +115,7 @@ class Player:
         if p.priv & Privileges.Frozen:
             p.frozen = True
             
-        db_achs = await glob.db.fetch('SELECT ach FROM user_achievements WHERE uid = $1', p.id)
+        db_achs = await glob.db.fetch('SELECT ach FROM user_achievements WHERE uid = %s', [p.id])
         for db in db_achs:
             for ach in glob.achievements:
                 if db['ach'] == ach.id:
@@ -133,7 +133,7 @@ class Player:
         else:
             return # ?
 
-        user = await glob.db.fetchrow(f'SELECT * FROM users WHERE {typ} = $1', spc)
+        user = await glob.db.fetchrow(f'SELECT * FROM users WHERE {typ} = %s', [spc])
         
         if not user:
             return
@@ -152,7 +152,7 @@ class Player:
             freeze_timer=datetime.fromtimestamp(user['freeze_timer'])
         )
 
-        clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = $1', p.id)
+        clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = %s', [p.id])
         if clan:
             p.clan = glob.clans.get(clan)
         
@@ -166,7 +166,7 @@ class Player:
 
     async def set_stats(self):
         for mode in osuModes:
-            stat = dict(await glob.db.fetchrow('SELECT rscore_{0} rscore, acc_{0} acc, pc_{0} pc, tscore_{0} tscore, pp_{0} pp, mc_{0} max_combo, pt_{0} playtime FROM stats WHERE id = $1'.format(mode.name), self.id))
+            stat = await glob.db.fetchrow('SELECT rscore_{0} rscore, acc_{0} acc, pc_{0} pc, tscore_{0} tscore, pp_{0} pp, mc_{0} max_combo, pt_{0} playtime FROM stats WHERE id = %s'.format(mode.name), [self.id])
 
             if not self.restricted:
                 stat['rank'] = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}', self.id)
@@ -198,8 +198,8 @@ class Player:
         stats = self.stats[mode.value]
         mode_name = mode.name
 
-        t100 = await glob.db.fetch(f'SELECT {table}.acc, {table}.pp FROM {table} LEFT OUTER JOIN maps ON maps.md5 = {table}.md5 WHERE {table}.uid = $1 AND {table}.mode = $2 AND {table}.status = 2 AND maps.status IN (1, 2) ORDER BY {table}.pp DESC LIMIT 100', self.id, mode_vn)
-        s = await glob.db.fetch(f'SELECT {table}.acc, {table}.pp FROM {table} LEFT OUTER JOIN maps ON maps.md5 = {table}.md5 WHERE {table}.uid = $1 AND {table}.mode = $2 AND {table}.status = 2 AND maps.status IN (1, 2) ORDER BY {table}.pp DESC', self.id, mode_vn)
+        t100 = await glob.db.fetch(f'SELECT {table}.acc, {table}.pp FROM {table} LEFT OUTER JOIN maps ON maps.md5 = {table}.md5 WHERE {table}.uid = %s AND {table}.mode = %s AND {table}.status = 2 AND maps.status IN (2, 3) ORDER BY {table}.pp DESC LIMIT 100', [self.id, mode_vn])
+        s = await glob.db.fetch(f'SELECT {table}.acc, {table}.pp FROM {table} LEFT OUTER JOIN maps ON maps.md5 = {table}.md5 WHERE {table}.uid = %s AND {table}.mode = %s AND {table}.status = 2 AND maps.status IN (2, 3) ORDER BY {table}.pp DESC', [self.id, mode_vn])
 
         if not t100:
             return # no scores xd
@@ -231,7 +231,7 @@ class Player:
             else:
                 stats.country_rank += 1
 
-        await glob.db.execute('UPDATE stats SET rscore_{0} = $1, acc_{0} = $2, pc_{0} = $3, tscore_{0} = $4, pp_{0} = $5, mc_{0} = $6, pt_{0} = $7 WHERE id = $8'.format(mode_name), stats.rscore, stats.acc, stats.pc, stats.tscore, stats.pp, stats.max_combo, stats.playtime, self.id)
+        await glob.db.execute('UPDATE stats SET rscore_{0} = %s, acc_{0} = %s, pc_{0} = %s, tscore_{0} = %s, pp_{0} = %s, mc_{0} = %s, pt_{0} = %s WHERE id = %s'.format(mode_name), [stats.rscore, stats.acc, stats.pc, stats.tscore, stats.pp, stats.max_combo, stats.playtime, self.id])
 
         self.enqueue(writer.userStats(self))
         
@@ -276,15 +276,15 @@ class Player:
 
     async def add_priv(self, priv):
         self.priv |= priv
-        await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', int(self.priv), self.id)
+        await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
 
     async def remove_priv(self, priv):
         self.priv &= ~priv
-        await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', int(self.priv), self.id)
+        await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
 
     async def set_priv(self, priv):
         self.priv = priv
-        await glob.db.execute('UPDATE users SET priv = $1 WHERE id = $2', int(self.priv), self.id)
+        await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
 
     def add_spectator(self, user):
         joiner = writer.spectatorJoined(user.id)
@@ -448,7 +448,7 @@ class Player:
         if self.token:
             self.enqueue(writer.userID(-3))
             
-        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'ban', reason, self.id, fr.id, time.time())
+        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['ban', reason, self.id, fr.id, time.time()])
 
         for mode, stat in self.stats.items():
             mode_name = mode.name
@@ -481,9 +481,9 @@ class Player:
         self.freeze_timer = expire
         
         await self.add_priv(Privileges.Frozen)
-        await glob.db.execute('UPDATE users SET freeze_timer = $1 WHERE id = $2', self.freeze_timer.timestamp(), self.id)
+        await glob.db.execute('UPDATE users SET freeze_timer = %s WHERE id = %s', [self.freeze_timer.timestamp(), self.id])
 
-        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'freeze', reason, self.id, fr.id, time.time())
+        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['freeze', reason, self.id, fr.id, time.time()])
         
         if self.token:
             self.enqueue(writer.restartServer(0))
@@ -501,7 +501,7 @@ class Player:
         log(f'{self.name} has been frozen for {reason}.', Ansi.LBLUE)
         
     async def flag(self, reason, fr):
-        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'flag', reason, self.id, fr.id, time.time())
+        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['flag', reason, self.id, fr.id, time.time()])
 
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
@@ -523,9 +523,9 @@ class Player:
         self.freeze_timer = 0
         
         await self.remove_priv(Privileges.Frozen)
-        await glob.db.execute('UPDATE users SET freeze_timer = 0 WHERE id = $1', self.id)
+        await glob.db.execute('UPDATE users SET freeze_timer = 0 WHERE id = %s', [self.id])
 
-        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'unfreeze', reason, self.id, fr.id, time.time())
+        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['unfreeze', reason, self.id, fr.id, time.time()])
         
         if self.token:
             self.enqueue(writer.restartServer(0))
@@ -545,7 +545,7 @@ class Player:
     async def unban(self, reason, fr):
         await self.remove_priv(Privileges.Banned)
 
-        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'unban', reason, self.id, fr.id, time.time())
+        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['unban', reason, self.id, fr.id, time.time()])
 
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
@@ -570,7 +570,7 @@ class Player:
         if self.token:
             self.enqueue(writer.restartServer(0)) # force relog if they're online
 
-        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'restrict', reason, self.id, fr.id, time.time())
+        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['restrict', reason, self.id, fr.id, time.time()])
 
         for mode, stat in self.stats.items():
             mode_name = mode.name
@@ -601,7 +601,7 @@ class Player:
         if self.token:
             self.enqueue(writer.restartServer(0)) # force relog if they're online
 
-            await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES ($1, $2, $3, $4, $5)', 'unrestrict', reason, self.id, fr.id, time.time())
+            await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['unrestrict', reason, self.id, fr.id, time.time()])
 
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
@@ -616,7 +616,7 @@ class Player:
         log(f'{self.name} has been unrestricted for {reason}.', Ansi.LBLUE)
         
     async def unlock_ach(self, ach):
-        await glob.db.execute('INSERT INTO user_achievements (uid, ach) VALUES ($1, $2)', self.id, ach.id)
+        await glob.db.execute('INSERT INTO user_achievements (uid, ach) VALUES (%s, %s)', [self.id, ach.id])
         self.achievements.append(ach)
 
     def enqueue(self, b: bytes):

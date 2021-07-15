@@ -7,7 +7,7 @@ from cmyui import Ansi, Version, log # import console logger (cleaner than print
 from pathlib import Path
 from aiohttp import ClientSession
 from discord.ext import commands
-from fatFuckSQL import fatFuckSQL
+from fatFuckSQL import fatFawkSQL
 import aioredis
 #import uvloop
 import asyncio
@@ -28,7 +28,7 @@ from objects.tasks import expired_donor, freeze_timers, prepare_tasks
 
 app = Xevel(glob.config.socket, loop=asyncio.get_event_loop()) # handler for webserver :D
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
-glob.version = Version(0, 3, 5) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 3, 6) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
@@ -48,11 +48,11 @@ async def connect(): # ran before server startup, used to do things like connect
     glob.web = ClientSession() # aiohttp session for external web requests
 
     try:
-        glob.db = await fatFuckSQL.connect(**glob.config.postgres) # connect to db using config :p
+        glob.db = await fatFawkSQL.connect(**glob.config.sql) # connect to db using config :p
         if glob.config.debug:
-            log('==== Asahi connected to PostgreSQL ====', Ansi.GREEN)
+            log('==== Asahi connected to MySQL ====', Ansi.GREEN)
     except Exception as error:
-        log(f'==== Asahi failed to connect to PostgreSQL ====\n\n{error}', Ansi.LRED)
+        log(f'==== Asahi failed to connect to MySQL ====\n\n{error}', Ansi.LRED)
 
     try:
         glob.redis = await aioredis.create_redis_pool(f"redis://{glob.config.redis['host']}", db=glob.config.redis['db'], password=glob.config.redis['password'] or None)
@@ -113,7 +113,7 @@ async def connect(): # ran before server startup, used to do things like connect
         clan.chan = clan_chan
         glob.clans[clan.id] = clan
 
-        async for id in glob.db.iter('SELECT id FROM users WHERE clan = $1', clan.id):
+        async for id in glob.db.iter('SELECT id FROM users WHERE clan = %s', [clan.id]):
             clan.members.append(id['id'])
 
         if glob.config.debug:
@@ -133,7 +133,7 @@ async def disconnect():
 
     await glob.db.close()
     if glob.config.debug:
-        log('==== Closed PostgreSQL connection ====', Ansi.GREEN)
+        log('==== Closed MySQL connection ====', Ansi.GREEN)
 
     glob.redis.close()
     await glob.redis.wait_closed()

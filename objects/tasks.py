@@ -1,6 +1,5 @@
 import time
 import asyncio
-import asyncpg
 
 from constants.privs import Privileges
 from objects.player import Player
@@ -11,15 +10,11 @@ from cmyui import log
 donors = None
 frozen = None
 
-async def prepare_tasks(): # we'll use a separate connection just in case because asyncpg hates us
-    db = await asyncpg.connect(user=glob.config.postgres['user'], password=glob.config.postgres['password'], database=glob.config.postgres['db'], host=glob.config.postgres['host'])
-
+async def prepare_tasks():
     global donors
     global frozen
-    donors = await db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Supporter} > 0')
-    frozen = await db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Frozen} > 0')
-
-    await db.close()
+    donors = await glob.db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Supporter}')
+    frozen = await glob.db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Frozen}')
 
 async def expired_donor():
     while True: # this sux   
@@ -34,7 +29,7 @@ async def expired_donor():
                 # user isn't online, we'll remove it ourselves
                 user_priv = Privileges(user['priv'])
                 user_priv &= ~Privileges.Supporter
-                await glob.db.execute(f'UPDATE users SET priv = $1 WHERE id = $2', int(user_priv), user['id'])
+                await glob.db.execute(f'UPDATE users SET priv = %s WHERE id = %s', [int(user_priv), user['id']])
                 
         await asyncio.sleep(600) # run every 10 mins
         

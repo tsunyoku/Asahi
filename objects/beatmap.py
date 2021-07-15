@@ -184,7 +184,7 @@ class Beatmap:
 
     @classmethod
     async def sql(self, md5: str):
-        bmap = await glob.db.fetchrow('SELECT * FROM maps WHERE md5 = $1', md5)
+        bmap = await glob.db.fetchrow('SELECT * FROM maps WHERE md5 = %s', [md5])
 
         if not bmap:
             return # not in sql so we know to attempt from api next
@@ -232,7 +232,7 @@ class Beatmap:
         b.update = dt.strptime(bmap['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
 
         b.nc = time.time()
-        e = await glob.db.fetchrow('SELECT frozen, status, update FROM maps WHERE id = $1', b.id)
+        e = await glob.db.fetchrow('SELECT frozen, status, `update` FROM maps WHERE id = %s', [b.id])
 
         if e:
             if b.update > e['update']:
@@ -308,7 +308,7 @@ class Beatmap:
             if not data:
                 return
 
-        bmap = await glob.db.fetchrow('SELECT id, status, frozen, update FROM maps WHERE id = $1', self.id)
+        bmap = await glob.db.fetchrow('SELECT id, status, frozen, `update` FROM maps WHERE id = %s', [self.id])
 
         exist = {}
         try:
@@ -332,24 +332,16 @@ class Beatmap:
 
                         self.nc = time.time() + 3600
 
-                        await glob.db.execute('UPDATE maps SET status = $1, nc = $2 WHERE md5 = $3', self.status, self.nc, self.md5)
+                        await glob.db.execute('UPDATE maps SET status = %s, nc = %s WHERE md5 = %s', [self.status, self.nc, self.md5])
                         if (cached := glob.cache['maps'].get(self.md5)):
                             cached.status = self.status
                             cached.nc = self.nc
 
     async def save(self):
-        try:
-            await glob.db.execute(
-                'INSERT INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, update, nc, plays, passes) '
-                'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)',
-                self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, 
-                self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc,
-                self.plays, self.passes
-            )
-        except Exception: # sadly there is no good way to update on duplicate like there is with mysql
-            await glob.db.execute(
-                'UPDATE maps SET id = $1, sid = $2, bpm = $3, cs = $4, ar = $5, od = $6, hp = $7, sr = $8, mode = $9, artist = $10, '
-                'title = $11, diff = $12, mapper = $13, status = $14, frozen = $15, update = $16, nc = $17, plays = $18, passes = $19 WHERE md5 = $20', 
-                self.id, self.sid, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, 
-                self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc, self.plays, self.passes, self.md5
-            )
+        await glob.db.execute(
+            'REPLACE INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, `update`, nc, plays, passes) '
+            'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
+            [self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, 
+            self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc,
+            self.plays, self.passes]
+        )

@@ -4,6 +4,7 @@ from constants.mods import Mods, convert
 from constants.modes import osuModes, lbModes
 from constants.statuses import scoreStatuses, mapStatuses
 from constants.grades import Grade
+from constants.privs import Privileges
 from objects import glob
 
 from base64 import b64decode
@@ -54,7 +55,7 @@ class Score:
 
     @classmethod
     async def sql(self, sid: int, table: str, sort: str, t: int, ensure: bool = False):
-        score = await glob.db.fetchrow(f'SELECT * FROM {table} WHERE id = $1', sid)
+        score = await glob.db.fetchrow(f'SELECT * FROM {table} WHERE id = %s', [sid])
 
         if not score:
             return
@@ -195,10 +196,10 @@ class Score:
         if self.map.status != mapStatuses.Loved:
             msg += f' worth {round(self.pp):,}pp'
 
-        prev1 = await glob.db.fetchrow(f'SELECT users.name FROM users LEFT OUTER JOIN {self.mode.table} t ON t.uid = users.id WHERE t.md5 = $1 AND t.mode = $2 AND t.status = 2 AND users.priv & 1 > 0 AND t.uid != $3 AND t.id != $4 ORDER BY t.{self.mode.sort} DESC LIMIT 1', self.map.md5, self.mode.as_vn, self.user.id, self.id)
+        prev1 = await glob.db.fetchval(f'SELECT users.name FROM users LEFT OUTER JOIN {self.mode.table} t ON t.uid = users.id WHERE t.md5 = %s AND t.mode = %s AND t.status = 2 AND NOT users.priv & {Privileges.Disallowed} AND t.uid != %s AND t.id != %s ORDER BY t.{self.mode.sort} DESC LIMIT 1', [self.map.md5, self.mode.as_vn, self.user.id, self.id])
 
         if prev1:
-            msg += f' (Previous #1: [https://{glob.config.domain}/u/{prev1["name"]} {prev1["name"]}])'
+            msg += f' (Previous #1: [https://{glob.config.domain}/u/{prev1} {prev1}])'
 
         chan = glob.channels['#announce']
         chan.send(glob.bot, msg, True)
@@ -217,8 +218,8 @@ class Score:
         return f'{self.id}|{nm}|{val}|{self.combo}|{self.n50}|{self.n100}|{self.n300}|{self.miss}|{self.katu}|{self.geki}|{int(self.fc)}|{self.mods}|{self.user.id}|{self.rank}|{self.time}|1'
 
     async def calc_lb(self, table, sort, value):
-        lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = $1 AND {table}.mode = $2 AND {table}.status = 2 AND users.priv & 1 > 0 AND {table}.{sort} > $3', self.map.md5, self.mode.value, value)
-        return lb['r'] + 1 if lb else 1
+        lb = await glob.db.fetchval(f'SELECT COUNT(*) AS r FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = %s AND {table}.mode = %s AND {table}.status = 2 AND NOT users.priv & {Privileges.Disallowed} AND {table}.{sort} > %s', [self.map.md5, self.mode.value, value])
+        return lb + 1 if lb else 1
 
     async def calc_pp(self, mode_vn):
         path = Path.cwd() / f'resources/maps/{self.map.id}.osu'
@@ -289,10 +290,10 @@ class Score:
         else:
             t = self.score
 
-        lb = await glob.db.fetchrow(f'SELECT COUNT(*) AS r FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = $1 AND t.mode = $2 AND t.status = 2 AND users.priv & 1 > 0 AND t.{self.mode.sort} > $3', self.map.md5, mode, t)
-        self.rank = lb['r'] + 1 if lb else 1
+        lb = await glob.db.fetchval(f'SELECT COUNT(*) AS r FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = %s AND t.mode = %s AND t.status = 2 AND NOT users.priv & {Privileges.Disallowed} AND t.{self.mode.sort} > %s', [self.map.md5, mode, t])
+        self.rank = lb + 1 if lb else 1
 
-        score = await glob.db.fetchrow(f'SELECT id, pp, score FROM {self.mode.table} WHERE uid = $1 AND md5 = $2 AND mode = $3 AND status = 2', self.user.id, self.map.md5, mode)
+        score = await glob.db.fetchrow(f'SELECT id, pp, score FROM {self.mode.table} WHERE uid = %s AND md5 = %s AND mode = %s AND status = 2', [self.user.id, self.map.md5, mode])
         if score: # they already have a (best) submitted score
             self.old_best = await Score.sql(score['id'], self.mode.table, self.mode.sort, t)
 

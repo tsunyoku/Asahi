@@ -187,9 +187,8 @@ async def ingameRegistration(request: Request):
         k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'', backend=backend())
         bc = k.derive(md5).decode('unicode-escape')
 
-        await glob.db.execute("INSERT INTO users (name, email, pw, safe_name) VALUES ($1, $2, $3, $4)", name, email, bc, name.lower().replace(' ', '_'))
-        uid = await glob.db.fetchval("SELECT id FROM users WHERE name = $1", name)
-        await glob.db.execute('INSERT INTO stats (id) VALUES ($1)', uid)
+        uid = await glob.db.execute("INSERT INTO users (name, email, pw, safe_name) VALUES (%s, %s, %s, %s)", [name, email, bc, name.lower().replace(' ', '_')])
+        await glob.db.execute('INSERT INTO stats (id) VALUES (%s)', [uid])
         log(f'{name} successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}ms', Ansi.LBLUE)
 
     return b'ok'
@@ -226,7 +225,6 @@ async def getMapScores(request: Request):
 
     mods = int(args['mods'])
     mode = lbModes(int(args['m']), mods)
-    sid = int(args['i'])
     lbm = int(args['v'])
 
     player = request.extras.get('player')
@@ -249,7 +247,7 @@ async def getMapScores(request: Request):
             glob.cache['unsub'].append(md5)
             return b'-1|false'
 
-        exists = await glob.db.fetchval('SELECT 1 FROM maps WHERE artist = $1 AND title = $2 AND diff = $3 AND mapper = $4', info['artist'], info['title'], info['diff'], info['mapper'])
+        exists = await glob.db.fetchval('SELECT 1 FROM maps WHERE artist = %s AND title = %s AND diff = %s AND mapper = %s', [info['artist'], info['title'], info['diff'], info['mapper']])
 
         if exists:
             return b'1|false' # bmap submitted but not up to date, send update available
@@ -291,12 +289,11 @@ async def scoreSubmit(request: Request):
             o.enqueue(writer.userStats(s.user))
 
     # submit score and get id xd
-    await glob.db.execute(f'INSERT INTO {s.mode.table} (md5, score, acc, pp, combo, mods, n300, geki, n100, katu, n50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)', s.map.md5, s.score, s.acc, s.pp, s.combo, s.mods, s.n300, s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status.value, s.mode.as_vn, s.time, s.user.id, s.readable_mods, s.fc)
-    s.id = await glob.db.fetchval(f'SELECT id FROM {s.mode.table} WHERE md5 = $1 AND uid = $2 AND time = $3', s.map.md5, s.user.id, s.time)
+    s.id = await glob.db.execute(f'INSERT INTO {s.mode.table} (md5, score, acc, pp, combo, mods, n300, geki, n100, katu, n50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', [s.map.md5, s.score, s.acc, s.pp, s.combo, int(s.mods), s.n300, s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status.value, s.mode.as_vn, s.time, s.user.id, s.readable_mods, s.fc])
     
     if s.status == scoreStatuses.Best:
         # set any other best scores to submitted ones as they've been overwritten
-        await glob.db.execute(f'UPDATE {s.mode.table} SET status = 1 WHERE status = 2 AND uid = $1 AND md5 = $2 AND mode = $3 AND id != $4', s.user.id, s.map.md5, s.mode.as_vn, s.id)
+        await glob.db.execute(f'UPDATE {s.mode.table} SET status = 1 WHERE status = 2 AND uid = %s AND md5 = %s AND mode = %s AND id != %s', [s.user.id, s.map.md5, s.mode.as_vn, s.id])
 
     # save replay if not a failed score
     if s.status != scoreStatuses.Failed:
@@ -355,8 +352,8 @@ async def scoreSubmit(request: Request):
             s.map.passes += 1
             
         await glob.db.execute(
-            'UPDATE maps SET plays = $1, passes = $2 WHERE md5 = $3', 
-            s.map.plays, s.map.passes, s.map.md5
+            'UPDATE maps SET plays = %s, passes = %s WHERE md5 = %s', 
+            [s.map.plays, s.map.passes, s.map.md5]
         )
 
     # sub charts bruh

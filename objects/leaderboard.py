@@ -34,19 +34,19 @@ class Leaderboard:
 
         mode_vn = self.mode.as_vn
 
-        query = [f'SELECT t.id, {self.mode.sort} as s FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = $1 AND mode = $2 AND status = 2 AND (users.priv & {int(Privileges.Disallowed)} = 0 OR users.id = {user.id})']
+        query = [f'SELECT t.id, {self.mode.sort} as s FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = %s AND mode = %s AND status = 2 AND (users.priv & {int(Privileges.Disallowed)} OR users.id = {user.id})']
         p = [self.map.md5, mode_vn]
 
         if lb == 2:
-            query.append('AND t.mods = $3')
+            query.append('AND t.mods = %s')
             p.append(mods)
             sc = self.mods_cache.get(mods)
         elif lb == 3:
             f = user.friends + [user.id]
-            query.append(f'AND t.uid IN ({",".join(str(e) for e in f)})') # CURSE YOU ASYNCPG
+            query.append(f'AND t.uid IN ({",".join(str(e) for e in f)})')
             sc = None
         elif lb == 4:
-            query.append('AND users.country = $3')
+            query.append('AND users.country = %s')
             p.append(user.country_iso.lower())
             sc = self.country_cache.get(user.country_iso)
         else:
@@ -54,7 +54,7 @@ class Leaderboard:
 
         query.append('ORDER BY s DESC LIMIT 100')
 
-        scores = await glob.db.fetch(' '.join(query), *p)
+        scores = await glob.db.fetch(' '.join(query), p)
 
         mbody = self.base_body + f'|{len(scores)}'
 
@@ -118,7 +118,7 @@ class Leaderboard:
 
         mode_vn = self.mode.as_vn
 
-        pbd = await glob.db.fetchrow(f'SELECT {self.mode.table}.id, {self.mode.sort} as s FROM {self.mode.table} WHERE md5 = $1 AND mode = $2 AND status = 2 AND uid = $3 ORDER BY s DESC LIMIT 1', self.map.md5, mode_vn, user.id)
+        pbd = await glob.db.fetchrow(f'SELECT {self.mode.table}.id, {self.mode.sort} as s FROM {self.mode.table} WHERE md5 = %s AND mode = %s AND status = 2 AND uid = %s ORDER BY s DESC LIMIT 1', [self.map.md5, mode_vn, user.id])
 
         if pbd:
             # score found xd

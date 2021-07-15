@@ -7,10 +7,10 @@ if TYPE_CHECKING:
     from cmyui import Version
     from objects.player import Player
 
-    import asyncpg
+    from fatFuckSQL import fatFawkSQL
     import aioredis
 
-db: 'asyncpg.connect' # type hinting
+db: 'fatFawkSQL.connect' # type hinting
 version: 'Version' # once again, type hinting
 web: 'ClientSession'
 redis: 'aioredis.create_redis_pool'

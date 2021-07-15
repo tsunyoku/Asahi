@@ -689,7 +689,7 @@ async def root_client(request: Request):
         username = info[0]
         pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later    
          
-        user = await glob.db.fetchrow("SELECT * FROM users WHERE name = $1", username)
+        user = await glob.db.fetchrow("SELECT * FROM users WHERE name = %s", [username])
         if not user: # ensure user actually exists before attempting to do anything else
             if glob.config.debug:
                 log(f'User {username} does not exist.', Ansi.LRED)
@@ -710,7 +710,7 @@ async def root_client(request: Request):
             else: # correct password, we allow the user to continue but lets convert the password to our new format first
                 k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'', backend=backend())
                 new_pw = k.derive(pw).decode('unicode-escape')
-                await glob.db.execute(f'UPDATE users SET pw = $1 WHERE id = $2', new_pw, user['id'])
+                await glob.db.execute(f'UPDATE users SET pw = %s WHERE id = %s', [new_pw, user['id']])
                 
                 # add to cache for the future
                 glob.cache['pw'][user_pw] = new_pw
@@ -746,12 +746,11 @@ async def root_client(request: Request):
                 p.logout()
 
         token = uuid.uuid4() # generate token for client to use as auth
-        user2 = dict(user)
-        user2['offset'] = int(cinfo[1]) # utc offset for time
-        user2['bot'] = False # used to specialise bot functions, kinda gay setup ngl
-        user2['token'] = str(token) # this may be useful in the future
-        user2['ltime'] = time.time() # useful for handling random logouts
-        user2['md5'] = pw # used for auth on /web/
+        user['offset'] = int(cinfo[1]) # utc offset for time
+        user['bot'] = False # used to specialise bot functions, kinda gay setup ngl
+        user['token'] = str(token) # this may be useful in the future
+        user['ltime'] = time.time() # useful for handling random logouts
+        user['md5'] = pw # used for auth on /web/
         ip = headers['X-Forwarded-For']
 
         # cache ip's geoloc | the speed gains too are ungodly
@@ -761,11 +760,11 @@ async def root_client(request: Request):
         else:
             geoloc = glob.geoloc[ip]
 
-        user2['country_iso'], user2['lat'], user2['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
-        user2['country'] = country_codes[user2['country_iso']]
+        user['country_iso'], user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
+        user['country'] = country_codes[user['country_iso']]
 
         # set player object
-        p = await Player.login(user2)
+        p = await Player.login(user)
         await p.set_stats()
 
         if not p.priv & Privileges.Verified:
@@ -773,7 +772,7 @@ async def root_client(request: Request):
                 # first user & not verified, give all permissions
                 await p.set_priv(Privileges.Master)
 
-            await glob.db.execute("UPDATE users SET country = $1 WHERE id = $2", p.country_iso.lower(), p.id) # set country code in db
+            await glob.db.execute("UPDATE users SET country = %s WHERE id = %s", [p.country_iso.lower(), p.id]) # set country code in db
             await p.add_priv(Privileges.Verified) # verify user
             log(f'{p.name} has been successfully verified.', Ansi.LBLUE)
             
@@ -849,7 +848,7 @@ async def root_client(request: Request):
                     b2[add].append(p)
                 
         if p.restricted:
-            reason = await glob.db.fetchval("SELECT reason FROM punishments WHERE type = 'restrict' AND target = $1 ORDER BY time DESC LIMIT 1", p.id)
+            reason = await glob.db.fetchval("SELECT reason FROM punishments WHERE type = 'restrict' AND target = %s ORDER BY time DESC LIMIT 1", [p.id])
             data += writer.sendMessage(fromname=glob.bot.name, msg=f'Your account is currently restricted for reason "{reason}"!', tarname=p.name, fromid=glob.bot.id)
             
         if p.frozen and not p.restricted:
@@ -858,7 +857,7 @@ async def root_client(request: Request):
                 await p.restrict(reason='Expired freeze timer')
                 data += writer.sendMessage(fromname=glob.bot.name, msg=f'Your freeze timer has expired and you have not submitted any liveplay, you have been restricted as a result!', tarname=p.name, fromid=glob.bot.id)
             else:
-                reason = await glob.db.fetchval("SELECT reason FROM punishments WHERE type = 'freeze' AND target = $1 ORDER BY time DESC LIMIT 1", p.id)
+                reason = await glob.db.fetchval("SELECT reason FROM punishments WHERE type = 'freeze' AND target = %s ORDER BY time DESC LIMIT 1", [p.id])
                 data += writer.sendMessage(fromname=glob.bot.name, msg=f'Your account is currently frozen for reason "{reason}"! If you do not provide a liveplay by {p.freeze_timer.strftime("%d/%m/%Y %H:%M:%S")}, you will be autorestricted.', tarname=p.name, fromid=glob.bot.id)
 
         if p.priv & Privileges.Supporter and p.donor_end < start:

@@ -62,23 +62,20 @@ async def user(request):
         return (400, {'message': 'you must specify either a username or id!'})
 
     if username:
-        id = await glob.db.fetchval('SELECT id FROM users WHERE name = $1', username)
+        id = await glob.db.fetchval('SELECT id FROM users WHERE name = %s', [username])
 
     if not id:
         return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
 
-    info = await glob.db.fetchrow('SELECT id, name, country, priv FROM users WHERE id = $1', id)
+    info = await glob.db.fetchrow('SELECT id, name, country, priv FROM users WHERE id = %s', [id])
 
     if not info:
         return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
 
-    stats_db = await glob.db.fetchrow('SELECT * FROM stats WHERE id = $1', id)
+    stats_db = await glob.db.fetchrow('SELECT * FROM stats WHERE id = %s', [id])
     
     if info['priv'] & Privileges.Disallowed:
         return (400, {'message': 'user is restricted/banned!'})
-
-    info = dict(info)
-    stats_db = dict(stats_db)
 
     stats = {}
     
@@ -126,7 +123,7 @@ async def playerStatus(request):
         return (400, {'message': 'you must specify either a username or id!'})
 
     if username:
-        id = await glob.db.fetchval('SELECT id FROM users WHERE name = $1', username)
+        id = await glob.db.fetchval('SELECT id FROM users WHERE name = %s', [username])
 
     if not id:
         return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
@@ -183,7 +180,7 @@ async def getLb(request):
     
     if not search:
         for rank, uid in enumerate(lb):
-            info = await glob.db.fetchrow('SELECT users.name, users.country, stats.pp_{0} pp, stats.acc_{0} acc FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.id = $1'.format(lb_mode.name), uid)
+            info = await glob.db.fetchrow('SELECT users.name, users.country, stats.pp_{0} pp, stats.acc_{0} acc FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.id = %s'.format(lb_mode.name), [uid])
             
             ret.append({
                 'rank': rank + 1,
@@ -197,7 +194,7 @@ async def getLb(request):
         return ret
 
     cursed_lb = (str(lb)).strip('[]')
-    users = await glob.db.fetch(f'SELECT users.name, users.id, users.country, stats.pp_{lb_mode.name} pp, stats.acc_{lb_mode.name} acc FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.id IN ({cursed_lb}) AND users.name LIKE $1', f'{search}%')
+    users = await glob.db.fetch(f'SELECT users.name, users.id, users.country, stats.pp_{lb_mode.name} pp, stats.acc_{lb_mode.name} acc FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.id IN ({cursed_lb}) AND users.name LIKE %s', [f'{search}%'])
         
     for info in users:
         ret.append({
@@ -243,8 +240,8 @@ async def getReplay(request):
     # get score from sql
     score = await glob.db.fetchrow(
         f'SELECT t.*, t.mode m, users.name, maps.* FROM {table} t '
-        'LEFT OUTER JOIN users ON users.id = t.uid LEFT OUTER JOIN maps ON maps.md5 = t.md5 WHERE t.id = $1', 
-        sid
+        'LEFT OUTER JOIN users ON users.id = t.uid LEFT OUTER JOIN maps ON maps.md5 = t.md5 WHERE t.id = %s', 
+        [sid]
     )
 
     hash = hashlib.md5(
@@ -321,7 +318,7 @@ async def playerScores(req):
     query = ('SELECT id, md5, score, pp, acc, combo, mods, '
             'n300, n100, n50, miss, geki, katu, '
             'grade, status, mode, time, fc '
-            f'FROM {mode.table} WHERE uid = $1 AND mode = $2')
+            f'FROM {mode.table} WHERE uid = %s AND mode = %s')
     
     if _type == 'best':
         query += ' AND status = 2'
@@ -329,9 +326,9 @@ async def playerScores(req):
     else:
         sort = 'time'
         
-    query += f' ORDER BY {sort} DESC LIMIT $3'
+    query += f' ORDER BY {sort} DESC LIMIT %s'
 
-    scores = await glob.db.fetch(query, uid, mode.as_vn, limit)
+    scores = await glob.db.fetch(query, [uid, mode.as_vn, limit])
     
     for idx, score in enumerate(scores):
         score = dict(score) # stupid psql records
