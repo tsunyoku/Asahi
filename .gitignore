@@ -1,4 +1,9 @@
 __pycache__/
 .vscode/
+.idea/
 *.lprof
 config.py
+*.log
+*.so
+*.c
+resources/
