@@ -5,6 +5,7 @@ from urllib.parse import unquote
 from pathlib import Path
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
+from cryptography.hazmat.backends import default_backend as backend
 
 import string
 import random
@@ -183,7 +184,7 @@ async def ingameRegistration(request: Request):
 
     if int(mpargs['check']) == 0:
         md5 = hashlib.md5(pw.encode()).hexdigest().encode()
-        k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'')
+        k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'', backend=backend())
         bc = k.derive(md5).decode('unicode-escape')
 
         await glob.db.execute("INSERT INTO users (name, email, pw, safe_name) VALUES ($1, $2, $3, $4)", name, email, bc, name.lower().replace(' ', '_'))
