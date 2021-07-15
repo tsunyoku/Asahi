@@ -4,6 +4,8 @@ __pycache__/
 *.lprof
 config.py
 *.log
-*.so
-*.c
 resources/
+packets/build
+packets/*.so
+packets/*.c
+disc/custom/
