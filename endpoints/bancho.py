@@ -6,6 +6,7 @@ from geoip2 import database # for geoloc
 # pw stuff xd
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
+from cryptography.hazmat.backends import default_backend as backend
 
 import pyfiglet
 import uuid
@@ -707,7 +708,7 @@ async def root_client(request: Request):
                 request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
                 return writer.userID(-1)
             else: # correct password, we allow the user to continue but lets convert the password to our new format first
-                k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'')
+                k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'', backend=backend())
                 new_pw = k.derive(pw).decode('unicode-escape')
                 await glob.db.execute(f'UPDATE users SET pw = $1 WHERE id = $2', new_pw, user['id'])
                 
@@ -724,7 +725,7 @@ async def root_client(request: Request):
                     request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
                     return writer.userID(-1)
             else:
-                k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'')
+                k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'', backend=backend())
                 try:
                     k.verify(pw, user_pw)
                 except Exception as e:
