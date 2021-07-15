@@ -187,7 +187,7 @@ async def ingameRegistration(request: Request):
         k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'', backend=backend())
         bc = k.derive(md5).decode('unicode-escape')
 
-        uid = await glob.db.execute("INSERT INTO users (name, email, pw, safe_name) VALUES (%s, %s, %s, %s)", [name, email, bc, name.lower().replace(' ', '_')])
+        uid = await glob.db.execute("INSERT INTO users (name, email, pw, safe_name, registered_at) VALUES (%s, %s, %s, %s, %s)", [name, email, bc, name.lower().replace(' ', '_'), time.time()])
         await glob.db.execute('INSERT INTO stats (id) VALUES (%s)', [uid])
         log(f'{name} successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}ms', Ansi.LBLUE)
 
