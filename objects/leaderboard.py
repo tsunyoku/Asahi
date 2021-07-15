@@ -34,7 +34,7 @@ class Leaderboard:
 
         mode_vn = self.mode.as_vn
 
-        query = [f'SELECT t.id, {self.mode.sort} as s FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = %s AND mode = %s AND status = 2 AND (users.priv & {int(Privileges.Disallowed)} OR users.id = {user.id})']
+        query = [f'SELECT t.id, {self.mode.sort} as s FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = %s AND mode = %s AND status = 2 AND (NOT users.priv & {int(Privileges.Disallowed)} OR users.id = {user.id})']
         p = [self.map.md5, mode_vn]
 
         if lb == 2:
