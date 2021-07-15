@@ -169,22 +169,40 @@ async def getLb(request):
     mode = int(args.get('mode', 0))
     rx = int(args.get('rx', 0))
     
+    search = args.get('u', None)
+    
     if rx == 0: rx = Mods.NOMOD
     elif rx == 1: rx = Mods.RELAX
     elif rx == 2: rx = Mods.AUTOPILOT
     
     lb_mode = lbModes(mode, rx)
-    lb = await glob.redis.zrangebyscore(f'asahi:leaderboard:{lb_mode.name}')
+    lb = [int(u) for u in await glob.redis.zrangebyscore(f'asahi:leaderboard:{lb_mode.name}')]
     lb.reverse() # redis returns backwards??
     
     ret = []
     
-    for rank, uid in enumerate(lb):
-        info = await glob.db.fetchrow('SELECT users.name, users.country, stats.pp_{0} pp, stats.acc_{0} acc FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.id = $1'.format(lb_mode.name), int(uid))
+    if not search:
+        for rank, uid in enumerate(lb):
+            info = await glob.db.fetchrow('SELECT users.name, users.country, stats.pp_{0} pp, stats.acc_{0} acc FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.id = $1'.format(lb_mode.name), uid)
+            
+            ret.append({
+                'rank': rank + 1,
+                'userid': uid,
+                'name': info['name'],
+                'country': info['country'],
+                'pp': info['pp'],
+                'acc': info['acc']
+            })
         
+        return ret
+
+    cursed_lb = (str(lb)).strip('[]')
+    users = await glob.db.fetch(f'SELECT users.name, users.id, users.country, stats.pp_{lb_mode.name} pp, stats.acc_{lb_mode.name} acc FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.id IN ({cursed_lb}) AND users.name LIKE $1', f'{search}%')
+        
+    for info in users:
         ret.append({
-            'rank': rank + 1,
-            'uid': int(uid),
+            'rank': lb[info['id']] + 1,
+            'userid': info['id'],
             'name': info['name'],
             'country': info['country'],
             'pp': info['pp'],

@@ -2,7 +2,6 @@
 from xevel import Router, Request # web server :blobcowboi:
 from cmyui import Ansi, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
 from geoip2 import database # for geoloc
-from re import compile
 
 # pw stuff xd
 from cryptography.hazmat.primitives import hashes
