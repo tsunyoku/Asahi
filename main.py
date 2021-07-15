@@ -9,7 +9,7 @@ from aiohttp import ClientSession
 from discord.ext import commands
 from fatFuckSQL import fatFuckSQL
 import aioredis
-import uvloop
+#import uvloop
 import asyncio
 import os
 import plazy
