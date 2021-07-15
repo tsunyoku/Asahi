@@ -128,8 +128,6 @@ async def disconnect():
     log(f'==== Asahi v{glob.version} stopping ====', Ansi.GREEN)
 
     await glob.web.close()
-    if glob.config.debug:
-        log('==== Closed webserver ====', Ansi.GREEN)
 
     await glob.db.close()
     if glob.config.debug:
