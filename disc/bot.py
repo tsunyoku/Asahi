@@ -27,6 +27,9 @@ class asahiBot(commands.Cog): # TODO: actually start this
             log('==== Asahi Discord bot started ====', Ansi.GREEN)
 
         await self.set_status.start()
+        
+    async def end_tasks(self):
+        self.set_status.cancel()
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):

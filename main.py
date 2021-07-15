@@ -138,6 +138,9 @@ async def disconnect():
     if glob.config.debug:
         log('==== Closed Redis connection ====', Ansi.GREEN)
 
+    bot = dc.cogs['asahiBot']
+    await bot.end_tasks()
+
     await dc.close()
     if glob.config.debug:
         log('==== Asahi Discord bot stopped ====', Ansi.GREEN)
