@@ -114,14 +114,15 @@ async def send_pm(user: Player, p):
         log(f'{user.name} tried to send message to offline user {tarname}', Ansi.LRED)
         return
 
-    if target is glob.bot and msg.startswith(glob.config.prefix):
-        if (cmd := await commands.process(user, msg)):
-            user.enqueue(writer.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
-    elif m := regexes.np_regex.match(msg):
-        user.np = await Beatmap.bid_fetch(int(m['bid']))
-        np = await user.np.np_msg(user)
+    if target is glob.bot: 
+        if msg.startswith(glob.config.prefix):
+            if (cmd := await commands.process(user, msg)):
+                user.enqueue(writer.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
+        elif m := regexes.np_regex.match(msg):
+            user.np = await Beatmap.bid_fetch(int(m['bid']))
+            np = await user.np.np_msg(user)
 
-        user.enqueue(writer.sendMessage(fromname = target.name, msg = np, tarname = user.name, fromid = target.id))
+            user.enqueue(writer.sendMessage(fromname = target.name, msg = np, tarname = user.name, fromid = target.id))
     else:
         target.enqueue(writer.sendMessage(fromname = user.name, msg = msg, tarname = target.name, fromid = user.id))
         log(f'{user.name} sent message "{msg}" to {tarname}', Ansi.LCYAN)
