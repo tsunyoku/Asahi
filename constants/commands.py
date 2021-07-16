@@ -54,6 +54,13 @@ async def help(user, args):
     cmd_list = '\n'.join(allowed_cmds)
     return f'List of available commands:\n\n{cmd_list}'
 
+@command(name=['last', 'l', 'recent', 'r', 'rs'], elapsed=False)
+async def last_score(user, args):
+    if (score := user.last_score):
+        return await score.format()
+    
+    return 'No recent score found!'
+
 @command(priv=Privileges.Owner, name='addpriv')
 async def add_priv(user, args):
     """Adds (a list of) privileges to a user"""

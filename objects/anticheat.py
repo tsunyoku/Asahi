@@ -49,7 +49,7 @@ class Anticheat:
             await og.flag(reason=f'Flagged with same IP as {self.player.name}', fr=glob.bot)
             
         await glob.db.execute(
-            f'INSERT INTO user_hashes ("uid", "mac_address", "uninstall_id", "disk_serial", "ip") '
+            f'INSERT INTO user_hashes (uid, mac_address, uninstall_id, disk_serial, ip) '
             'VALUES (%s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE occurrences = occurrences + 1',
             [self.player.id, mac, uninstall, disk, ip]
         )

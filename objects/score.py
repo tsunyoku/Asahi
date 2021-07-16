@@ -18,7 +18,7 @@ import time
 import re
 import asyncio
 import orjson
-import requests
+import copy
 
 class Score:
     def __init__(self):
@@ -52,6 +52,24 @@ class Score:
         self.old_best: Score = None
         
         self.osuver: int = None
+        self.ur: float = None
+
+    async def format(self):
+        msg = f'{self.user.name} | {self.map.name} +{self.readable_mods} {self.acc:.2f}% {"FC" if not self.miss else f"{self.miss}xMiss"} {round(self.pp):,}pp'
+        
+        if self.miss:
+            fc_score = copy.copy(self)
+            
+            fc_score.fc = True
+            fc_score.combo = 0 # oppai will take max combo
+            pp, _ = await fc_score.calc_pp(self.mode.as_vn)
+            
+            msg += f' (~{round(pp):,}pp for FC)'
+            
+        if self.mode.value == 0 and self.ur:
+            msg += f' | {self.ur:.2f} (cv)UR'
+            
+        return msg
 
     @classmethod
     async def sql(self, sid: int, table: str, sort: str, t: int, ensure: bool = False):
@@ -183,9 +201,9 @@ class Score:
         replay = ReplayString(rp)
 
         # TODO: compare replay against bancho leaderboards
-
-        if (ur := cg.ur(replay)) < 60:
-            await self.user.freeze(reason=f'potential relax (ur: {ur:.2f})', fr=glob.bot)
+        self.ur = cg.ur(replay) # cant do := because class :(
+        if self.ur < 70:
+            await self.user.flag(reason=f'potential relax (ur: {self.ur:.2f})', fr=glob.bot)
 
         if (ft := cg.frametime(replay)) < 14: # TODO: check for false positives in frametime
             await self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f})', fr=glob.bot)
@@ -239,7 +257,10 @@ class Score:
                     ezpp.set_mods(int(self.mods))
                     
                 ezpp.set_mode(mode_vn)
-                ezpp.set_combo(self.combo)
+                
+                if self.combo:
+                    ezpp.set_combo(self.combo)
+
                 ezpp.set_nmiss(self.miss)
                 ezpp.set_accuracy_percent(self.acc)
 
@@ -261,7 +282,10 @@ class Score:
         else: # ctb: use shitty osu-tools
 
             cmd = [f'./osu-tools/compiled/PerformanceCalculator simulate {nm} {str(path)}']
-            cmd.append(f'-c {self.combo}') # max combo
+            
+            if self.combo:
+                cmd.append(f'-c {self.combo}') # max combo
+
             cmd.append(f'-X {self.miss}') # miss count
 
             cmd.append(f'-D {self.n50}') # 50s equivalent for catch? 
@@ -278,7 +302,7 @@ class Score:
             pr = await asyncio.create_subprocess_shell(comp, stdout=p, stderr=p)
             ot, _ = await pr.communicate()
             o = orjson.loads(ot.decode('utf-8'))
-            return o['pp']
+            return o['pp'], 0.0
 
     async def score_order(self):
         mode = self.mode.as_vn
