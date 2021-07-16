@@ -342,6 +342,6 @@ class Beatmap:
             'REPLACE INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, `update`, nc, plays, passes) '
             'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
             [self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, 
-            self.artist, self.title, self.diff, self.mapper, self.status, self.frozen, self.update, self.nc,
+            self.artist, self.title, self.diff, self.mapper, int(self.status), self.frozen, self.update, self.nc,
             self.plays, self.passes]
         )
