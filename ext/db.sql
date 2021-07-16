@@ -420,10 +420,10 @@ CREATE TABLE `user_achievements` (
 
 CREATE TABLE `user_hashes` (
   `uid` int(11) NOT NULL,
-  `mac_address` varchar(32) NOT NULL,
-  `uninstall_id` varchar(32) NOT NULL,
-  `disk_serial` varchar(32) NOT NULL,
-  `ip` varchar(32) NOT NULL,
+  `mac_address` varchar(64) NOT NULL,
+  `uninstall_id` varchar(64) NOT NULL,
+  `disk_serial` varchar(64) NOT NULL,
+  `ip` varchar(64) NOT NULL,
   `occurrences` bigint(20) NOT NULL DEFAULT '1'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
