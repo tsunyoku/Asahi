@@ -190,30 +190,57 @@ async def getLb(request):
     
     if not search:
         for rank, uid in enumerate(lb):
-            info = await glob.db.fetchrow('SELECT users.name, users.country, stats.pp_{0} pp, stats.acc_{0} acc FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.id = %s'.format(lb_mode.name), [uid])
-            
+            info = await glob.db.fetchrow(
+                'SELECT users.name, users.country, stats.pp_{0} pp, stats.acc_{0} acc, stats.pc_{0} pc FROM users '
+                'LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.id = %s'.format(lb_mode.name), 
+                [uid]
+            )
+
+            db_grades = await glob.db.fetchrow(
+                'SELECT SUM(grade IN ("SS", "SSH")) AS ss, '
+                'SUM(grade IN ("S", "SH")) AS s, '
+                'SUM(grade = "A") AS a FROM {0} WHERE uid = %s AND mode = %s'.format(lb_mode.table),
+                [uid, mode]
+            )
+
             ret.append({
                 'rank': rank + 1,
                 'userid': uid,
                 'name': info['name'],
                 'country': info['country'],
                 'pp': info['pp'],
-                'acc': info['acc']
+                'acc': info['acc'],
+                'playcount': info['pc'],
+                'grades': {key: int(val) for key, val in db_grades.items()}
             })
         
         return ret
 
-    cursed_lb = (str(lb)).strip('[]')
-    users = await glob.db.fetch(f'SELECT users.name, users.id, users.country, stats.pp_{lb_mode.name} pp, stats.acc_{lb_mode.name} acc FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.id IN ({cursed_lb}) AND users.name LIKE %s', [f'{search}%'])
+    users = await glob.db.fetch(
+        f'SELECT users.name, users.id, users.country, stats.pp_{lb_mode.name} pp, stats.acc_{lb_mode.name} acc, stats.pc_{lb_mode.name} pc '
+        f'FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.name LIKE %s', [f'{search}%']
+    )
         
     for info in users:
+        if info['id'] not in lb:
+            continue
+
+        db_grades = await glob.db.fetchrow(
+            'SELECT SUM(grade IN ("SS", "SSH")) AS ss, '
+            'SUM(grade IN ("S", "SH")) AS s, '
+            'SUM(grade = "A") AS a FROM {0} WHERE uid = %s AND mode = %s'.format(lb_mode.table), 
+            [info['id'], mode]
+        )
+        
         ret.append({
             'rank': lb[info['id']] + 1,
             'userid': info['id'],
             'name': info['name'],
             'country': info['country'],
             'pp': info['pp'],
-            'acc': info['acc']
+            'acc': info['acc'],
+            'playcount': info['pc'],
+            'grades': {key: int(val) for key, val in db_grades.items()}
         })
         
     return ret
