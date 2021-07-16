@@ -16,7 +16,7 @@ import time
 
 cmds = []
 
-def command(priv: Privileges = Privileges.Normal, name: str = None, elapsed: bool = True):
+def command(priv: Privileges = Privileges.Normal, name: str = None, elapsed: bool = True, allow_public: bool = False):
     def wrapper(cmd_cb):
         if name is not None:
             if not isinstance(name, list):
@@ -24,7 +24,8 @@ def command(priv: Privileges = Privileges.Normal, name: str = None, elapsed: boo
                     'name': name, 
                     'priv': priv, 
                     'elapsed': elapsed, 
-                    'cb': cmd_cb, 
+                    'cb': cmd_cb,
+                    'allow_public': allow_public,
                     'desc': cmd_cb.__doc__
                 })
             else:
@@ -34,6 +35,7 @@ def command(priv: Privileges = Privileges.Normal, name: str = None, elapsed: boo
                         'priv': priv,
                         'elapsed': elapsed,
                         'cb': cmd_cb,
+                        'allow_public': allow_public,
                         'desc': cmd_cb.__doc__
                     }) 
         else:
@@ -54,7 +56,7 @@ async def help(user, args):
     cmd_list = '\n'.join(allowed_cmds)
     return f'List of available commands:\n\n{cmd_list}'
 
-@command(name=['last', 'l', 'recent', 'r', 'rs'], elapsed=False)
+@command(name=['last', 'l', 'recent', 'r', 'rs'], elapsed=False, allow_public=True)
 async def last_score(user, args):
     if (score := user.last_score):
         return await score.format()
@@ -475,7 +477,7 @@ async def d_req(user, args):
 
 #####################
 
-async def process(user, msg):
+async def process(user, msg, public = False):
     start = time.time()
     args = msg.split()
     ct = args[0].split(glob.config.prefix)[1]
@@ -485,6 +487,9 @@ async def process(user, msg):
         if cmd == ct:
             if not user.priv & c['priv']:
                 return 'You have insufficient permissions to perform this command!'
+            
+            if public and not c['allow_public']:
+                return
 
             cb = c['cb']
             o = await cb(user, args[1:])

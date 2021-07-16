@@ -116,8 +116,7 @@ async def send_pm(user: Player, p):
 
     if target is glob.bot:
         if msg.startswith(glob.config.prefix):
-            cmd = await commands.process(user, msg)
-            if cmd:
+            if (cmd := await commands.process(user, msg)):
                 user.enqueue(writer.sendMessage(fromname = target.name, msg = cmd, tarname = user.name, fromid = target.id))
         elif m := regexes.np_regex.match(msg):
             user.np = await Beatmap.bid_fetch(int(m['bid']))
@@ -159,7 +158,11 @@ async def send_msg(user: Player, p):
     
     if not c:
         return
-    
+
+    if msg.startswith(glob.config.prefix) and (cmd := await commands.process(user, msg, True)):
+        msg = cmd
+        user = glob.bot # bot returns the message
+
     c.send(user, msg, False)
 
 @packet(Packets.OSU_CHANNEL_JOIN, allow_res=True)
