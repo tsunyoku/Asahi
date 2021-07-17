@@ -20,7 +20,7 @@ from objects import glob
 from objects.beatmap import Beatmap
 from objects.score import Score
 from constants.modes import lbModes
-from constants.statuses import mapStatuses, scoreStatuses
+from constants.statuses import mapStatuses, scoreStatuses, apiStatuses, directStatuses, apiFromDirect
 from constants.mods import Mods
 from constants.flags import osuFlags
 from objects.leaderboard import Leaderboard
@@ -115,8 +115,17 @@ async def getFriends(request: Request):
 
 @web.route("/d/<mid>")
 async def mapDownload(request: Request, mid: str):
-    request.resp_headers['Location'] = f'https://osu.gatari.pw/d/{mid}' # reliable downloads
+    request.resp_headers['Location'] = f'{glob.config.map_api}/d/{mid}'
     return (301, b'') # redirect
+
+def directMapFormat(diff):
+    return f'{diff["DiffName"]} ({diff["DifficultyRating"]}⭐)@{diff["Mode"]}'
+
+def directSetFormat(bmap, diffs):
+    return (f'{bmap["SetID"]}.osz|{bmap["Artist"]}|{bmap["Title"]}|{bmap["Creator"]}'
+            f'|{bmap["RankedStatus"]}|10.0|{bmap["LastUpdate"]}|{bmap["SetID"]}|0|0'
+            f'|0|0|0|{diffs}'
+            )
 
 @web.route("/web/osu-search.php")
 async def osuSearch(request: Request):
@@ -124,16 +133,33 @@ async def osuSearch(request: Request):
     if not auth(args['u'], args['h'], request):
         return b''
 
-    args['u'] = glob.config.bancho_username
-    args['h'] = glob.config.bancho_hashed_password
+    request_args = {'amount': 100, 'offset': 100 * int(args['p'])}
+    
+    if (query := args['q']) not in ('Newest', 'Top+Rated', 'Most+Played'):
+        request_args['query'] = query
+        
+    if (mode := int(args['m'])) != -1:
+        request_args['mode'] = mode
 
-    async with glob.web.get("https://osu.ppy.sh/web/osu-search.php", params=args) as resp:
+    if (d_status := int(args['r'])) != 4:
+        request_args['status'] = apiFromDirect(d_status)
+
+    async with glob.web.get(f"{glob.config.map_api}/api/search", params=request_args) as resp:
         if resp.status != 200:
             return (resp.status, b'0')
 
-        ret = await resp.read()
+        result = await resp.json()
+        
+    map_amount = len(result)
+    ret = [f'{"101" if map_amount == 100 else map_amount}']
+    
+    for _map in result:
+        sorted_diffs = sorted(_map['ChildrenBeatmaps'], key=lambda sr: sr['DifficultyRating'])
+        
+        diffs = ', '.join([directMapFormat(s) for s in sorted_diffs])
+        ret.append(directSetFormat(_map, diffs))
 
-    return (resp.status, ret)
+    return '\n'.join(ret).encode()
 
 @web.route("/web/osu-search-set.php")
 async def osuSearchSet(request: Request):
@@ -266,7 +292,6 @@ async def getMapScores(request: Request):
         
     return await lb.return_leaderboard(player, lbm, mods)
 
-# POGGG
 @web.route("/web/osu-submit-modular-selector.php", ['POST'])
 async def scoreSubmit(request: Request):
     mpargs = request.args

@@ -58,11 +58,8 @@ pp_caps = (
     1200 # autopilot std
 )
 
-# these are used for osu!direct mirror. i understand some people may find this sketchy but the entire code is open source so you can see what is using it.
-# the only place these are used are in endpoints/web.py, but feel free to check if you are worried.
-# obviously, if you don't want to provide these then you can just edit the code to use a beatmap mirror instead
-bancho_username = ''
-bancho_hashed_password = '' # md5 hash of your password, you can generate an md5 hash here: https://www.md5hashgenerator.com/
+# used for osu!direct/downloads -> written to be compatible with kitsu's structure but its cheesegull-structure so any cheesegull api **should** work
+map_api = 'https://kitsu.moe'
 
 # if you have switched to asahi from another source with asahi's migrator, you will need to enable this.
 # other server sources use bcrypt, while we dont: this will handle conversion from bcrypt to our format for you if it is enabled.
