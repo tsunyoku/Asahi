@@ -233,7 +233,7 @@ async def getLb(request):
         )
         
         ret.append({
-            'rank': lb[info['id']] + 1,
+            'rank': lb.index(info['id']) + 1,
             'userid': info['id'],
             'name': info['name'],
             'country': info['country'],
