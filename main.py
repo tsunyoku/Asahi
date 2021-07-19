@@ -28,7 +28,7 @@ from objects.tasks import expired_donor, freeze_timers, prepare_tasks
 
 app = Xevel(glob.config.socket, loop=asyncio.get_event_loop()) # handler for webserver :D
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
-glob.version = Version(0, 3, 6) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 3, 7) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
