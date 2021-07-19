@@ -38,6 +38,11 @@ token = ''
 # NOTE: i would recommend not disabling this unless you are using asahi for a cheat server as this removes any form of anticheat (client checks, replay checks, pp cap etc.)
 anticheat = True
 
+# you will need anticheat enabled for this to work when enabled
+# not recommended to enable: it makes many api requests and you *will* get ratelimited which effects many processes in asahi that use the api
+# use of this is for checking for replay botting (circleguard similarity) which is good in essence but this entire system is flawed for reason stated above
+similarity_checks = False
+
 webhooks = { # you can leave the urls empty if you don't want to use them!
     'logs': '', # server-related logs (user registers etc.) - if you dont want a channel flooded with new registered/verified users then just leave this empty
     'maps': '', # now-ranked channel

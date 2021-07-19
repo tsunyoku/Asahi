@@ -19,7 +19,7 @@ class Privileges(IntFlag):
 
     Staff = Nominator | Admin | Developer | Owner
     Manager = Admin | Developer | Owner
-    Master = Normal | Verified | Supporter | Nominator | Admin | Developer | Owner
+    Master = Normal | Verified | Supporter | Nominator | Admin | Developer | Owner | Whitelisted
     Disallowed = Restricted | Banned
     
     @classmethod

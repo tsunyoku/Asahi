@@ -20,8 +20,9 @@ from objects import glob
 from objects.beatmap import Beatmap
 from objects.score import Score
 from constants.modes import lbModes
-from constants.statuses import mapStatuses, scoreStatuses, apiStatuses, directStatuses, apiFromDirect
+from constants.statuses import mapStatuses, scoreStatuses, apiFromDirect
 from constants.mods import Mods
+from constants.privs import Privileges
 from constants.flags import osuFlags
 from objects.leaderboard import Leaderboard
 from constants import regexes
@@ -341,7 +342,7 @@ async def scoreSubmit(request: Request):
     
     cap = glob.config.pp_caps[s.mode.value]
 
-    if cap is not None and s.pp >= cap and s.map.status & mapStatuses.GIVE_PP and glob.config.anticheat and not s.user.restricted: # ugly
+    if cap is not None and s.pp >= cap and s.map.status & mapStatuses.GIVE_PP and glob.config.anticheat and not s.user.restricted and not s.user.priv & Privileges.Whitelisted: # ugly
         await s.user.restrict(reason='Exceeding PP cap', fr=glob.bot)
 
     # update stats EEEEEEE

@@ -19,6 +19,7 @@ import re
 import asyncio
 import orjson
 import copy
+import threading
 
 class Score:
     def __init__(self):
@@ -197,16 +198,32 @@ class Score:
         async with glob.web.get(url) as resp:
             rp = await resp.read()
 
+        threading.Thread(target=self.replay_check, args=(rp,), daemon=True).start()
+            
+    def replay_check(self, rp):
         cg = Circleguard(glob.config.api_key)
         replay = ReplayString(rp)
 
-        # TODO: compare replay against bancho leaderboards
+        if glob.config.similarity_checks:
+            # get bancho leaderboards and compare replay
+            # TODO: check replays on private servers
+            if self.map.status >= mapStatuses.Ranked: # has bancho lb
+                map = cg.Map(self.map.id, span='1-100')# maybe ill increase this to the top 1000?
+    
+                for mreplay in map:
+                    sim = cg.similarity(replay, mreplay)
+                    if sim < 17: # suggested circlecore value, idk if this should change
+                        # THIS CAN FLAG LEGIT HENCE WHY IT FLAGS, PLEASE CHECK A REPLAY MANUALLY IF FLAGGED!
+                        return asyncio.run(self.user.flag(reason=f'potential replay botting using {mreplay.username}\'s bancho replay (similarity: {sim:.2f}) on {self.map.name}', fr=glob.bot))
+
         self.ur = cg.ur(replay) # cant do := because class :(
         if self.ur < 70:
-            await self.user.flag(reason=f'potential relax (ur: {self.ur:.2f})', fr=glob.bot)
+            asyncio.run(self.user.flag(reason=f'potential relax (ur: {self.ur:.2f}) on {self.map.name}', fr=glob.bot))
 
-        if (ft := cg.frametime(replay)) < 14: # TODO: check for false positives in frametime
-            await self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f})', fr=glob.bot)
+        # this can sometimes be a false positive but its detectable thru a visualized graph (i may send it alongside the embed at some point)
+        # there is a fix in the works for detecting false positives
+        if (ft := cg.frametime(replay)) < 14:
+            asyncio.run(self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f}) on {self.map.name}', fr=glob.bot))
             
     async def announce_n1(self):
         msg = f'[{self.mode!r}] {self.user.embed} achieved #1 on {self.map.embed} +{self.readable_mods}'

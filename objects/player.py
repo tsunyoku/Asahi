@@ -448,10 +448,10 @@ class Player:
         if self.token:
             self.enqueue(writer.userID(-3))
             
-        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['ban', reason, self.id, fr.id, time.time()])
+        await glob.db.execute('INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES (%s, %s, %s, %s, %s)', ['ban', reason, self.id, fr.id, time.time()])
 
         for mode, stat in self.stats.items():
-            mode_name = mode.name
+            mode_name = osuModes(mode).name
 
             await glob.redis.zrem(f'asahi:leaderboard:{mode_name}', self.id)
             await glob.redis.zrem(f'asahi:leaderboard:{mode_name}:{self.country_iso}', self.id)
@@ -483,7 +483,7 @@ class Player:
         await self.add_priv(Privileges.Frozen)
         await glob.db.execute('UPDATE users SET freeze_timer = %s WHERE id = %s', [self.freeze_timer.timestamp(), self.id])
 
-        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['freeze', reason, self.id, fr.id, time.time()])
+        await glob.db.execute('INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES (%s, %s, %s, %s, %s)', ['freeze', reason, self.id, fr.id, time.time()])
         
         if self.token:
             self.enqueue(writer.restartServer(0))
@@ -501,7 +501,7 @@ class Player:
         log(f'{self.name} has been frozen for {reason}.', Ansi.LBLUE)
         
     async def flag(self, reason, fr):
-        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['flag', reason, self.id, fr.id, time.time()])
+        await glob.db.execute('INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES (%s, %s, %s, %s, %s)', ['flag', reason, self.id, fr.id, time.time()])
 
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
@@ -525,7 +525,7 @@ class Player:
         await self.remove_priv(Privileges.Frozen)
         await glob.db.execute('UPDATE users SET freeze_timer = 0 WHERE id = %s', [self.id])
 
-        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['unfreeze', reason, self.id, fr.id, time.time()])
+        await glob.db.execute('INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES (%s, %s, %s, %s, %s)', ['unfreeze', reason, self.id, fr.id, time.time()])
         
         if self.token:
             self.enqueue(writer.restartServer(0))
@@ -545,7 +545,7 @@ class Player:
     async def unban(self, reason, fr):
         await self.remove_priv(Privileges.Banned)
 
-        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['unban', reason, self.id, fr.id, time.time()])
+        await glob.db.execute('INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES (%s, %s, %s, %s, %s)', ['unban', reason, self.id, fr.id, time.time()])
 
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
@@ -570,10 +570,10 @@ class Player:
         if self.token:
             self.enqueue(writer.restartServer(0)) # force relog if they're online
 
-        await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['restrict', reason, self.id, fr.id, time.time()])
+        await glob.db.execute('INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES (%s, %s, %s, %s, %s)', ['restrict', reason, self.id, fr.id, time.time()])
 
         for mode, stat in self.stats.items():
-            mode_name = mode.name
+            mode_name = osuModes(mode).name
 
             await glob.redis.zrem(f'asahi:leaderboard:{mode_name}', self.id)
             await glob.redis.zrem(f'asahi:leaderboard:{mode_name}:{self.country_iso}', self.id)
@@ -601,7 +601,7 @@ class Player:
         if self.token:
             self.enqueue(writer.restartServer(0)) # force relog if they're online
 
-            await glob.db.execute('INSERT INTO punishments ("type", "reason", "target", "from", "time") VALUES (%s, %s, %s, %s, %s)', ['unrestrict', reason, self.id, fr.id, time.time()])
+            await glob.db.execute('INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES (%s, %s, %s, %s, %s)', ['unrestrict', reason, self.id, fr.id, time.time()])
 
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
