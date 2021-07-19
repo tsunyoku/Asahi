@@ -27,9 +27,11 @@ cache = {
     'latest_ver': {}
 }
 
+# TODO: player list collection
 players = {} # player dict | player[token] = player
 players_name = {} # playername dict | player[name] = player
 players_id = {} # playerid dict | player[id] = player
+
 geoloc = {} # geoloc dict | geoloc[ip] = geoloc
 channels = {} # channels dict | channel[name] = channel
 matches = {} # matches dict | matches[id] = match

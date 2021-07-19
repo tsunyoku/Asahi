@@ -426,6 +426,6 @@ async def searchPlayers(req):
         return (400, {'message': 'please provide a search query!'})
     
     users = await glob.db.fetch('SELECT id, name FROM users WHERE name LIKE %s', [f'{query}%'])
-    return users
+    return users or []
 
     

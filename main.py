@@ -9,9 +9,7 @@ from aiohttp import ClientSession
 from discord.ext import commands
 from fatFuckSQL import fatFawkSQL
 import aioredis
-#import uvloop
 import asyncio
-import os
 import plazy
 
 # internal imports
@@ -38,7 +36,8 @@ RAP_PATH = Path.cwd() / 'resources/replays_ap'
 MAPS_PATH = Path.cwd() / 'resources/maps'
 ACHIEVEMENTS_PATH = Path.cwd() / 'resources/achievements'
 
-# commented because it breaks subprocess
+# commented because it breaks subprocess - if we remove it in the future then ill uncomment it
+#import uvloop
 #asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 @app.before_serving()
@@ -68,13 +67,12 @@ async def connect(): # ran before server startup, used to do things like connect
     for directory in (SS_PATH, R_PATH, RRX_PATH, RAP_PATH, MAPS_PATH, ACHIEVEMENTS_PATH):
         if not directory.exists(): directory.mkdir(parents=True)
 
-    # add bot to user cache lmao CURSED | needs to be cleaned DESPERATELY
     botinfo = await glob.db.fetchrow('SELECT name, pw, country, name FROM users WHERE id = 1')
     bot = Player(id=1, name=botinfo['name'], offset=1, country_iso=botinfo['country'], country=country_codes[botinfo['country'].upper()])
     glob.players[''] = bot
     glob.players_name[bot.name] = bot
     glob.players_id[1] = bot
-    glob.bot = bot # might be useful in the future?
+    glob.bot = bot
     if glob.config.debug:
         log(f"==== Added bot {bot.name} to player list ====", Ansi.GREEN)
         
