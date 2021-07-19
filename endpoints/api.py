@@ -171,12 +171,19 @@ async def getLb(request):
     limit = int(args.get('limit', 50))
     page = int(args.get('p', 0))
     
+    country = args.get('country', None)
+    
     if rx == 0: rx = Mods.NOMOD
     elif rx == 1: rx = Mods.RELAX
     elif rx == 2: rx = Mods.AUTOPILOT
-    
+
     lb_mode = lbModes(mode, rx)
-    lb = [int(u) for u in await glob.redis.zrangebyscore(f'asahi:leaderboard:{lb_mode.name}')]
+    lb_str = f'asahi:leaderboard:{lb_mode.name}'
+    
+    if country:
+        lb_str += f':{country.upper()}'
+
+    lb = [int(u) for u in await glob.redis.zrangebyscore(lb_str)]
     lb.reverse() # redis returns backwards??
     
     # limit amount of users to return
