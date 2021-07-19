@@ -416,4 +416,16 @@ async def playerScores(req):
     
     return {'player': uinfo, 'scores': scores}
 
+@api.route('/player_search')
+async def searchPlayers(req):
+    args = req.args
+    
+    query = args.get('search')
+    
+    if not query:
+        return (400, {'message': 'please provide a search query!'})
+    
+    users = await glob.db.fetch('SELECT id, name FROM users WHERE name LIKE %s', [f'{query}%'])
+    return users
+
     
