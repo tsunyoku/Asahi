@@ -161,6 +161,8 @@ class Player:
             
         if p.priv & Privileges.Frozen:
             p.frozen = True
+            
+        await p.set_stats()
         
         return p
 

@@ -61,54 +61,41 @@ async def user(request):
     if not username and not id:
         return (400, {'message': 'you must specify either a username or id!'})
 
-    if username:
-        id = await glob.db.fetchval('SELECT id FROM users WHERE name = %s', [username])
-
-    if not id:
+    if not (user := await Player.from_sql(id or username)):
         return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
-
-    info = await glob.db.fetchrow('SELECT id, name, country, priv FROM users WHERE id = %s', [id])
-
-    if not info:
-        return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
-
-    stats_db = await glob.db.fetchrow('SELECT * FROM stats WHERE id = %s', [id])
     
-    if info['priv'] & Privileges.Disallowed:
+    if user.priv & Privileges.Disallowed:
         return (400, {'message': 'user is restricted/banned!'})
 
     stats = {}
+
+    stats['std'] = {}
+    stats['std']['vn'] = user.stats[0]
+    stats['std']['rx'] = user.stats[4]
+    stats['std']['ap'] = user.stats[7]
     
-    # cleaner way soonTM
-
-    for mode in ('std', 'taiko', 'catch', 'mania'):
-        stats[mode] = {}
-
-        stats[mode]['vn'] = {
-            'acc': stats_db[f'acc_{mode}'],
-            'playcount': stats_db[f'pc_{mode}'],
-            'pp': stats_db[f'pp_{mode}'],
-            'ranked_score': stats_db[f'rscore_{mode}'],
-            'total_score': stats_db[f'tscore_{mode}'],
-            'max_combo': stats_db[f'mc_{mode}'],
-            'global_rank': await get_rank(f'{mode}', id, stats_db[f'pp_{mode}']),
-            'country_rank': await get_country_rank(f'{mode}', id, stats_db[f'pp_{mode}'], info['country'].upper())
-        }
-
-        for s in ('rx', 'ap'):
-            if (mode == 'mania' and s in ('rx', 'ap')) or (mode in ('taiko', 'catch') and s == 'ap'):
-                continue
-
-            stats[mode][s] = {
-                'acc': stats_db[f'acc_{mode}_{s}'],
-                'playcount': stats_db[f'pc_{mode}_{s}'],
-                'pp': stats_db[f'pp_{mode}_{s}'],
-                'ranked_score': stats_db[f'rscore_{mode}_{s}'],
-                'total_score': stats_db[f'tscore_{mode}_{s}'],
-                'max_combo': stats_db[f'mc_{mode}_{s}'],
-                'global_rank': await get_rank(f'{mode}_{s}', id, stats_db[f'pp_{mode}_{s}']),
-                'country_rank': await get_country_rank(f'{mode}_{s}', id, stats_db[f'pp_{mode}_{s}'], info['country'].upper())
-            }
+    stats['taiko'] = {}
+    stats['taiko']['vn'] = user.stats[1]
+    stats['taiko']['rx'] = user.stats[5]
+    
+    stats['catch'] = {}
+    stats['catch']['vn'] = user.stats[2]
+    stats['catch']['rx'] = user.stats[6]
+    
+    stats['mania'] = {}
+    stats['mania']['vn'] = user.stats[3]
+    
+    info = {
+        'id': user.id,
+        'name': user.name,
+        'country': user.country_iso,
+        'priv': user.priv,
+        'clan': {
+            'id': user.clan.id,
+            'name': user.clan.name,
+            'tag': user.clan.tag
+        } if user.clan else None
+    }
 
     return {'info': info, 'stats': stats}
 
@@ -375,7 +362,6 @@ async def playerScores(req):
     scores = await glob.db.fetch(query, [uid, mode.as_vn, limit])
     
     for idx, score in enumerate(scores):
-        score = dict(score) # stupid psql records
         bmap = await Beatmap.from_md5(score.pop('md5'))
         
         if mode.as_vn <= 1:
@@ -400,21 +386,8 @@ async def playerScores(req):
             'nomod_sr': bmap.sr,
             'modded_sr': modded_sr
         } if bmap else None
-        
-        scores[idx] = score # stupid psql pt 2
-        
-    uinfo = {
-        'id': user.id,
-        'name': user.name,
-        'country': user.country_iso,
-        'clan': {
-            'id': user.clan.id,
-            'name': user.clan.name,
-            'tag': user.clan.tag
-        } if user.clan else None
-    }
     
-    return {'player': uinfo, 'scores': scores}
+    return {'scores': scores}
 
 @api.route('/player_search')
 async def searchPlayers(req):
@@ -428,4 +401,48 @@ async def searchPlayers(req):
     users = await glob.db.fetch('SELECT id, name FROM users WHERE name LIKE %s', [f'{query}%'])
     return users or []
 
+@api.route('/player_most_played')
+async def mostPlayed(req):
+    args = req.args
+    
+    uid = int(args.get('id', 0))
+    username = args.get('username', None)
+    
+    m = int(args.get('mode', 0))
+    r = int(args.get('rx', 0))
+    
+    limit = int(args.get('limit', 5))
+
+    if r == 0: rx = Mods.NOMOD
+    elif r == 1: rx = Mods.RELAX
+    elif r == 2: rx = Mods.AUTOPILOT
+    
+    mode = lbModes(m, rx)
+    
+    if not uid and not username:
+        return (400, {'message': 'please provide either a username or user id!'})
+
+    if not (user := await Player.from_sql(uid or username)):
+        return (400, {'message': "user couldn't be found!"})
+
+    query = ('SELECT md5, COUNT(*) plays '
+             f'FROM {mode.table} WHERE uid = %s AND mode = %s '
+             f'GROUP BY md5 ORDER BY plays DESC LIMIT %s')
+    
+    maps = await glob.db.fetch(query, [user.id, mode.value, limit])
+    
+    for map in maps:
+        bmap = await Beatmap.from_md5(map.pop('md5'))
+        map['map'] = {
+            'md5': bmap.md5,
+            'id': bmap.id,
+            'set_id': bmap.sid,
+            'artist': bmap.artist,
+            'title': bmap.title,
+            'difficulty': bmap.diff,
+            'mapper': bmap.mapper,
+            'nomod_sr': bmap.sr,
+        } if bmap else None
+
+    return {'maps': maps}
     
