@@ -749,7 +749,6 @@ async def mp_host(user, args, match):
     return f'Match host given to {u.name}'
 
 async def process_multiplayer(user, msg):
-    start = time.time()
     args = msg.split()
     ct = args[1]
     for c in mp_cmds:
