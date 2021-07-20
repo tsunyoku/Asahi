@@ -1,5 +1,5 @@
 from objects import glob
-from objects.match import Match
+from objects.match import Match, slotStatus
 from objects.channel import Channel
 from objects.beatmap import Beatmap
 from objects.player import Player
@@ -11,11 +11,14 @@ from packets import writer
 from .privs import Privileges
 from .types import teamTypes
 from .modes import osuModes
+from .mods import Mods
 from .statuses import strStatuses, mapStatuses
 
 import time
+import asyncio
 
 cmds = []
+mp_cmds = []
 
 def command(priv: Privileges = Privileges.Normal, name: str = None, elapsed: bool = True, allow_public: bool = False):
     def wrapper(cmd_cb):
@@ -418,6 +421,7 @@ async def unfreeze(user, args):
 
 @command(priv=Privileges.Developer, name='crash')
 async def crash(user, args):
+    """Crash a user's client"""
     if len(args) < 1:
         return 'You must provide a username to crash!'
     
@@ -432,6 +436,7 @@ async def crash(user, args):
 
 @command(priv=Privileges.Admin, name=['recalc', 'calc', 'recalculate', 'calculate'])
 async def recalc(user, args):
+   """Recalculate scores globally or on a specific map"""
    if len(args) < 1:
        return 'You must specify what to recalc! (map/all)'
    
@@ -569,3 +574,197 @@ async def process(user, msg, public = False):
             return # we still wanna end the loop even if theres no text to return
     else:
         return f'Unknown command! Use {glob.config.prefix}help for a list of available commands.'
+
+def mp_command(name: str = None, host: bool = True):
+    def wrapper(cmd_cb):
+        if name is not None:
+            if not isinstance(name, list):
+                mp_cmds.append({
+                    'name': name,
+                    'cb': cmd_cb,
+                    'host': host,
+                    'desc': cmd_cb.__doc__
+                })
+            else:
+                for n in name:
+                    mp_cmds.append({
+                        'name': n,
+                        'cb': cmd_cb,
+                        'host': host,
+                        'desc': cmd_cb.__doc__
+                    })
+        else:
+            log(f'Tried to add multiplayer command with no name!', Ansi.LRED)
+
+        return cmd_cb
+    return wrapper
+
+@mp_command(name='help', host=False)
+async def mp_help(user, args, match):
+    """Displays all available multiplayer commands to the user"""
+    allowed_cmds = []
+    for cmd in cmds:
+        if user.priv & cmd['priv']:
+            s = f'{glob.config.prefix}mp {cmd["name"]} - {cmd["desc"]}'
+            allowed_cmds.append(s)
+
+    cmd_list = '\n'.join(allowed_cmds)
+    return f'List of available multiplayer commands:\n\n{cmd_list}'
+
+@mp_command(name='start')
+async def mp_start(user, args, match):
+    """Starts the current match, either forcefully or on a timer"""
+    if len(args) < 1:
+        return 'Please provide either a timer to start or cancel/force'
+    
+    if not args[0]: # start now
+        if any([s.status == slotStatus.not_ready for s in match.slots]):
+            return 'Not all players are ready. You can force start with `!mp start force`'
+
+    elif args[0] == 'force':
+        match.start()
+        match.chat.send(glob.bot, 'Starting match. Have fun!', False)
+
+    elif args[0].isdecimal():
+        def start_timer():
+            match.start()
+            match.chat.send(glob.bot, 'Starting match. Have fun!', False)
+            
+        def alert_timer(remaining):
+            match.chat.send(glob.bot, f'Starting match in {remaining} seconds!', False)
+            
+        loop = asyncio.get_event_loop()
+        timer = int(args[0])
+        match.start_task = loop.call_later(timer, start_timer)
+        match.alert_tasks = [
+            loop.call_later(
+                timer - countdown, lambda countdown = countdown: alert_timer(countdown)
+            ) for countdown in (30, 10, 5, 4, 3, 2, 1) if countdown < timer
+        ]
+        
+        return f'Starting match in {timer} seconds'
+
+    elif args[0] == 'cancel':
+        if not match.start_task:
+            return
+        
+        match.start_task.cancel()
+        for alert in match.alert_tasks:
+            alert.cancel()
+            
+        match.start_task = None
+        match.alert_tasks = None
+        
+        return 'Cancelled timer.'
+        
+    else:
+        return 'Unknown argument. Please use seconds/force/cancel'
+    
+@mp_command(name='abort')
+async def mp_abort(user, args, match):
+    """Abort current multiplayer session"""
+    if not match.in_prog:
+        return
+    
+    match.unready_players(wanted=slotStatus.playing)
+    match.in_prog = False
+    
+    match.enqueue(writer.matchAbort())
+    match.enqueue_state()
+    
+    return 'Match aborted.'
+
+@mp_command(name='mods')
+async def mp_mods(user, args, match):
+    """Set the mods of the lobby"""
+    if len(args) < 1:
+        return 'You must provide the mods to set!'
+    
+    if args[0].isdecimal():
+        mods = Mods(args[0])
+    elif isinstance(args[0], str):
+        mods = Mods.convert_str(args[0])
+    else:
+        return 'Invalid mods.'
+    
+    if match.fm:
+        match.mods = mods & Mods.SPEED_MODS
+        
+        for slot in match.slots:
+            if slot.status & slotStatus.has_player:
+                slot.mods = mods & ~Mods.SPEED_MODS
+    else:
+        match.mods = match.mods = mods
+        
+    match.enqueue_state()
+    return 'Updated mods.'
+
+@mp_command(name=['freemod', 'fm'])
+async def mp_fm(user, args, match):
+    if len(args) < 1:
+        return 'Please provide whether to turn freemod on or off!'
+    
+    if args[0] == 'on':
+        match.fm = True
+        
+        for slot in match.slots:
+            if slot.status & slotStatus.has_player:
+                slot.mods = match.mods & ~Mods.SPEED_MODS
+                
+        match.mods &= Mods.SPEED_MODS
+    else:
+        match.fm = False
+        
+        match.mods &= Mods.SPEED_MODS
+        match.mods |= (match.get_slot(user)).mods
+        
+        for slot in match.slots:
+            if slot.status & slotStatus.has_player:
+                slot.mods = Mods.NOMOD
+                
+    match.enqueue_state()
+    return 'Freemod state toggled.'
+
+@mp_command(name='host', host=False)
+async def mp_host(user, args, match):
+    if user not in (match.host, match.first_host):
+        return
+    
+    if len(args) < 1:
+        return 'Please provide the user to give host!'
+    
+    if not (u := glob.players_name.get(args[0])):
+        return 'Couldn\'t find this user!'
+    
+    if u is match.host:
+        return
+    
+    if not u.match or u.match is not match:
+        return
+    
+    match.host = u
+    u.enqueue(writer.matchTransferHost())
+    match.enqueue_state(lobby=False)
+    
+    return f'Match host given to {u.name}'
+
+async def process_multiplayer(user, msg):
+    start = time.time()
+    args = msg.split()
+    ct = args[1]
+    for c in mp_cmds:
+        cmd = c['name']
+
+        if cmd == ct:
+            if user is not user.match.host:
+                return 'You must be the host to perform this command!'
+
+            cb = c['cb']
+            o = await cb(user, args[2:], user.match)
+
+            if o:
+                return f'{o}'
+
+            return # we still wanna end the loop even if theres no text to return
+    else:
+        return f'Unknown command! Use {glob.config.prefix}mp help for a list of available multiplayer commands.'

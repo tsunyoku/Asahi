@@ -38,6 +38,21 @@ class Mods(IntFlag):
     GAME_CHANGING = RELAX | AUTOPILOT
     
     UNRANKED = SCOREV2 | AUTOPLAY | TARGET
+    
+    @classmethod
+    def convert_str(self, mods: str):
+        _mods = self.NOMOD # in case theres none to match
+        
+        if not mods or mods == 'NM':
+            return _mods
+        
+        split_mods = [mods[char:char + 2].upper() for char in range(0, len(mods), 2)]
+        
+        for mod in split_mods:
+            if mod in mods_str:
+                _mods |= mods_str[mod]
+                
+        return _mods
 
 def convert(m: int):
     if not m:
@@ -59,3 +74,38 @@ def convert(m: int):
     if m & Mods.TOUCHSCREEN: r.append('TD')
     if m & Mods.SCOREV2:     r.append('V2')
     return ''.join(r)
+
+mods_str = {
+    'NF': Mods.NOFAIL,
+    'EZ': Mods.EASY,
+    'TD': Mods.TOUCHSCREEN,
+    'HD': Mods.HIDDEN,
+    'HR': Mods.HARDROCK,
+    'SD': Mods.SUDDENDEATH,
+    'DT': Mods.DOUBLETIME,
+    'RX': Mods.RELAX,
+    'HT': Mods.HALFTIME,
+    'NC': Mods.NIGHTCORE,
+    'FL': Mods.FLASHLIGHT,
+    'AU': Mods.AUTOPLAY,
+    'SO': Mods.SPUNOUT,
+    'AP': Mods.AUTOPILOT,
+    'PF': Mods.PERFECT,
+    'FI': Mods.FADEIN,
+    'RN': Mods.RANDOM,
+    'CN': Mods.CINEMA,
+    'TP': Mods.TARGET,
+    'V2': Mods.SCOREV2,
+    'MR': Mods.MIRROR,
+
+    '1K': Mods.KEY1,
+    '2K': Mods.KEY2,
+    '3K': Mods.KEY3,
+    '4K': Mods.KEY4,
+    '5K': Mods.KEY5,
+    '6K': Mods.KEY6,
+    '7K': Mods.KEY7,
+    '8K': Mods.KEY8,
+    '9K': Mods.KEY9,
+    'CO': Mods.KEYCOOP
+}

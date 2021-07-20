@@ -91,6 +91,7 @@ class Match:
         self.name: str = ''
         self.pw: str = ''
 
+        self.first_host: Player = None
         self.host: Player = None
 
         self.mods: Mods = Mods.NOMOD
@@ -122,6 +123,9 @@ class Match:
         self.battle_ready: bool = False
         self.clan_1_users: list = []
         self.clan_2_users: list = []
+        
+        self.start_task = None
+        self.alert_tasks = None
     
     @property
     def invite(self):
