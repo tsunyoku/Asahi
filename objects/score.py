@@ -273,13 +273,15 @@ class Score:
                 if self.mods:
                     ezpp.set_mods(int(self.mods))
                     
-                ezpp.set_mode(mode_vn)
+                ezpp.set_mode(int(mode_vn))
                 
                 if self.combo:
-                    ezpp.set_combo(self.combo)
+                    ezpp.set_combo(int(self.combo))
 
-                ezpp.set_nmiss(self.miss)
-                ezpp.set_accuracy_percent(self.acc)
+                if self.miss:
+                    ezpp.set_nmiss(int(self.miss))
+
+                ezpp.set_accuracy_percent(float(self.acc))
 
                 ezpp.calculate(path)
                 return (ezpp.get_pp(), ezpp.get_sr())
@@ -292,7 +294,7 @@ class Score:
             else:
                 mods = 0
 
-            c = Maniera(str(path), mods, self.score)
+            c = Maniera(str(path), mods, int(self.score))
             c.calculate()
 
             return (c.pp, c.sr)

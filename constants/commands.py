@@ -4,6 +4,7 @@ from objects.channel import Channel
 from objects.beatmap import Beatmap
 from objects.player import Player
 from objects.menu import Menu
+from objects.score import Score
 from cmyui import log, Ansi
 from cmyui.discord import Webhook, Embed
 from packets import writer
@@ -130,13 +131,13 @@ async def clan_battle(user, args):
             return 'Clan owner offline, battle request cancelled!'
         
         if args[1] == 'deny':
-            owner.enqueue(writer.sendMessage(fromname=glob.bot.name, args=f'{user.name} denied your request to battle their clan {clan.name}!', tarname=owner.name, fromid=glob.bot.id))
+            owner.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'{user.name} denied your request to battle their clan {clan.name}!', tarname=owner.name, fromid=glob.bot.id))
             return 'Battle request denied!'
 
         # battle was accepted, create the battle match
 
-        user.enqueue(writer.sendMessage(fromname=glob.bot.name, args=f'Request accepted! Creating match...', tarname=user.name, fromid=glob.bot.id))
-        owner.enqueue(writer.sendMessage(fromname=glob.bot.name, args=f'{user.name} accepted your request to battle their clan {user.clan.name}! Creating match...', tarname=owner.name, fromid=glob.bot.id))
+        user.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Request accepted! Creating match...', tarname=user.name, fromid=glob.bot.id))
+        owner.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'{user.name} accepted your request to battle their clan {user.clan.name}! Creating match...', tarname=owner.name, fromid=glob.bot.id))
 
         match = Match()
 
@@ -172,10 +173,10 @@ async def clan_battle(user, args):
         glob.clan_battles[match.clan_2] = b_info
 
         for u in online1:
-            u.enqueue(writer.sendMessage(fromname=glob.bot.name, args=f'Your clan has initiated in a clan battle against the clan {user.clan.name}! Please join the battle here: {match.embed}', tarname=u.name, fromid=glob.bot.id)) 
+            u.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your clan has initiated in a clan battle against the clan {user.clan.name}! Please join the battle here: {match.embed}', tarname=u.name, fromid=glob.bot.id)) 
 
         for u in online2:
-            u.enqueue(writer.sendMessage(fromname=glob.bot.name, args=f'Your clan has initiated in a clan battle against the clan {clan.name}! Please join the battle here: {match.embed}', tarname=u.name, fromid=glob.bot.id))
+            u.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your clan has initiated in a clan battle against the clan {clan.name}! Please join the battle here: {match.embed}', tarname=u.name, fromid=glob.bot.id))
 
         return
 
@@ -194,7 +195,7 @@ async def clan_battle(user, args):
     if not (owner := glob.players_id.get(clan.owner)):
         return 'The clan owner must be online for you to request a battle!'
 
-    owner.enqueue(writer.sendMessage(fromname=glob.bot.name, args=f'{user.name} has invited you to a clan battle! If you wish to accept then type !battle accept {user.clan.name}, or !battle deny {user.clan.name} to deny. If you accept, a multiplayer match will be created for you and all your online clanmates to battle to the death!', tarname=owner.name, fromid=glob.bot.id))
+    owner.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'{user.name} has invited you to a clan battle! If you wish to accept then type !battle accept {user.clan.name}, or !battle deny {user.clan.name} to deny. If you accept, a multiplayer match will be created for you and all your online clanmates to battle to the death!', tarname=owner.name, fromid=glob.bot.id))
 
     return f'Clan battle request sent to {clan.name} clan!'
 
@@ -216,7 +217,12 @@ async def _map(user, args):
     if _type == 'map':
         bmap.status = ns
         bmap.frozen = True
-        bmap.lb = None # reset lb cache in case of major status change
+
+        # reset lb cache in case of major status change
+        bmap.lb = None
+        bmap.lb_rx = None
+        bmap.lb_ap = None
+        
         await bmap.save()
         glob.cache['maps'][bmap.md5] = bmap
     else:
@@ -227,7 +233,12 @@ async def _map(user, args):
             bm = await Beatmap.from_md5(md5)
             bm.status = ns
             bm.frozen = True
-            bm.lb = None # reset lb cache in case of major status change
+
+            # reset lb cache in case of major status change
+            bm.lb = None
+            bm.lb_rx = None
+            bm.lb_ap = None
+            
             await bm.save()
             glob.cache['maps'][bm.md5] = bm
     
@@ -419,6 +430,54 @@ async def crash(user, args):
     
     return ':troll:'
 
+@command(priv=Privileges.Admin, name=['recalc', 'calc', 'recalculate', 'calculate'])
+async def recalc(user, args):
+   if len(args) < 1:
+       return 'You must specify what to recalc! (map/all)'
+   
+   if args[0] == 'map':
+       if not (bmap := user.np):
+           return 'You must /np the map you want to recalculate first!'
+       
+       for mode in osuModes:
+           scores_db = await glob.db.fetch(f'SELECT id, {mode.sort} sort FROM {mode.table} WHERE md5 = %s AND mode = %s', [bmap.md5, mode.value])
+           
+           for sc in scores_db:
+               score = await Score.sql(sc['id'], mode.table, mode.sort, sc['sort'])
+               score.pp, score.sr = await score.calc_pp(mode.as_vn)
+               
+               await glob.db.execute(f'UPDATE {mode.table} SET pp = %s WHERE id = %s', [score.pp, score.id])
+
+       bmap.lb = None
+       bmap.lb_rx = None
+       bmap.lb_ap = None
+
+       return f'Recalculated all scores on {bmap.embed}'
+   elif args[0] == 'all':
+       maps = await glob.db.fetch(f'SELECT md5 FROM maps WHERE status >= {mapStatuses.Ranked}')
+       
+       for map_sql in maps:
+           bmap = await Beatmap.from_md5(map_sql['md5'])
+
+           for mode in osuModes:
+               scores_db = await glob.db.fetch(f'SELECT id, {mode.sort} sort FROM {mode.table} WHERE md5 = %s AND mode = %s', [bmap.md5, mode.value])
+        
+               for sc in scores_db:
+                   score = await Score.sql(sc['id'], mode.table, mode.sort, sc['sort'])
+                   score.pp, score.sr = await score.calc_pp(mode.as_vn)
+        
+                   await glob.db.execute(f'UPDATE {mode.table} SET pp = %s WHERE id = %s', [score.pp, score.id])
+                   
+           bmap.lb = None
+           bmap.lb_rx = None
+           bmap.lb_ap = None
+                   
+           user.enqueue(writer.sendMessage(writer.sendMessage(fromname=glob.bot.name, msg=f'Recalculated all scores on {bmap.embed}', tarname=user.name, fromid=glob.bot.id)))
+           
+       return 'Recalculated all scores!'
+   else:
+       return 'Unknown recalc option. Valid options: map/all'
+        
 #####################
 
 async def a_req(user, args):
@@ -437,7 +496,12 @@ async def a_req(user, args):
         bm = await Beatmap.from_md5(m['md5'])
         bm.status = ns
         bm.frozen = True
-        bm.lb = None # reset lb cache in case of major status change
+
+        # reset lb cache in case of major status change
+        bm.lb = None 
+        bm.lb_rx = None
+        bm.lb_ap = None
+
         await bm.save()
         glob.cache['maps'][bm.md5] = bm
 
