@@ -346,18 +346,20 @@ async def playerScores(req):
     
     mode = lbModes(mode, rx)
     
-    query = ('SELECT id, md5, score, pp, acc, combo, mods, '
+    query = ('SELECT t.id, t.md5, score, pp, acc, combo, mods, '
             'n300, n100, n50, miss, geki, katu, '
-            'grade, status, mode, time, fc '
-            f'FROM {mode.table} WHERE uid = %s AND mode = %s')
+            'grade, t.status, t.mode, time, fc '
+            f'FROM {mode.table} t INNER JOIN maps ON t.md5 = maps.md5 WHERE uid = %s AND t.mode = %s')
     
     if _type == 'best':
-        query += ' AND status = 2'
+        query += ' AND t.status = 2'
         sort = 'pp'
+        s_list = '2, 3'
     else:
         sort = 'time'
+        s_list = '2, 3, 4, 5'
         
-    query += f' ORDER BY {sort} DESC LIMIT %s'
+    query += f' AND maps.status IN ({s_list}) ORDER BY {sort} DESC LIMIT %s'
 
     scores = await glob.db.fetch(query, [uid, mode.as_vn, limit])
     
