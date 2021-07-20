@@ -14,12 +14,13 @@ class Privileges(IntFlag):
     Restricted = 1 << 7
     Banned = 1 << 8
     
-    Whitelisted = 1 << 9 # can bypass anticheat checks
+    BypassAnticheat = 1 << 9 # can bypass anticheat checks
     Frozen = 1 << 10
+    Whitelisted = 1 << 11 # can bypass pp cap
 
     Staff = Nominator | Admin | Developer | Owner
     Manager = Admin | Developer | Owner
-    Master = Normal | Verified | Supporter | Nominator | Admin | Developer | Owner | Whitelisted
+    Master = Normal | Verified | Supporter | Nominator | Admin | Developer | Owner | BypassAnticheat | Whitelisted
     Disallowed = Restricted | Banned
     
     @classmethod

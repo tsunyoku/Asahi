@@ -336,14 +336,14 @@ async def scoreSubmit(request: Request):
 
         f.write_bytes(replay)
         
-        if glob.config.anticheat:
+        if glob.config.anticheat and s.user.priv & Privileges.BypassAnticheat:
             loop = asyncio.get_event_loop()
             loop.create_task(s.analyse())
     
     cap = glob.config.pp_caps[s.mode.value]
 
     if cap is not None and s.pp >= cap and s.map.status & mapStatuses.GIVE_PP and glob.config.anticheat and not s.user.restricted and not s.user.priv & Privileges.Whitelisted: # ugly
-        await s.user.restrict(reason='Exceeding PP cap', fr=glob.bot)
+        await s.user.restrict(reason=f'Exceeding PP cap ({s.pp:,}pp) on {s.map.name}', fr=glob.bot)
 
     # update stats EEEEEEE
     stats = s.user.stats[s.mode.value]
@@ -351,7 +351,7 @@ async def scoreSubmit(request: Request):
 
     elapsed = mpargs.get('st' if s.passed else 'ft') # timewarp check with this soon?
     
-    if not elapsed:
+    if not elapsed and s.user.priv & Privileges.BypassAnticheat:
         await s.user.restrict('Modified client', fr=glob.bot) # its really only old version, but its supposed to be blocked on login. if it isnt present it must be modified to seem like a new version
 
     stats.playtime += int(elapsed) // 1000
@@ -511,7 +511,7 @@ async def lastFM(request: Request):
 
     b = args['b']
 
-    if b[0] != 'a' or not glob.config.anticheat:
+    if b[0] != 'a' or not glob.config.anticheat or player.priv & Privileges.BypassAnticheat:
         return b'-3'
 
     flags = int(b[1:])

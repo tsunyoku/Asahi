@@ -779,7 +779,7 @@ async def root_client(request: Request):
             await p.add_priv(Privileges.Verified) # verify user
             log(f'{p.name} has been successfully verified.', Ansi.LBLUE)
             
-        if glob.config.anticheat:
+        if glob.config.anticheat and not p.priv & Privileges.BypassAnticheat:
             a = cinfo[3][:-1].split(':')
             adapters = {'osu_md5': a[0], 'mac_address': a[1], 'uninstall_id': a[2], 'disk_serial': a[3], 'ip': ip}
 
@@ -842,13 +842,9 @@ async def root_client(request: Request):
                     data += writer.sendMessage(fromname=glob.bot.name, msg=f'Your clan has initiated in a clan battle against the clan {against.name}! Please join the battle here: {m.embed}', tarname=p.name, fromid=glob.bot.id)
 
                     # update player lists for the battle
-                    b1 = glob.clan_battles[m.clan_1]
-                    b2 = glob.clan_battles[m.clan_2]
-
-                    b1['total'].append(p)
-                    b2['total'].append(p)
-                    b1[add].append(p)
-                    b2[add].append(p)
+                    battle = glob.clan_battles[m.clan_1]
+                    battle['total'].append(p)
+                    battle[add].append(p)
                 
         if p.restricted:
             reason = await glob.db.fetchval("SELECT reason FROM punishments WHERE type = 'restrict' AND target = %s ORDER BY time DESC LIMIT 1", [p.id])
