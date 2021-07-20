@@ -6,7 +6,19 @@ avatar, bancho & /web/ server & Discord bot hybrid for osu! 😎
 Note: This has only been tested on Ubuntu 18.04 LTS. If you would like to use it on a distro other than Ubuntu or a version greater than 18.04, you can make Asahi work by changing the minimum TLS version in the nginx config (to my belief atleast).
 Note 2: In the rare case you edit the packet reader/writer, you will need to rebuild the cython files upon any edits. You can find instructions further below on how to build them if you do change it.
 
-## Setup
+## Auto Setup
+
+I have written an install script to make the install process easier. Note that this is untested and may have errors and if so, please report them!
+To add to this I'd like to note I added this for ease of install, and you will still be expected to have atleast basic linux and python knowledge. I am willing to help people who face troubles but if you are coming to me with a lack of common sense/knowledge, I probably won't help you.
+
+To run the script:
+
+```bash
+chmod +x ext/install.sh
+./ext/install.sh
+```
+
+## Manual Setup
 
 First install any requirements:
 ```bash
@@ -35,11 +47,8 @@ cp ext/config.sample.py config.py
 
 We also want to compile the pp systems & packet handlers:
 ```bash
-chmod +x ext/osu-tools.sh
-./ext/osu-tools.sh
-chmod +x oppai-ng/libbuild
-./oppai-ng/libbuild
-cd packets && python3.9 setup.py build_ext --inplace && cd ..
+chmod +x ext/compile.sh
+./ext/compile.sh
 ```
 
 Finally, start up Asahi:
