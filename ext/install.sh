@@ -3,7 +3,7 @@ echo "Starting install script"
 echo "Please understand that while this script is written to make the install process easy, you still need basic linux and python knowledge to use Asahi. While I (tsunyoku) am open to helping people, if you have no clue what you are doing that isn't my problem and I won't provide support for this! If you are aware of this and would like to continue, press 'Y', else, press 'N' to exit now."
 read understand
 
-if "$understand" = "N"
+if [ $understand = "N" ]
 then
   exit 0
 fi
@@ -12,7 +12,7 @@ echo "This script is also untested so errors may arise. If this happens, please 
 echo "This script is written with assumption you are using Ubuntu 18.04. If you are not please edit this script to install the correct Microsoft package! If you are not using Ubuntu 18.04, exit now by typing 'N'. Otherwise, type 'Y' to continue!"
 read cont
 
-if "$cont" = "N"
+if [ $cont = "N" ]
 then
   exit 0
 fi
@@ -36,7 +36,7 @@ sudo certbot certonly --manual --preferred-challenges=dns --email $email --serve
 echo "Do you already have a database user created? (Y/N)"
 read create_user
 
-if "$create_user" = "N"
+if [ $create_user = "N" ]
 then
   echo "Creating user..."
   echo "Please enter your desired username"
