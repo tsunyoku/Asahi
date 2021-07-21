@@ -78,7 +78,7 @@ async def friend_add(user: Player, p):
         return
 
     user.friends.append(tar)
-    await glob.db.execute('INSERT INTO friends (user1, user2) VALUES ($1, $2)', req, tar)
+    await glob.db.execute('INSERT INTO friends (user1, user2) VALUES (%s, %s)', [req, tar])
     
     log(f"{user.name} added UID {tar} into their friends list.", Ansi.LCYAN)
 
@@ -91,7 +91,7 @@ async def friend_remove(user: Player, p):
         return
 
     user.friends.remove(tar)
-    await glob.db.execute('DELETE FROM friends WHERE user1 = $1 AND user2 = $2', req, tar)
+    await glob.db.execute('DELETE FROM friends WHERE user1 = %s AND user2 = %s', [req, tar])
 
     log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LCYAN)
     
