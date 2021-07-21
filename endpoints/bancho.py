@@ -754,7 +754,17 @@ async def root_client(request: Request):
         user['token'] = str(token) # this may be useful in the future
         user['ltime'] = time.time() # useful for handling random logouts
         user['md5'] = pw # used for auth on /web/
-        ip = headers['X-Forwarded-For']
+        
+        # i hate it here
+        if 'CF-Connecting-IP' in headers:
+            ip = headers['CF-Connecting-IP']
+        else:
+            f = headers['X-Forwarded-For'].split(',')
+            
+            if len(f) == 1:
+                ip = headers['X-Real-IP']
+            else:
+                ip = f[0]
 
         # cache ip's geoloc | the speed gains too are ungodly
         if not glob.geoloc.get(ip):
