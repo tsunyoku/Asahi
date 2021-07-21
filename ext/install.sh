@@ -56,8 +56,9 @@ sudo mariadb -e "CREATE DATABASE IF NOT EXISTS $db"
 sudo mariadb $db < ext/db.sql
 
 sed -i -e "s/tsunyoku.xyz/$domain/g" ext/nginx.conf
-read domain tld <<<$(IFS="."; echo $domain)
-sed -i -e "s/tsunyoku\.xyz/$domain\.$tld/g" ext/nginx.conf
+read dm tld <<<$(IFS="."; echo $domain)
+sed -i -e "s/DOMAIN/$dm/g" ext/nginx.conf
+sed -i -e "s/TLD/$tld/g" ext/nginx.conf
 sudo ln ext/nginx.conf /etc/nginx/sites-enabled/asahi.conf
 sudo nginx -s reload
 
