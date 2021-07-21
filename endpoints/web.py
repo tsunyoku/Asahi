@@ -35,13 +35,8 @@ ap_path = Path.cwd() / 'resources/replays_ap'
 
 web = Router(f'osu.{glob.config.domain}')
 
-def auth(name: str, md5: str, req: Request):
-    player = glob.players_name.get(name)
-    if not player:
-        log(f'{name} failed authentication', Ansi.LRED)
-        return False
-
-    if player.pw != md5:
+async def auth(name: str, md5: str, req: Request):
+    if not (player := await glob.players.find_login(name, md5)):
         log(f'{name} failed authentication', Ansi.LRED)
         return False
     
@@ -67,7 +62,7 @@ if glob.config.debug:
 @web.route("/web/osu-screenshot.php", ['POST'])
 async def uploadScreenshot(request: Request):
     mpargs = request.args
-    if not auth(mpargs['u'], mpargs['p'], request):
+    if not await auth(mpargs['u'], mpargs['p'], request):
         return b''
 
     files = request.files
@@ -108,10 +103,10 @@ async def banchoConnect(request: Request):
 @web.route("/web/osu-getfriends.php")
 async def getFriends(request: Request):
     args = request.args
-    if not auth(args['u'], args['h'], request):
+    if not await auth(args['u'], args['h'], request):
         return b''
 
-    p = glob.players_name.get(args['u'], request)
+    p = await glob.players.get(name=args['u'])
     return '\n'.join(map(str, p.friends)).encode()
 
 @web.route("/d/<mid>")
@@ -131,7 +126,7 @@ def directSetFormat(bmap, diffs):
 @web.route("/web/osu-search.php")
 async def osuSearch(request: Request):
     args = request.args
-    if not auth(args['u'], args['h'], request):
+    if not await auth(args['u'], args['h'], request):
         return b''
 
     request_args = {'amount': 100, 'offset': 100 * int(args['p'])}
@@ -165,7 +160,7 @@ async def osuSearch(request: Request):
 @web.route("/web/osu-search-set.php")
 async def osuSearchSet(request: Request):
     args = request.args
-    if not auth(args['u'], args['h'], request):
+    if not await auth(args['u'], args['h'], request):
         return b''
 
     args['u'] = glob.config.bancho_username
@@ -235,7 +230,7 @@ async def osuUpdates(request: Request):
 @web.route("/web/osu-getbeatmapinfo.php")
 async def osuMapInfo(request: Request): # TODO
     args = request.args
-    if not auth(args['u'], args['h'], request):
+    if not await auth(args['u'], args['h'], request):
         return b''
 
     data = request.body
@@ -244,7 +239,7 @@ async def osuMapInfo(request: Request): # TODO
 @web.route("/web/osu-osz2-getscores.php")
 async def getMapScores(request: Request):
     args = request.args
-    if not auth(args['us'], args['ha'], request):
+    if not await auth(args['us'], args['ha'], request):
         return b''
 
     if (md5 := args['c']) in glob.cache['unsub']:
@@ -262,8 +257,7 @@ async def getMapScores(request: Request):
         player.mods = mods
         
         if not player.restricted:
-            for o in glob.players.values():
-                o.enqueue(writer.userStats(player))
+            glob.players.enqueue(writer.userStats(player))
 
     bmap = await Beatmap.from_md5(md5)
 
@@ -311,8 +305,7 @@ async def scoreSubmit(request: Request):
     if s.mode != s.user.mode or s.mods != s.user.mods:
         s.user.mode = s.mode.value
         s.user.mods = s.mods
-        for o in glob.players.values():
-            o.enqueue(writer.userStats(s.user))
+        glob.players.enqueue(writer.userStats(s.user))
 
     # submit score and get id xd
     s.id = await glob.db.execute(f'INSERT INTO {s.mode.table} (md5, score, acc, pp, combo, mods, n300, geki, n100, katu, n50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', [s.map.md5, s.score, s.acc, s.pp, s.combo, int(s.mods), s.n300, s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status.value, s.mode.as_vn, s.time, s.user.id, s.readable_mods, s.fc])
@@ -483,7 +476,7 @@ async def scoreSubmit(request: Request):
 @web.route("/web/osu-getreplay.php")
 async def getReplay(request: Request):
     args = request.args
-    if not auth(args['u'], args['h'], request):
+    if not await auth(args['u'], args['h'], request):
         return b''
 
     player = request.extras.get('player')
@@ -504,7 +497,7 @@ async def getReplay(request: Request):
 @web.route("/web/lastfm.php")
 async def lastFM(request: Request):
     args = request.args
-    if not auth(args['us'], args['ha'], request):
+    if not await auth(args['us'], args['ha'], request):
         return b''
 
     player = request.extras.get('player')

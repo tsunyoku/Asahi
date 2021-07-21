@@ -316,10 +316,10 @@ class Match:
             return
 
         if self.host in self.clan_1_users:
-            new_host = glob.players_id.get(self.clan_2.owner)
+            new_host = await glob.players.get(id=self.clan_2.owner)
             next_pick = self.clan_2
         else:
-            new_host = glob.players_id.get(self.clan_1.owner)
+            new_host = await glob.players.get(id=self.clan_1.owner)
             next_pick = self.clan_1
 
         self.host = new_host # alternate turns for map picks

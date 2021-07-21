@@ -238,8 +238,7 @@ class Player:
         self.enqueue(writer.userStats(self))
         
         if not self.restricted:
-            for o in glob.players.values():
-                o.enqueue(writer.userStats(self))
+            glob.players.enqueue(writer.userStats(self))
 
     @property
     def current_stats(self):
@@ -422,9 +421,7 @@ class Player:
         self.match = None
 
     def logout(self):
-        glob.players.pop(self.token)
-        glob.players_name.pop(self.name)
-        glob.players_id.pop(self.id)
+        glob.players.remove(self)
         
         self.token = ''
 
@@ -435,8 +432,7 @@ class Player:
             self.leave_match()
 
         if not self.restricted:
-            for o in glob.players.values():
-                o.enqueue(writer.logout(self.id))
+            glob.players.enqueue(writer.logout(self.id))
 
         for chan in self.channels:
             self.leave_chan(chan)

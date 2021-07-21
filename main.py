@@ -19,6 +19,7 @@ from objects.channel import Channel # Channel - channel object to store name, de
 from objects.clan import Clan
 from objects.achievement import Achievement
 from constants.countries import country_codes
+from lists.players import PlayerList
 
 from endpoints.assets import assets, init_customs
 
@@ -26,7 +27,7 @@ from objects.tasks import expired_donor, freeze_timers, prepare_tasks
 
 app = Xevel(glob.config.socket, loop=asyncio.get_event_loop()) # handler for webserver :D
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
-glob.version = Version(0, 3, 7) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 3, 8) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
@@ -45,6 +46,7 @@ async def connect(): # ran before server startup, used to do things like connect
     log(f'==== Asahi v{glob.version} starting ====', Ansi.GREEN)
 
     glob.web = ClientSession() # aiohttp session for external web requests
+    glob.players = PlayerList() # init player list
 
     try:
         glob.db = await fatFawkSQL.connect(**glob.config.sql) # connect to db using config :p
@@ -69,9 +71,7 @@ async def connect(): # ran before server startup, used to do things like connect
 
     botinfo = await glob.db.fetchrow('SELECT name, pw, country, name FROM users WHERE id = 1')
     bot = Player(id=1, name=botinfo['name'], offset=1, country_iso=botinfo['country'], country=country_codes[botinfo['country'].upper()])
-    glob.players[''] = bot
-    glob.players_name[bot.name] = bot
-    glob.players_id[1] = bot
+    glob.players.append(bot)
     glob.bot = bot
     if glob.config.debug:
         log(f"==== Added bot {bot.name} to player list ====", Ansi.GREEN)

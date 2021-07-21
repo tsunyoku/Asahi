@@ -64,8 +64,11 @@ async def user(request):
     if not username and not id:
         return (400, {'message': 'you must specify either a username or id!'})
 
-    if not (user := await Player.from_sql(id or username)):
-        return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
+    if not id:
+        id = await glob.db.fetchval('SELECT id FROM users WHERE name = %s', [username])
+
+    if not (user := await glob.players.get(id=id, sql=True)):
+        return (400, {'message': "user couldn't be found!"})
     
     if user.priv & Privileges.Disallowed:
         return (400, {'message': 'user is restricted/banned!'})
@@ -106,7 +109,7 @@ async def playerStatus(request):
     if not id:
         return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
 
-    if not (player := glob.players_id.get(id)):
+    if not (player := await glob.players.get(id=id)):
         return {'status': {'online': False}}
     
     if player.priv & Privileges.Disallowed:
@@ -325,7 +328,10 @@ async def playerScores(req):
     if not uid and not username:
         return (400, {'message': 'you must specify either a username or id!'})
     
-    if not (user := await Player.from_sql(uid or username)):
+    if not uid:
+        uid = await glob.db.fetchval('SELECT id FROM users WHERE name = %s', [username])
+    
+    if not (user := await glob.players.get(id=uid, sql=True)):
         return (400, {'message': "user couldn't be found!"})
 
     if user.priv & Privileges.Disallowed:
@@ -418,7 +424,10 @@ async def mostPlayed(req):
     if not uid and not username:
         return (400, {'message': 'please provide either a username or user id!'})
 
-    if not (user := await Player.from_sql(uid or username)):
+    if not uid:
+        uid = await glob.db.fetchval('SELECT id FROM users WHERE name = %s', [username])
+
+    if not (user := await glob.players.get(id=uid, sql=True)):
         return (400, {'message': "user couldn't be found!"})
 
     if user.priv & Privileges.Disallowed:

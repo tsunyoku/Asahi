@@ -88,13 +88,10 @@ class Score:
         if not s.map:
             return # ?
 
-        s.user = glob.players_id.get(score['uid'])
+        s.user = await glob.players.get(id=score['uid'], sql=ensure)
 
-        if not s.user and not ensure:
-            return s # even if user isnt found, may be related to connection and we want to tell the client to retry
-        
-        if not s.user and ensure:
-            s.user = await Player.from_sql(score['uid'])
+        if not s.user:
+            return s
 
         if not s.map:
             return # ??
@@ -142,7 +139,7 @@ class Score:
 
         s.map = await Beatmap.from_md5(data[0])
 
-        if (u := glob.players_name.get(data[1].rstrip())): # faster i think?
+        if (u := await glob.players.get(name=data[1].rstrip())): # faster i think?
             if u.pw == pw:
                 s.user = u
         

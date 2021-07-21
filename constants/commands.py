@@ -75,17 +75,15 @@ async def add_priv(user, args):
     
     name = args[0]
 
-    priv = Privileges(await glob.db.fetchval("SELECT priv FROM users WHERE name = %s", [name]))
+    if not (user := await glob.players.get(name=name, sql=True)):
+        return 'Couldn\'t find this user!'
+
     new_privs = Privileges(0)
     for npriv in args[1:]:
         if not (new_priv := Privileges.get(npriv)):
             return f'Privilege {npriv} not found.'
 
-        priv |= new_priv
         new_privs |= new_priv
-
-    if not (user := glob.players_name.get(name)):
-        user = await Player.from_sql(name)
         
     for priv in new_privs:
         await user.add_priv(priv)
@@ -100,17 +98,15 @@ async def rm_priv(user, args):
 
     name = args[0]
 
-    priv = Privileges(await glob.db.fetchval("SELECT priv FROM users WHERE name = %s", [name]))
+    if not (user := await glob.players.get(name=name, sql=True)):
+        return 'Couldn\'t find this user!'
+
     new_privs = Privileges(0)
     for npriv in args[1:]:
         if not (new_priv := Privileges.get(npriv)):
             return f'Privilege {npriv} not found.'
 
-        priv &= ~new_priv
         new_privs |= new_priv
-
-    if not (user := glob.players_name.get(name)):
-        user = await Player.from_sql(name)
 
     for priv in new_privs:
         await user.remove_priv(priv)
@@ -130,7 +126,7 @@ async def clan_battle(user, args):
         if not clan:
             return 'We could not find a clan by this name!'
 
-        if not (owner := glob.players_id.get(clan.owner)):
+        if not (owner := await glob.players.get(id=clan.owner)):
             return 'Clan owner offline, battle request cancelled!'
         
         if args[1] == 'deny':
@@ -162,12 +158,12 @@ async def clan_battle(user, args):
         # get list of potential clan members we should expect
         online1 = []
         for m in clan.members:
-            if (e := glob.players_id.get(m)):
+            if (e := await glob.players.get(id=m)):
                 online1.append(e)
 
         online2 = []
         for m in user.clan.members:
-            if (e := glob.players_id.get(m)):
+            if (e := await glob.players.get(id=m)):
                 online2.append(e)
 
         b_info = {'clan1': clan, 'clan2': user.clan, 'online1': online1, 'online2': online2, 'total': (online1 + online2), 'match': match}
@@ -195,7 +191,7 @@ async def clan_battle(user, args):
     if not clan:
         return 'We could not find a clan by this name!'
 
-    if not (owner := glob.players_id.get(clan.owner)):
+    if not (owner := await glob.players.get(id=clan.owner)):
         return 'The clan owner must be online for you to request a battle!'
 
     owner.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'{user.name} has invited you to a clan battle! If you wish to accept then type !battle accept {user.clan.name}, or !battle deny {user.clan.name} to deny. If you accept, a multiplayer match will be created for you and all your online clanmates to battle to the death!', tarname=owner.name, fromid=glob.bot.id))
@@ -329,8 +325,8 @@ async def ban(user, args):
     username = args[0].lower()
     reason = args[1]
     
-    if not (target := glob.players_name.get(username)):
-        target = await Player.from_sql(username)
+    if not (target := await glob.players.get(name=username, sql=True)):
+        return 'Couldn\'t find this user!'
         
     await target.ban(reason=reason, fr=user)
     
@@ -345,8 +341,8 @@ async def unban(user, args):
     username = args[0].lower()
     reason = args[1]
 
-    if not (target := glob.players_name.get(username)):
-        target = await Player.from_sql(username)
+    if not (target := await glob.players.get(name=username, sql=True)):
+        return 'Couldn\'t find this user!'
 
     await target.unban(reason=reason, fr=user)
 
@@ -361,8 +357,8 @@ async def restrict(user, args):
     username = args[0].lower()
     reason = args[1]
 
-    if not (target := glob.players_name.get(username)):
-        target = await Player.from_sql(username)
+    if not (target := await glob.players.get(name=username, sql=True)):
+        return 'Couldn\'t find this user!'
 
     await target.restrict(reason=reason, fr=user)
 
@@ -377,8 +373,8 @@ async def unrestrict(user, args):
     username = args[0].lower()
     reason = args[1]
 
-    if not (target := glob.players_name.get(username)):
-        target = await Player.from_sql(username)
+    if not (target := await glob.players.get(name=username, sql=True)):
+        return 'Couldn\'t find this user!'
 
     await target.unrestrict(reason=reason, fr=user)
 
@@ -393,8 +389,8 @@ async def freeze(user, args):
     username = args[0].lower()
     reason = args[1]
 
-    if not (target := glob.players_name.get(username)):
-        target = await Player.from_sql(username)
+    if not (target := await glob.players.get(name=username, sql=True)):
+        return 'Couldn\'t find this user!'
         
     if not target:
         return f'User {username} not found!'
@@ -412,8 +408,8 @@ async def unfreeze(user, args):
     username = args[0].lower()
     reason = args[1]
 
-    if not (target := glob.players_name.get(username)):
-        target = await Player.from_sql(username)
+    if not (target := await glob.players.get(name=username, sql=True)):
+        return 'Couldn\'t find this user!'
 
     await target.unfreeze(reason=reason, fr=user)
 
@@ -425,9 +421,7 @@ async def crash(user, args):
     if len(args) < 1:
         return 'You must provide a username to crash!'
     
-    t = glob.players_name.get(args[0])
-    
-    if not t:
+    if not (t := await glob.players.get(id=args[0])):
         return 'User not online'
     
     t.enqueue(b'G\x00\x00\x04\x00\x00\x00\x80\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00')
@@ -521,7 +515,7 @@ async def a_req(user, args):
         wh.add_embed(embed)
         await wh.post()
 
-    if (rq := glob.players_name.get(request['requester'])):
+    if (rq := await glob.players.get(name=request['requester'])):
         rq.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your request to make {_map.embed} {mapStatuses(request["status"]).name.lower()} was accepted by {user.name}! It is now {ns.name.lower()}.', tarname=rq.name, fromid=glob.bot.id))
 
     await glob.db.execute('DELETE FROM requests WHERE id = %s', [int(args[0])])
@@ -537,7 +531,7 @@ async def d_req(user, args):
     _map = await Beatmap.bid_fetch(request['map'])
     ns = mapStatuses(request['status'])
 
-    if (rq := glob.players_name.get(request['requester'])):
+    if (rq := await glob.players.get(name=request['requester'])):
         rq.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your request to make {_map.embed} {ns.name.lower()} was denied by {user.name}!', tarname=rq.name, fromid=glob.bot.id))
 
     await glob.db.execute('DELETE FROM requests WHERE id = %s', [int(args[0])])
@@ -733,7 +727,7 @@ async def mp_host(user, args, match):
     if len(args) < 1:
         return 'Please provide the user to give host!'
     
-    if not (u := glob.players_name.get(args[0])):
+    if not (u := await glob.players.get(name=args[0])):
         return 'Couldn\'t find this user!'
     
     if u is match.host:

@@ -34,10 +34,5 @@ class Channel:
         return len(self.players)
 
     def enqueue(self, b: bytes, ignore: int = 0, ignore_list: list = []):
-        for o in glob.players.values():
-            if o.id != ignore:
-                if ignore_list:
-                    if o.id not in ignore_list:
-                        o.enqueue(b)
-                else:
-                    o.enqueue(b)
+        ignore_list.append(ignore)
+        glob.players.enqueue(b, ignored=ignore_list)

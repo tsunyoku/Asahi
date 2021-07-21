@@ -51,7 +51,7 @@ async def update_stats(user: Player, p):
 async def request_stats(user: Player, p):
     uids = (reader.handle_packet(p, (('uids', osuTypes.i32_list),)))['uids']
     
-    for o in glob.players.values():
+    for o in glob.players:
         if o.id != user.id and o.id in uids and not o.restricted:
             user.enqueue(writer.userStats(o))
             
@@ -59,13 +59,13 @@ async def request_stats(user: Player, p):
 async def presence_request(user: Player, p):
     uids = (reader.handle_packet(p, (('uids', osuTypes.i32_list),)))['uids']
     
-    for u in uid:
-        if o := glob.players_id.get(u):
+    for u in uids:
+        if o := await glob.players.get(id=u):
             user.enqueue(writer.userPresence(o))
         
 @packet(Packets.OSU_USER_PRESENCE_REQUEST)
 async def presence_request_all(user: Player, p):
-    for o in glob.players.values():
+    for o in glob.players:
         if o.id != user.id:
             user.enqueue(writer.userPresence(o))
             
@@ -110,7 +110,7 @@ async def send_pm(user: Player, p):
     msg = d['msg'].msg
     tarname = d['msg'].tarname
 
-    if not (target := glob.players_name.get(tarname)):
+    if not (target := await glob.players.get(name=tarname)):
         log(f'{user.name} tried to send message to offline user {tarname}', Ansi.LRED)
         return
 
@@ -273,8 +273,7 @@ async def update_action(user: Player, p):
         user.info += f' +{convert(d["mods"])}'
         
     if not user.restricted:
-        for o in glob.players.values():
-            o.enqueue(writer.userStats(user))
+        glob.players.enqueue(writer.userStats(user))
         
 @packet(Packets.OSU_START_SPECTATING)
 async def start_spec(user: Player, p):
@@ -283,7 +282,7 @@ async def start_spec(user: Player, p):
     if tid == 1:
         return
     
-    if not (target := glob.players_id.get(tid)):
+    if not (target := await glob.players.get(id=tid)):
         return
     
     target.add_spectator(user)
@@ -650,7 +649,7 @@ async def match_team(user: Player, p):
 async def match_invite(user: Player, p):
     uid = (reader.handle_packet(p, (('uid', osuTypes.i32),)))['uid']
     
-    if not user.match or not (target := glob.players_id.get(uid)) or target is glob.bot:
+    if not user.match or not (target := await glob.players.get(id=uid)) or target is glob.bot:
         return
     
     target.enqueue(writer.matchInvite(user, target.name))
@@ -667,7 +666,7 @@ async def match_pw(user: Player, p):
 
 BASE_MESSAGE = f"{pyfiglet.figlet_format(f'Asahi v{glob.version}')}\n\ntsunyoku attempts bancho v2, gone right :sunglasses:\n\nOnline Players:\n"
 def root_web():
-    pl = '\n'.join(p.name for p in glob.players.values())
+    pl = '\n'.join(p.name for p in glob.players)
     return (BASE_MESSAGE + pl).encode()
 
 @bancho.route("/", ['POST', 'GET']) # only accept POST requests, we can assume it is for a login request but we can deny access if not
@@ -744,7 +743,7 @@ async def root_client(request: Request):
             request.resp_headers['cho-token'] = 'no'
             return writer.userID(-3)
 
-        if (p := glob.players_id.get(user['id'])):
+        if (p := await glob.players.get(id=user['id'])):
             if (start - p.last_ping) > 10: # game crashes n shit
                 p.logout()
 
@@ -759,12 +758,7 @@ async def root_client(request: Request):
         if 'CF-Connecting-IP' in headers:
             ip = headers['CF-Connecting-IP']
         else:
-            f = headers['X-Forwarded-For'].split(',')
-            
-            if len(f) == 1:
-                ip = headers['X-Real-IP']
-            else:
-                ip = f[0]
+            ip = headers['X-Forwarded-For'].split(',')[0]
 
         # cache ip's geoloc | the speed gains too are ungodly
         if not glob.geoloc.get(ip):
@@ -822,15 +816,14 @@ async def root_client(request: Request):
             data += writer.channelInfo(chan) # regardless of whether the channel should be auto-joined we should make the client aware of it
 
         # add user to cache?
-        glob.players[p.token] = p
-        glob.players_name[p.name] = p
-        glob.players_id[p.id] = p
+        glob.players.append(p)
 
         own_presence = writer.userPresence(p) + writer.userStats(p)
-        for o in glob.players.values(): # enqueue other users to client
-            if not p.restricted:
-                o.enqueue(own_presence) # enqueue this user to every other logged in user
+        
+        if not p.restricted:
+            glob.players.enqueue(own_presence)
 
+        for o in glob.players:
             data += (writer.userPresence(o) + writer.userStats(o)) # enqueue every other logged in user to this user
 
         if p.clan:
@@ -883,7 +876,7 @@ async def root_client(request: Request):
 
     # if we have made it this far then it's a reconnect attempt with token already provided
     user_token = headers['osu-token'] # client-provided token
-    if not (p := glob.players.get(user_token)):
+    if not (p := await glob.players.get(token=user_token)):
         # user is logged in but token is not found? most likely a restart so we force a reconnection
         return writer.restartServer(0)
 
