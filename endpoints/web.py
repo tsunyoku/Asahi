@@ -195,10 +195,10 @@ async def ingameRegistration(request: Request):
     if ' ' in name and '_' in name:
         errors['username'].append('Username cannot contain both "_" and " "')
 
-    if await glob.db.fetchval("SELECT 1 FROM users WHERE name = $1", name):
+    if await glob.db.fetchval("SELECT 1 FROM users WHERE name = %s", [name]):
         errors['username'].append('Username already taken!')
 
-    if await glob.db.fetchval("SELECT 1 FROM users WHERE name = $1", email):
+    if await glob.db.fetchval("SELECT 1 FROM users WHERE name = %s", [email]):
         errors['user_email'].append('Email already in use!')
 
     if not len(pw) >= 8:
