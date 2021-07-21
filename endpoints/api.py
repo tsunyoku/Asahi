@@ -57,6 +57,9 @@ async def user(request):
 
     id = int(args.get('id', 0))
     username = args.get('username', None)
+    
+    m = int(args.get('mode', 0))
+    rx = int(args.get('rx', 0))
 
     if not username and not id:
         return (400, {'message': 'you must specify either a username or id!'})
@@ -67,23 +70,11 @@ async def user(request):
     if user.priv & Privileges.Disallowed:
         return (400, {'message': 'user is restricted/banned!'})
 
-    stats = {}
-
-    stats['std'] = {}
-    stats['std']['vn'] = user.stats[0]
-    stats['std']['rx'] = user.stats[4]
-    stats['std']['ap'] = user.stats[7]
+    if rx == 0: rx = Mods.NOMOD
+    elif rx == 1: rx = Mods.RELAX
+    elif rx == 2: rx = Mods.AUTOPILOT
     
-    stats['taiko'] = {}
-    stats['taiko']['vn'] = user.stats[1]
-    stats['taiko']['rx'] = user.stats[5]
-    
-    stats['catch'] = {}
-    stats['catch']['vn'] = user.stats[2]
-    stats['catch']['rx'] = user.stats[6]
-    
-    stats['mania'] = {}
-    stats['mania']['vn'] = user.stats[3]
+    mode = lbModes(m, rx)
     
     info = {
         'id': user.id,
@@ -97,7 +88,7 @@ async def user(request):
         } if user.clan else None
     }
 
-    return {'info': info, 'stats': stats}
+    return {'info': info, 'stats': user.stats[mode.value]}
 
 @api.route("/player_status")
 async def playerStatus(request):
@@ -337,6 +328,9 @@ async def playerScores(req):
     if not (user := await Player.from_sql(uid or username)):
         return (400, {'message': "user couldn't be found!"})
 
+    if user.priv & Privileges.Disallowed:
+        return (400, {'message': 'user is restricted/banned!'})
+
     if not _type:
         return (400, {'message': 'please provide a return type (recent/top)'})
 
@@ -426,6 +420,9 @@ async def mostPlayed(req):
 
     if not (user := await Player.from_sql(uid or username)):
         return (400, {'message': "user couldn't be found!"})
+
+    if user.priv & Privileges.Disallowed:
+        return (400, {'message': 'user is restricted/banned!'})
 
     query = ('SELECT md5, COUNT(*) plays '
              f'FROM {mode.table} WHERE uid = %s AND mode = %s '
