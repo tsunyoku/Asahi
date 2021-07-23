@@ -10,3 +10,4 @@ packets/*.so
 packets/*.c
 disc/custom/
 ext/nginx.conf
+endpoints/irc.py
