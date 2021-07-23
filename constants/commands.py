@@ -75,13 +75,10 @@ async def link_discord(user, args):
     if user.discord:
         return 'You already have your account linked to a Discord account.'
 
-    if not (code := glob.codes.get(user)):
-        return 'We were unable to find your link attempt. Please run the link command in Discord another time and try again.'
-
-    if args[0] != code['code']:
-        return 'Incorrect verification code!'
+    if not (discord := glob.codes.get(args[0])):
+        return 'Invalid verification code!'
     
-    user.discord = code['discord']
+    user.discord = discord
     await glob.db.execute('UPDATE users SET discord = %s WHERE id = %s', [user.discord, user.id])
     return 'Discord account linked!'
 
