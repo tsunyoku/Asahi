@@ -8,7 +8,7 @@ class asahiBot(commands.Cog):
         self.bot = bot
 
     @commands.command()
-    def link(self, ctx, username):
+    async def link(self, ctx, username):
         if (user := await glob.players.get(discord=ctx.author.id, sql=True)):
             return await ctx.send(f'You already have your Discord account linked to a user called {user.name}!')
 
