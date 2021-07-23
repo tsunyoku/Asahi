@@ -21,7 +21,7 @@ class asahiBot(commands.Cog):
 
         try:
             await ctx.send('Linking initiated! Please check your DMs for further instructions.')
-            return await ctx.author.send(f'Please enter this command to the ingame bot ({glob.bot.name}) in order to link your account:\n`{glob.config.prefix}link {glob.codes[user]}')
+            return await ctx.author.send(f'Please enter this command to the ingame bot ({glob.bot.name}) in order to link your account:\n`{glob.config.prefix}link {code}')
         except Exception:
             return await ctx.send('There was an error when trying to DM you! Please ensure I am able to DM you and try again.')
 
