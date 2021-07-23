@@ -28,7 +28,7 @@ class PlayerList(list[Player]):
                 u.enqueue(packets)
                 
     async def get(self, **kwargs): # lord this is spaghetti
-        for _type in ('id', 'name', 'token'):
+        for _type in ('id', 'name', 'token', 'discord'):
             if (user := kwargs.pop(_type, None)):
                 utype = _type
                 break

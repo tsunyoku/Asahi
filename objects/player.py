@@ -78,6 +78,8 @@ class Player:
         self.silence_end: int = uinfo.get('silence_end', 0)
         self.donor_end: int = uinfo.get('donor_end', 0)
 
+        self.discord: int = uinfo.get('discord', 0)
+
     @property
     def full_name(self):
         if self.clan:
@@ -98,7 +100,8 @@ class Player:
             loc=[user['lon'], user['lat']],
             pw=user['md5'].decode(),
             priv=Privileges(user['priv']),
-            freeze_timer=datetime.fromtimestamp(user['freeze_timer'])
+            freeze_timer=datetime.fromtimestamp(user['freeze_timer']),
+            discord=user['discord']
         )
 
         p.friends = []
@@ -149,7 +152,8 @@ class Player:
             loc=[0, 0],
             pw='',
             priv=Privileges(user['priv']),
-            freeze_timer=datetime.fromtimestamp(user['freeze_timer'])
+            freeze_timer=datetime.fromtimestamp(user['freeze_timer']),
+            discord=user['discord']
         )
 
         clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = %s', [p.id])
