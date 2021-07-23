@@ -67,7 +67,7 @@ async def last_score(user, args):
     
     return 'No recent score found!'
 
-@command(name=['verify', 'link']):
+@command(name=['verify', 'link'])
 async def link_discord(user, args):
     if len(args) < 1:
         return 'Please provide a verification code!'
