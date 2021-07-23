@@ -12,11 +12,8 @@ class asahiBot(commands.Cog):
         if (user := await glob.players.get(discord=ctx.author.id, sql=True)):
             return await ctx.send(f'You already have your Discord account linked to a user called {user.name}!')
 
-        if glob.codes.get(user):
-            return await ctx.send('You have already initiated the linking process! Please check our DMs to finalise it.')
-
         # generate random validation code for the user
-        code = ''.join(random.choices(ascii_uppercase + ascii_lowercase + string.digits, k=16))
+        code = ''.join(choices(ascii_uppercase + ascii_lowercase + digits, k=16))
         glob.codes[code] = ctx.author.id
 
         try:

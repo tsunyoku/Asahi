@@ -37,4 +37,6 @@ clan_battles = {} # clan battles dict | clan_battle[clan1/clan2] = dict of info
 menus = {} # ingame menus dict | menu[id] = menu
 achievements = []
 
+codes = {} # memory-cache list of verification codes for discord linking
+
 bot: 'Player'
