@@ -855,7 +855,7 @@ async def root_client(request: Request) -> bytes:
         data = bytearray(writer.userID(p.id)) # initiate login by providing the user's id
         data += writer.protocolVersion(19) # no clue what this does
         data += writer.banchoPrivileges(p.client_priv | ClientPrivileges.Supporter)
-        data += (writer.userPresence(p) + writer.userStats(p)) # provide user & other user's presence/stats (for f9 + user stats)
+        data += writer.userPresence(p) + writer.userStats(p) # provide user & other user's presence/stats (for f9 + user stats)
         data += writer.channelInfoEnd() # no clue what this does either
         data += writer.menuIcon() # set main menu icon
         data += writer.friends(p.friends) # send user friend list
@@ -876,7 +876,7 @@ async def root_client(request: Request) -> bytes:
             glob.players.enqueue(writer.userPresence(p) + writer.userStats(p))
 
         for o in glob.players:
-            data += (writer.userPresence(o) + writer.userStats(o)) # enqueue every other logged in user to this user
+            data += writer.userPresence(o) + writer.userStats(o) # enqueue every other logged in user to this user
 
         if p.clan:
             p.join_chan(p.clan.chan)

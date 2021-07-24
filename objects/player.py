@@ -179,21 +179,21 @@ class Player:
             stat['country_rank'] = 0
 
             if not self.restricted: # might do my own aioredis wrapper just to solve this ugly
-                stat['rank'] = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}', self.id)
+                r = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}', self.id)
     
-                if stat['rank'] is None:
+                if r is None:
                     if stat['pp'] > 0:
                         stat['rank'] = 1
                 else:
                     stat['rank'] += 1
     
-                stat['country_rank'] = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}:{self.country_iso}', self.id)
+                cr = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}:{self.country_iso}', self.id)
     
-                if stat['country_rank'] is None:
+                if cr is None:
                     if stat['pp'] > 0:
                         stat['country_rank'] = 1
                 else:
-                    stat['country_rank'] += 1
+                    stat['country_rank'] =  cr + 1
                 
             self.stats[mode.value] = Stats(**stat)
 
@@ -223,23 +223,23 @@ class Player:
             await glob.redis.zadd(f'asahi:leaderboard:{mode_name}', stats.pp, self.id)
             await glob.redis.zadd(f'asahi:leaderboard:{mode_name}:{self.country_iso}', stats.pp, self.id)
 
-            stats.rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}', self.id)
-            stats.country_rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}:{self.country_iso}', self.id)
+            r = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}', self.id)
+            cr = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}:{self.country_iso}', self.id)
             
             stats.rank = 0
             stats.country_rank = 0
     
-            if stats.rank is None:
+            if r is None:
                 if stats.pp > 0:
                     stats.rank = 1
             else:
-                stats.rank += 1
+                stats.rank = r + 1
     
-            if stats.country_rank is None:
+            if cr is None:
                 if stats.pp > 0:
                     stats.country_rank = 1
             else:
-                stats.country_rank += 1
+                stats.country_rank = cr + 1
 
         await glob.db.execute(
             'UPDATE stats SET rscore_{0} = %s, acc_{0} = %s, pc_{0} = %s, tscore_{0} = %s,'
