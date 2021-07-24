@@ -1,5 +1,6 @@
 ﻿from xevel import Router, Request
 from pathlib import Path
+from typing import Union
 
 from objects import glob
 
@@ -15,7 +16,7 @@ def init_customs():
             custom.append(f'{ach.image}@2x')
 
 @assets.route("/medals/client/<medal>")
-async def ingameAchievements(request: Request, medal: str):
+async def ingameAchievements(request: Request, medal: str) -> Union[tuple, bytes]:
     name = medal.split('.')[0]
     if name not in custom:
         request.resp_headers['Location'] = f'https://assets.ppy.sh/medals/client/{medal}' # redirect regular achievements

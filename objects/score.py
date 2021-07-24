@@ -1,6 +1,6 @@
 from .beatmap import Beatmap
 from .player import Player
-from constants.mods import Mods, convert
+from constants.mods import Mods
 from constants.modes import osuModes, lbModes
 from constants.statuses import scoreStatuses, mapStatuses
 from constants.grades import Grade
@@ -158,7 +158,7 @@ class Score:
         s.geki = int(data[6])
         s.katu = int(data[7])
         s.mods = Mods(int(data[13]))
-        s.readable_mods = convert(int(data[13]))
+        s.readable_mods = repr(Mods(int(data[13])))
         s.combo = int(data[10])
         s.mode = lbModes(int(data[15]), s.mods)
 

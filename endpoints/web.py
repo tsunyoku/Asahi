@@ -3,6 +3,8 @@ from cmyui import log, Ansi
 from collections import defaultdict
 from urllib.parse import unquote
 from pathlib import Path
+from typing import Union, Optional
+
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
 from cryptography.hazmat.backends import default_backend as backend
@@ -11,7 +13,6 @@ import string
 import random
 import hashlib
 import time
-import orjson
 import copy
 import threading
 import asyncio
@@ -35,7 +36,7 @@ ap_path = Path.cwd() / 'resources/replays_ap'
 
 web = Router(f'osu.{glob.config.domain}')
 
-async def auth(name: str, md5: str, req: Request):
+async def auth(name: str, md5: str, req: Request) -> bool:
     if not (player := await glob.players.find_login(name, md5)):
         log(f'{name} failed authentication', Ansi.LRED)
         return False
@@ -45,7 +46,7 @@ async def auth(name: str, md5: str, req: Request):
 
 if glob.config.debug:
     @web.after_request()
-    async def logRequest(resp: Request):
+    async def logRequest(resp: Request) -> Request:
         if resp.extras.get('player'):
             ret = f' | Request by {resp.extras.pop("player").name}'
         else:
@@ -60,7 +61,7 @@ if glob.config.debug:
         return resp
 
 @web.route("/web/osu-screenshot.php", ['POST'])
-async def uploadScreenshot(request: Request):
+async def uploadScreenshot(request: Request) -> bytes:
     mpargs = request.args
     if not await auth(mpargs['u'], mpargs['p'], request):
         return b''
@@ -81,7 +82,7 @@ async def uploadScreenshot(request: Request):
     return name.encode()
 
 @web.route("/ss/<scr>")
-async def getScreenshot(request: Request, scr: str):
+async def getScreenshot(request: Request, scr: str) -> bytes:
     ss = ss_path / scr
     _type = scr.split('.')[1]
 
@@ -93,15 +94,15 @@ async def getScreenshot(request: Request, scr: str):
         return b'could not find screenshot'
 
 @web.route("/web/osu-getseasonal.php")
-async def seasonalBG(request: Request):
-    return orjson.dumps(glob.config.menu_bgs)
+async def seasonalBG(request: Request) -> list:
+    return glob.config.menu_bgs
 
 @web.route("/web/bancho_connect.php")
-async def banchoConnect(request: Request):
+async def banchoConnect(request: Request) -> bytes:
     return b'asahi is gamer owo'
 
 @web.route("/web/osu-getfriends.php")
-async def getFriends(request: Request):
+async def getFriends(request: Request) -> bytes:
     args = request.args
     if not await auth(args['u'], args['h'], request):
         return b''
@@ -110,21 +111,21 @@ async def getFriends(request: Request):
     return '\n'.join(map(str, p.friends)).encode()
 
 @web.route("/d/<mid>")
-async def mapDownload(request: Request, mid: str):
+async def mapDownload(request: Request, mid: str) -> tuple[int, bytes]:
     request.resp_headers['Location'] = f'{glob.config.map_api}/d/{mid}'
     return (301, b'') # redirect
 
-def directMapFormat(diff):
+def directMapFormat(diff: dict) -> str:
     return f'{diff["DiffName"]} ({diff["DifficultyRating"]}⭐)@{diff["Mode"]}'
 
-def directSetFormat(bmap, diffs):
+def directSetFormat(bmap: dict, diffs: list) -> str:
     return (f'{bmap["SetID"]}.osz|{bmap["Artist"]}|{bmap["Title"]}|{bmap["Creator"]}'
             f'|{bmap["RankedStatus"]}|10.0|{bmap["LastUpdate"]}|{bmap["SetID"]}|0|0'
             f'|0|0|0|{diffs}'
             )
 
 @web.route("/web/osu-search.php")
-async def osuSearch(request: Request):
+async def osuSearch(request: Request) -> Union[tuple, bytes]:
     args = request.args
     if not await auth(args['u'], args['h'], request):
         return b''
@@ -157,25 +158,26 @@ async def osuSearch(request: Request):
 
     return '\n'.join(ret).encode()
 
-@web.route("/web/osu-search-set.php")
-async def osuSearchSet(request: Request):
-    args = request.args
-    if not await auth(args['u'], args['h'], request):
-        return b''
+# commenting out til i redo for mirror lol
+# @web.route("/web/osu-search-set.php")
+# async def osuSearchSet(request: Request):
+#     args = request.args
+#     if not await auth(args['u'], args['h'], request):
+#         return b''
 
-    args['u'] = glob.config.bancho_username
-    args['h'] = glob.config.bancho_hashed_password
+#     args['u'] = glob.config.bancho_username
+#     args['h'] = glob.config.bancho_hashed_password
 
-    async with glob.web.get("https://osu.ppy.sh/web/osu-search-set.php", params=args) as resp:
-        if resp.status != 200:
-            return (resp.status, b'0')
+#     async with glob.web.get("https://osu.ppy.sh/web/osu-search-set.php", params=args) as resp:
+#         if resp.status != 200:
+#             return (resp.status, b'0')
 
-        ret = await resp.read()
+#         ret = await resp.read()
 
-    return (resp.status, ret)
+#     return (resp.status, ret)
 
 @web.route("/users", ['POST'])
-async def ingameRegistration(request: Request):
+async def ingameRegistration(request: Request) -> Union[dict, bytes]:
     start = time.time()
     mpargs = request.args
 
@@ -200,14 +202,14 @@ async def ingameRegistration(request: Request):
         errors['password'].append('Password must be 8+ characters!')
 
     if errors:
-        ret = {'form_error': {'user': errors}}
-        request.resp_headers['Content-Type'] = 'application/json'
-        return orjson.dumps(ret)
+        return {'form_error': {'user': errors}}
 
     if int(mpargs['check']) == 0:
         md5 = hashlib.md5(pw.encode()).hexdigest().encode()
         k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'', backend=backend())
         bc = k.derive(md5).decode('unicode-escape')
+
+        glob.cache['pw'][bc] = md5
 
         uid = await glob.db.execute("INSERT INTO users (name, email, pw, safe_name, registered_at) VALUES (%s, %s, %s, %s, %s)", [name, email, bc, name.lower().replace(' ', '_'), time.time()])
         await glob.db.execute('INSERT INTO stats (id) VALUES (%s)', [uid])
@@ -216,7 +218,7 @@ async def ingameRegistration(request: Request):
     return b'ok'
 
 @web.route("/web/check-updates.php")
-async def osuUpdates(request: Request):
+async def osuUpdates(request: Request) -> bytes:
     args = request.args
 
     async with glob.web.get("https://old.ppy.sh/web/check-updates.php", params=args) as resp:
@@ -228,7 +230,7 @@ async def osuUpdates(request: Request):
     return ret
 
 @web.route("/web/osu-getbeatmapinfo.php")
-async def osuMapInfo(request: Request): # TODO
+async def osuMapInfo(request: Request) -> None: # TODO
     args = request.args
     if not await auth(args['u'], args['h'], request):
         return b''
@@ -237,7 +239,7 @@ async def osuMapInfo(request: Request): # TODO
     ...
 
 @web.route("/web/osu-osz2-getscores.php")
-async def getMapScores(request: Request):
+async def getMapScores(request: Request) -> bytes:
     args = request.args
     if not await auth(args['us'], args['ha'], request):
         return b''
@@ -288,7 +290,7 @@ async def getMapScores(request: Request):
     return await lb.return_leaderboard(player, lbm, mods)
 
 @web.route("/web/osu-submit-modular-selector.php", ['POST'])
-async def scoreSubmit(request: Request):
+async def scoreSubmit(request: Request) -> bytes:
     mpargs = request.args
 
     s = await Score.submission(mpargs['score'], mpargs['iv'], mpargs['pass'], mpargs['osuver'])
@@ -474,7 +476,7 @@ async def scoreSubmit(request: Request):
     return '\n'.join(charts).encode() # thank u osu
 
 @web.route("/web/osu-getreplay.php")
-async def getReplay(request: Request):
+async def getReplay(request: Request) -> bytes:
     args = request.args
     if not await auth(args['u'], args['h'], request):
         return b''
@@ -495,7 +497,7 @@ async def getReplay(request: Request):
     return # osu wants empty response if there's no replay
 
 @web.route("/web/lastfm.php")
-async def lastFM(request: Request):
+async def lastFM(request: Request) -> Optional[bytes]:
     args = request.args
     if not await auth(args['us'], args['ha'], request):
         return b''

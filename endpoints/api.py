@@ -1,14 +1,14 @@
-from xevel import Router
+from xevel import Router, Request
 from cmyui import log, Ansi
 from cmyui.osu.oppai_ng import OppaiWrapper
 from pathlib import Path
 from datetime import datetime
+from typing import Union
 
 from objects import glob
 
 from objects.beatmap import Beatmap
-from objects.player import Player
-from constants.mods import convert, Mods
+from constants.mods import Mods
 from constants.modes import osuModes, lbModes
 from constants.privs import Privileges
 from packets import writer
@@ -20,7 +20,7 @@ api = Router(f'api.{glob.config.domain}')
 
 if glob.config.debug:
     @api.after_request()
-    async def logRequest(resp):
+    async def logRequest(resp: Request) -> Request:
         if resp.code >= 400:
             colourret = Ansi.LRED
         else:
@@ -29,7 +29,7 @@ if glob.config.debug:
         log(f'[{resp.type}] {resp.code} {resp.url} | Time Elapsed: {resp.elapsed}', colourret)
         return resp
 
-async def get_rank(mode, uid, pp):
+async def get_rank(mode: str, uid: int, pp: int) -> int:
     rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode}', uid)
     if rank is not None:
         return rank + 1
@@ -38,7 +38,7 @@ async def get_rank(mode, uid, pp):
 
     return 1
 
-async def get_country_rank(mode, uid, pp, country):
+async def get_country_rank(mode: str, uid: int, pp: int, country: str) -> int:
     rank = await glob.redis.zrevrank(f'asahi:leaderboard:{mode}:{country}', uid)
     if rank is not None:
         return rank + 1
@@ -48,11 +48,11 @@ async def get_country_rank(mode, uid, pp, country):
     return 1
 
 @api.route('/player_count')
-async def onlinePlayers(request):
+async def onlinePlayers(request: Request) -> dict:
     return {'online': len(glob.players) - 1}
 
 @api.route('/player')
-async def user(request):
+async def user(request: Request) -> Union[tuple, dict]:
     args = request.args
 
     id = int(args.get('id', 0))
@@ -94,7 +94,7 @@ async def user(request):
     return {'info': info, 'stats': user.stats[mode.value]}
 
 @api.route("/player_status")
-async def playerStatus(request):
+async def playerStatus(request: Request) -> Union[tuple, dict]:
     args = request.args
 
     id = int(args.get('id', 0))
@@ -125,7 +125,7 @@ async def playerStatus(request):
         'action': player.action,
         'info': player.info,
         'mode': osuModes(player.mode).name,
-        'mods': convert(player.mods),
+        'mods': repr(player.mods),
         'map': {
             'md5': bmap.md5,
             'id': bmap.id,
@@ -141,7 +141,7 @@ async def playerStatus(request):
     return {'status': status}
 
 @api.route("/get_leaderboard")
-async def getLb(request):
+async def getLb(request: Request) -> list:
     args = request.args
     
     mode = int(args.get('mode', 0))
@@ -175,6 +175,8 @@ async def getLb(request):
         lb = lb[offset:]
     
     ret = []
+
+    # TODO: clean this?
     
     if not search:
         for rank, uid in enumerate(lb):
@@ -234,7 +236,7 @@ async def getLb(request):
     return ret
 
 @api.route("/get_replay")
-async def getReplay(request):
+async def getReplay(request: Request) -> Union[tuple, bytes]:
     args = request.args
 
     sid = int(args.get('id', 0))
@@ -304,7 +306,8 @@ async def getReplay(request):
     rp += raw
     rp += struct.pack('<q', sid)
 
-    name = f'{score["name"]} ~ {score["artist"]} - {score["title"]} [{score["diff"]}] +{score["readable_mods"]} ({datetime.fromtimestamp(score["time"]).strftime("%Y/%m/%d")})'
+    name = (f'{score["name"]} ~ {score["artist"]} - {score["title"]} [{score["diff"]}] '
+           f'+{score["readable_mods"]} ({datetime.fromtimestamp(score["time"]).strftime("%Y/%m/%d")})')
 
     request.resp_headers['Content-Type'] = 'application/octet-stream'
     request.resp_headers['Content-Description'] = 'File Transfer'
@@ -313,7 +316,7 @@ async def getReplay(request):
     return bytes(rp)
 
 @api.route('/player_scores')
-async def playerScores(req):
+async def playerScores(req: Request) -> Union[tuple, list]:
     args = req.args
     
     _type = args.get('type')
@@ -363,7 +366,7 @@ async def playerScores(req):
 
     scores = await glob.db.fetch(query, [uid, mode.as_vn, limit])
     
-    for idx, score in enumerate(scores):
+    for score in scores:
         bmap = await Beatmap.from_md5(score.pop('md5'))
         
         if mode.as_vn <= 1:
@@ -392,7 +395,7 @@ async def playerScores(req):
     return {'scores': scores}
 
 @api.route('/player_search')
-async def searchPlayers(req):
+async def searchPlayers(req: Request) -> Union[tuple, list]:
     args = req.args
     
     query = args.get('search')
@@ -404,7 +407,7 @@ async def searchPlayers(req):
     return users or []
 
 @api.route('/player_most_played')
-async def mostPlayed(req):
+async def mostPlayed(req: Request) -> Union[tuple, dict]:
     args = req.args
     
     uid = int(args.get('id', 0))

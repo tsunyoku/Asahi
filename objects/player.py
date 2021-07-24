@@ -127,9 +127,11 @@ class Player:
         return p
     
     @classmethod
-    async def from_sql(self, spc):
+    async def from_sql(self, spc, discord = False):
         
-        if isinstance(spc, str):
+        if discord:
+            typ = 'discord'
+        elif isinstance(spc, str):
             typ = 'name'
         elif isinstance(spc, int):
             typ = 'id'
@@ -156,8 +158,7 @@ class Player:
             discord=user['discord']
         )
 
-        clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = %s', [p.id])
-        if clan:
+        if (clan := user['clan']):
             p.clan = glob.clans.get(clan)
         
         if p.priv & Privileges.Disallowed:

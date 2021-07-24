@@ -70,8 +70,14 @@ class osuModes(Enum):
 
 def lbModes(mode: int, mods: int):
     if mods & Mods.RELAX:
+        if mode == 3:
+            return osuModes(3)
+
         return osuModes(mode + 4)
     elif mods & Mods.AUTOPILOT:
+        if mode != 0:
+            return osuModes(mode)
+
         return osuModes(7)
    
     return osuModes(mode)

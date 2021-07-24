@@ -5,8 +5,8 @@ from objects.beatmap import Beatmap
 from objects.player import Player
 from objects.menu import Menu
 from objects.score import Score
-from cmyui import log, Ansi
 from cmyui.discord import Webhook, Embed
+from typing import Optional
 from packets import writer
 from .privs import Privileges
 from .types import teamTypes
@@ -20,38 +20,26 @@ import asyncio
 cmds = []
 mp_cmds = []
 
-def command(priv: Privileges = Privileges.Normal, name: str = None, elapsed: bool = True, allow_public: bool = False):
+def command(priv: Privileges = Privileges.Normal, name: str = None, aliases: list = None, elapsed: bool = True, allow_public: bool = False):
     def wrapper(cmd_cb):
-        if name is not None:
-            if not isinstance(name, list):
-                cmds.append({
-                    'name': name, 
-                    'priv': priv, 
-                    'elapsed': elapsed, 
-                    'cb': cmd_cb,
-                    'allow_public': allow_public,
-                    'desc': cmd_cb.__doc__
-                })
-            else:
-                for n in name:
-                    cmds.append({
-                        'name': n,
-                        'priv': priv,
-                        'elapsed': elapsed,
-                        'cb': cmd_cb,
-                        'allow_public': allow_public,
-                        'desc': cmd_cb.__doc__
-                    }) 
-        else:
-            log(f'Tried to add command with no name!', Ansi.LRED)
+        cmds.append({
+            'name': name,
+            'priv': priv,
+            'aliases': aliases,
+            'elapsed': elapsed, 
+            'cb': cmd_cb,
+            'allow_public': allow_public,
+            'desc': cmd_cb.__doc__
+        })
         
         return cmd_cb
     return wrapper
 
 @command(name='help', elapsed=False)
-async def help(user, args):
+async def help(user: Player, args: list) -> str:
     """Displays all available commands to the user"""
     allowed_cmds = []
+
     for cmd in cmds:
         if user.priv & cmd['priv']:
             s = f'{glob.config.prefix}{cmd["name"]} - {cmd["desc"]}'
@@ -60,15 +48,15 @@ async def help(user, args):
     cmd_list = '\n'.join(allowed_cmds)
     return f'List of available commands:\n\n{cmd_list}'
 
-@command(name=['last', 'l', 'recent', 'r', 'rs'], elapsed=False, allow_public=True)
-async def last_score(user, args):
+@command(name='last', aliases=['l', 'recent', 'r', 'rs'], elapsed=False, allow_public=True)
+async def last_score(user: Player, args: list) -> str:
     if (score := user.last_score):
         return await score.format()
     
     return 'No recent score found!'
 
-@command(name=['verify', 'link'])
-async def link_discord(user, args):
+@command(name='link', aliases=['verify'])
+async def link_discord(user, args) -> str:
     if len(args) < 1:
         return 'Please provide a verification code!'
 
@@ -83,7 +71,7 @@ async def link_discord(user, args):
     return 'Discord account linked!'
 
 @command(priv=Privileges.Owner, name='addpriv')
-async def add_priv(user, args):
+async def add_priv(user: Player, args: list) -> str:
     """Adds (a list of) privileges to a user"""
     if len(args) < 2:
         return "You haven't provided a username and privileges!"
@@ -98,15 +86,12 @@ async def add_priv(user, args):
         if not (new_priv := Privileges.get(npriv)):
             return f'Privilege {npriv} not found.'
 
-        new_privs |= new_priv
-        
-    for priv in new_privs:
-        await user.add_priv(priv)
+        await user.add_priv(new_priv)
 
-    return f"Added privilege(s) {new_privs} to {name}."
+    return f"Added new privilege(s) to {name}."
 
 @command(priv=Privileges.Owner, name='rmpriv')
-async def rm_priv(user, args):
+async def rm_priv(user: Player, args: list) -> str:
     """Removes (a list of) privileges from a user"""
     if len(args) < 2:
         return "You haven't provided a username and privileges!"
@@ -121,87 +106,131 @@ async def rm_priv(user, args):
         if not (new_priv := Privileges.get(npriv)):
             return f'Privilege {npriv} not found.'
 
-        new_privs |= new_priv
+        await user.remove_priv(new_priv)
 
-    for priv in new_privs:
-        await user.remove_priv(priv)
+    return f"Removed privilege(s) from {name}."
 
-    return f"Removed privilege(s) {new_privs} from {name}."
+async def _clan_response(user: Player, args: list) -> Optional[str]:
+    if len(args) < 2:
+        return 'Please accept/deny a battle and specify the clan!'
+
+    clan_name = args[1]
+    clan = glob.clans.get(await glob.db.fetchval('SELECT id FROM clans WHERE name = %s', [clan_name]))
+    
+    if not clan:
+        return 'We could not find a clan by this name!'
+
+    if not (owner := await glob.players.get(id=clan.owner)):
+        return 'Clan owner offline, battle request cancelled!'
+    
+    if args[1] == 'deny':
+        owner.enqueue(
+            writer.sendMessage(
+                fromname=glob.bot.name, 
+                msg=f'{user.name} denied your request to battle their clan {clan.name}!', 
+                tarname=owner.name, 
+                fromid=glob.bot.id
+            )
+        )
+
+        return 'Battle request denied!'
+
+    # battle was accepted, create the battle match
+    # TODO: clan battle object to clean this shit up?
+
+    user.enqueue(
+        writer.sendMessage(
+            fromname=glob.bot.name, 
+            msg=f'Request accepted! Creating match...', 
+            tarname=user.name, 
+            fromid=glob.bot.id
+        )
+    )
+
+    owner.enqueue(
+        writer.sendMessage(
+            fromname=glob.bot.name, 
+            msg=f'{user.name} accepted your request to battle their clan {user.clan.name}! Creating match...', 
+            tarname=owner.name, 
+            fromid=glob.bot.id
+        )
+    )
+
+    match = Match()
+
+    match.name = f'Clan Battle: ({clan.name}) vs ({user.clan.name})'
+    match.clan_battle = True
+
+    match.clan_1 = clan
+    match.clan_2 = user.clan
+
+    match.host = owner
+    match.type = teamTypes.team
+
+    glob.matches[match.id] = match
+
+    mp_chan = Channel(name=f'#multiplayer', desc=f'Multiplayer channel for match ID {match.id}', auto=False, perm=False)
+    glob.channels[f'#multi_{match.id}'] = mp_chan
+    match.chat = mp_chan
+
+    # get list of potential clan members we should expect
+    online1 = []
+    for m in clan.members:
+        if (e := await glob.players.get(id=m)):
+            online1.append(e)
+
+    online2 = []
+    for m in user.clan.members:
+        if (e := await glob.players.get(id=m)):
+            online2.append(e)
+
+    b_info = {
+        'clan1': clan, 
+        'clan2': user.clan, 
+        'online1': online1, 
+        'online2': online2, 
+        'total': (online1 + online2), 
+        'match': match
+    }
+
+    glob.clan_battles[match.clan_1] = b_info
+    glob.clan_battles[match.clan_2] = b_info
+
+    for u in online1:
+        u.enqueue(
+            writer.sendMessage(
+                fromname=glob.bot.name, 
+                msg=f'Your clan has initiated in a clan battle against the clan {user.clan.name}!'
+                    f'Please join the battle here: {match.embed}', 
+                tarname=u.name, 
+                fromid=glob.bot.id
+            )
+        ) 
+
+    for u in online2:
+        u.enqueue(
+            writer.sendMessage(
+                fromname=glob.bot.name, 
+                msg=f'Your clan has initiated in a clan battle against the clan {clan.name}!'
+                    f'Please join the battle here: {match.embed}', 
+                tarname=u.name, 
+                fromid=glob.bot.id
+            )
+        )
 
 @command(name='battle')
-async def clan_battle(user, args):
+async def clan_battle(user: Player, args: list) -> str:
     """Battle other clans in a scrim-like multi lobby"""
+    if len(args) < 1:
+        return "Please provide a clan to request a battle, or an action to an invite!"
+
     if args[0] in ('accept', 'deny'):
-        if len(args) < 2:
-            return 'Please accept/deny a battle and specify the clan!'
-
-        clan_name = args[1]
-        clan = glob.clans.get(await glob.db.fetchval('SELECT id FROM clans WHERE name = %s', [clan_name]))
-        
-        if not clan:
-            return 'We could not find a clan by this name!'
-
-        if not (owner := await glob.players.get(id=clan.owner)):
-            return 'Clan owner offline, battle request cancelled!'
-        
-        if args[1] == 'deny':
-            owner.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'{user.name} denied your request to battle their clan {clan.name}!', tarname=owner.name, fromid=glob.bot.id))
-            return 'Battle request denied!'
-
-        # battle was accepted, create the battle match
-
-        user.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Request accepted! Creating match...', tarname=user.name, fromid=glob.bot.id))
-        owner.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'{user.name} accepted your request to battle their clan {user.clan.name}! Creating match...', tarname=owner.name, fromid=glob.bot.id))
-
-        match = Match()
-
-        match.name = f'Clan Battle: ({clan.name}) vs ({user.clan.name})'
-        match.clan_battle = True
-
-        match.clan_1 = clan
-        match.clan_2 = user.clan
-
-        match.host = owner
-        match.type = teamTypes.team
-
-        glob.matches[match.id] = match
-
-        mp_chan = Channel(name=f'#multiplayer', desc=f'Multiplayer channel for match ID {match.id}', auto=False, perm=False)
-        glob.channels[f'#multi_{match.id}'] = mp_chan
-        match.chat = mp_chan
-
-        # get list of potential clan members we should expect
-        online1 = []
-        for m in clan.members:
-            if (e := await glob.players.get(id=m)):
-                online1.append(e)
-
-        online2 = []
-        for m in user.clan.members:
-            if (e := await glob.players.get(id=m)):
-                online2.append(e)
-
-        b_info = {'clan1': clan, 'clan2': user.clan, 'online1': online1, 'online2': online2, 'total': (online1 + online2), 'match': match}
-
-        glob.clan_battles[match.clan_1] = b_info
-        glob.clan_battles[match.clan_2] = b_info
-
-        for u in online1:
-            u.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your clan has initiated in a clan battle against the clan {user.clan.name}! Please join the battle here: {match.embed}', tarname=u.name, fromid=glob.bot.id)) 
-
-        for u in online2:
-            u.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your clan has initiated in a clan battle against the clan {clan.name}! Please join the battle here: {match.embed}', tarname=u.name, fromid=glob.bot.id))
-
-        return
+        return await _clan_response(user, args)
 
     if user.clan.owner != user.id:
         return 'You must be the owner of your clan to request a battle!'
 
-    if len(args) < 1:
-        return "Please provide a clan to request a battle!"
-
-    clan_name = args[0]
-    clan = glob.clans.get(await glob.db.fetchval('SELECT id FROM clans WHERE name = %s', [clan_name]))
+    clan = glob.clans.get(await glob.db.fetchval('SELECT id FROM clans WHERE name = %s', [args[0]]))
 
     if not clan:
         return 'We could not find a clan by this name!'
@@ -209,12 +238,21 @@ async def clan_battle(user, args):
     if not (owner := await glob.players.get(id=clan.owner)):
         return 'The clan owner must be online for you to request a battle!'
 
-    owner.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'{user.name} has invited you to a clan battle! If you wish to accept then type !battle accept {user.clan.name}, or !battle deny {user.clan.name} to deny. If you accept, a multiplayer match will be created for you and all your online clanmates to battle to the death!', tarname=owner.name, fromid=glob.bot.id))
+    owner.enqueue(
+        writer.sendMessage(
+            fromname=glob.bot.name, 
+            msg=f'{user.name} has invited you to a clan battle! ' 
+                f'If you wish to accept then type !battle accept {user.clan.name}, or !battle deny {user.clan.name} to deny. '
+                'If you accept, a multiplayer match will be created for you and all your online clanmates to battle to the death!', 
+            tarname=owner.name, 
+            fromid=glob.bot.id
+        )
+    )
 
     return f'Clan battle request sent to {clan.name} clan!'
 
 @command(priv=Privileges.Nominator, name='map')
-async def _map(user, args):
+async def _map(user: Player, args: list) -> str:
     """Update map statuses on the server"""
     if len(args) != 2:
         return 'Please provide the new status & whether we should update the map/set! (!map <rank/love/unrank> <map/set>)'
@@ -260,9 +298,20 @@ async def _map(user, args):
         wh = Webhook(url=wh_url)
         embed = Embed(title='')
         
-        embed.set_author(url=f'https://{glob.config.domain}/u/{user.id}', name=user.name, icon_url=f'https://a.{glob.config.domain}/{user.id}')
+        embed.set_author(
+            url=f'https://{glob.config.domain}/u/{user.id}', 
+            name=user.name, 
+            icon_url=f'https://a.{glob.config.domain}/{user.id}'
+        )
+
         embed.set_image(url=f'https://assets.ppy.sh/beatmaps/{bmap.sid}/covers/card.jpg')
-        embed.add_field(name=f'New {ns.name.lower()} map', value=f'[{bmap.name}]({bmap.url}) is now {ns.name.lower()}!', inline=True)
+
+
+        embed.add_field(
+            name=f'New {ns.name.lower()} map', 
+            value=f'[{bmap.name}]({bmap.url}) is now {ns.name.lower()}!', 
+            inline=True
+        )
         
         wh.add_embed(embed)
         await wh.post()
@@ -270,7 +319,7 @@ async def _map(user, args):
     return 'Status updated!'
 
 @command(priv=Privileges.Nominator, name=['requests', 'reqs'], elapsed=False)
-async def reqs(user, args):
+async def reqs(user: Player, args: list) -> str:
     """View all map status requests on the server"""
     if (requests := await glob.db.fetch(f'SELECT * FROM requests')):
         ret = []
@@ -282,25 +331,51 @@ async def reqs(user, args):
                 
             mode = repr(osuModes(req['mode']))
             status = mapStatuses(req['status'])
+
+            # TODO: CLEAN THESE GODDAMN FUCKING MENUS.
             
             # despite them being saved in cache, these are context based so we cant reuse them, hence destroy arg also
-            rank = Menu(id=_map.id + 1, name='Rank', callback=a_req, args=(user, (req['id'], 'rank')), destroy=True) # CURSED CALLBACK
+            rank = Menu(
+                id=_map.id + 1, 
+                name='Rank', 
+                callback=a_req, 
+                args=(user, (req['id'], 'rank')), 
+                destroy=True
+            )
+
             glob.menus[_map.id + 1] = rank
                 
-            love = Menu(id=_map.id + 2, name='Love', callback=a_req, args=(user, (req['id'], 'love')), destroy=True) # CURSED CALLBACK
+            love = Menu(
+                id=_map.id + 2, 
+                name='Love', 
+                callback=a_req, 
+                args=(user, (req['id'], 'love')), 
+                destroy=True
+            )
+
             glob.menus[_map.id + 2] = love
 
-            deny = Menu(id=_map.id + 3, name='Deny', callback=d_req, args=(user, (req['id'],)), destroy=True) # CURSED CALLBACK
+            deny = Menu(
+                id=_map.id + 3, 
+                name='Deny', 
+                callback=d_req, 
+                args=(user, (req['id'],)), 
+                destroy=True
+            )
+
             glob.menus[_map.id + 3] = deny
                 
-            ret.append(f'Request #{idx + 1}: {req["requester"]} requested {_map.embed} to be {status.name.lower()} (Mode: {mode}) | {rank.embed}  {love.embed}  {deny.embed}')
+            ret.append(
+                f'Request #{idx + 1}: {req["requester"]} requested {_map.embed} to be {status.name.lower()} '
+                f'(Mode: {mode}) | {rank.embed}  {love.embed}  {deny.embed}'
+            )
             
         return '\n'.join(ret)
     
     return 'No requests to read!'
 
-@command(name=['request', 'req'])
-async def req(user, args):
+@command(name='request', aliases=['req'])
+async def req(user: Player, args: list) -> str:
     """Request a map status change"""
     if len(args) < 1:
         return 'You must provide what status you want the map to be!'
@@ -313,18 +388,25 @@ async def req(user, args):
     
     ns = strStatuses(args[0])
     
-    try:
-        await glob.db.execute('INSERT INTO requests (requester, map, status, mode) VALUES (%s, %s, %s, %s)', [user.name, user.np.id, int(ns), user.mode_vn])
-    except Exception:
-        return "Someone has already requested this map's status to be changed! Your request has not been sent."
+    await glob.db.execute('INSERT IGNORE INTO requests (requester, map, status, mode) VALUES (%s, %s, %s, %s)', [user.name, user.np.id, int(ns), user.mode_vn])
 
     if (wh_url := glob.config.webhooks['requests']):
         wh = Webhook(url=wh_url)
         embed = Embed(title='')
 
-        embed.set_author(url=f'https://{glob.config.domain}/u/{user.id}', name=user.name, icon_url=f'https://a.{glob.config.domain}/{user.id}')
+        embed.set_author(
+            url=f'https://{glob.config.domain}/u/{user.id}', 
+            name=user.name, 
+            icon_url=f'https://a.{glob.config.domain}/{user.id}'
+        )
+
         embed.set_image(url=f'https://assets.ppy.sh/beatmaps/{_map.sid}/covers/card.jpg')
-        embed.add_field(name=f'New request', value=f'{user.name} requested [{_map.name}]({_map.url}) to be {ns.name.lower()}', inline=True)
+
+        embed.add_field(
+            name=f'New request', 
+            value=f'{user.name} requested [{_map.name}]({_map.url}) to be {ns.name.lower()}', 
+            inline=True
+        )
 
         wh.add_embed(embed)
         await wh.post()
@@ -332,7 +414,7 @@ async def req(user, args):
     return 'Request sent!'
 
 @command(priv=Privileges.Admin, name='ban')
-async def ban(user, args):
+async def ban(user: Player, args: list) -> str:
     """Ban a specified user for a specified reason"""
     if len(args) < 2:
         return 'You must provide a user and a reason to ban!'
@@ -348,7 +430,7 @@ async def ban(user, args):
     return 'User banned!'
 
 @command(priv=Privileges.Admin, name='unban')
-async def unban(user, args):
+async def unban(user: Player, args: list) -> str:
     """Unban a specified user for a specified reason"""
     if len(args) < 2:
         return 'You must provide a user and a reason to unban!'
@@ -364,7 +446,7 @@ async def unban(user, args):
     return 'User unbanned!'
 
 @command(priv=Privileges.Admin, name='restrict')
-async def restrict(user, args):
+async def restrict(user: Player, args: list) -> str:
     """Restrict a specified user for a specified reason"""
     if len(args) < 2:
         return 'You must provide a user and a reason to restrict!'
@@ -380,7 +462,7 @@ async def restrict(user, args):
     return 'User restricted!'
 
 @command(priv=Privileges.Admin, name='unrestrict')
-async def unrestrict(user, args):
+async def unrestrict(user: Player, args: list) -> str:
     """Unrestrict a specified user for a specified reason"""
     if len(args) < 2:
         return 'You must provide a user and a reason to unrestrict!'
@@ -396,7 +478,7 @@ async def unrestrict(user, args):
     return 'User unrestricted!'
 
 @command(priv=Privileges.Admin, name='freeze')
-async def freeze(user, args):
+async def freeze(user: Player, args: list) -> str:
     """Freeze a specified user for a specified reason"""
     if len(args) < 2:
         return 'You must provide a user and a reason to freeze!'
@@ -415,7 +497,7 @@ async def freeze(user, args):
     return 'User frozen!'
 
 @command(priv=Privileges.Admin, name='unfreeze')
-async def unfreeze(user, args):
+async def unfreeze(user: Player, args: list) -> str:
     """Unfreeze a specified user for a specified reason"""
     if len(args) < 2:
         return 'You must provide a user and a reason to unfreeze!'
@@ -431,7 +513,7 @@ async def unfreeze(user, args):
     return 'User unfrozen!'
 
 @command(priv=Privileges.Developer, name='crash')
-async def crash(user, args):
+async def crash(user: Player, args: list) -> str:
     """Crash a user's client"""
     if len(args) < 1:
         return 'You must provide a username to crash!'
@@ -439,12 +521,14 @@ async def crash(user, args):
     if not (t := await glob.players.get(id=args[0])):
         return 'User not online'
     
-    t.enqueue(b'G\x00\x00\x04\x00\x00\x00\x80\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00')
+    t.enqueue(
+        b'G\x00\x00\x04\x00\x00\x00\x80\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00' # best bytes ever :troll:
+    )
     
     return ':troll:'
 
-@command(priv=Privileges.Admin, name=['recalc', 'calc', 'recalculate', 'calculate'])
-async def recalc(user, args):
+@command(priv=Privileges.Admin, name='recalculate', aliases=['recalc', 'calc', 'calculate'])
+async def recalc(user: Player, args: list) -> str:
    """Recalculate scores globally or on a specific map"""
    if len(args) < 1:
        return 'You must specify what to recalc! (map/all)'
@@ -454,7 +538,10 @@ async def recalc(user, args):
            return 'You must /np the map you want to recalculate first!'
        
        for mode in osuModes:
-           scores_db = await glob.db.fetch(f'SELECT id, {mode.sort} sort FROM {mode.table} WHERE md5 = %s AND mode = %s', [bmap.md5, mode.value])
+           scores_db = await glob.db.fetch(
+               f'SELECT id, {mode.sort} sort FROM {mode.table} WHERE md5 = %s AND mode = %s', 
+               [bmap.md5, mode.value]
+            )
            
            for sc in scores_db:
                score = await Score.sql(sc['id'], mode.table, mode.sort, sc['sort'])
@@ -474,7 +561,10 @@ async def recalc(user, args):
            bmap = await Beatmap.from_md5(map_sql['md5'])
 
            for mode in osuModes:
-               scores_db = await glob.db.fetch(f'SELECT id, {mode.sort} sort FROM {mode.table} WHERE md5 = %s AND mode = %s', [bmap.md5, mode.value])
+               scores_db = await glob.db.fetch(
+                   f'SELECT id, {mode.sort} sort FROM {mode.table} WHERE md5 = %s AND mode = %s', 
+                   [bmap.md5, mode.value]
+                )
         
                for sc in scores_db:
                    score = await Score.sql(sc['id'], mode.table, mode.sort, sc['sort'])
@@ -486,7 +576,14 @@ async def recalc(user, args):
            bmap.lb_rx = None
            bmap.lb_ap = None
                    
-           user.enqueue(writer.sendMessage(writer.sendMessage(fromname=glob.bot.name, msg=f'Recalculated all scores on {bmap.embed}', tarname=user.name, fromid=glob.bot.id)))
+           user.enqueue(
+               writer.sendMessage(
+                   fromname=glob.bot.name, 
+                   msg=f'Recalculated all scores on {bmap.embed}', 
+                   tarname=user.name, 
+                   fromid=glob.bot.id
+                )
+            )
            
        return 'Recalculated all scores!'
    else:
@@ -494,7 +591,7 @@ async def recalc(user, args):
         
 #####################
 
-async def a_req(user, args):
+async def a_req(user: Player, args: list) -> str:
     """Accept a map status request"""
     if len(args) < 2:
         return 'You must provide the request ID and status to set!'
@@ -523,21 +620,39 @@ async def a_req(user, args):
         wh = Webhook(url=wh_url)
         embed = Embed(title='')
 
-        embed.set_author(url=f'https://{glob.config.domain}/u/{user.id}', name=user.name, icon_url=f'https://a.{glob.config.domain}/{user.id}')
+        embed.set_author(
+            url=f'https://{glob.config.domain}/u/{user.id}', 
+            name=user.name, 
+            icon_url=f'https://a.{glob.config.domain}/{user.id}'
+        )
+
         embed.set_image(url=f'https://assets.ppy.sh/beatmaps/{_map.sid}/covers/card.jpg')
-        embed.add_field(name=f'New {ns.name.lower()} map', value=f'[{_map.name}]({_map.url}) is now {ns.name.lower()}!', inline=True)
+
+        embed.add_field(
+            name=f'New {ns.name.lower()} map', 
+            value=f'[{_map.name}]({_map.url}) is now {ns.name.lower()}!', 
+            inline=True
+        )
 
         wh.add_embed(embed)
         await wh.post()
 
     if (rq := await glob.players.get(name=request['requester'])):
-        rq.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your request to make {_map.embed} {mapStatuses(request["status"]).name.lower()} was accepted by {user.name}! It is now {ns.name.lower()}.', tarname=rq.name, fromid=glob.bot.id))
+        rq.enqueue(
+            writer.sendMessage(
+                fromname=glob.bot.name, 
+                msg=f'Your request to make {_map.embed} {mapStatuses(request["status"]).name.lower()} was accepted by {user.name}! '
+                    f'It is now {ns.name.lower()}.', 
+                tarname=rq.name, 
+                fromid=glob.bot.id
+            )
+        )
 
     await glob.db.execute('DELETE FROM requests WHERE id = %s', [int(args[0])])
 
     return 'Map status updated!'
 
-async def d_req(user, args):
+async def d_req(user: Player, args: list) -> str:
     """Deny a map status request"""
     if len(args) < 1:
         return 'You must provide the request ID to deny!'
@@ -547,7 +662,14 @@ async def d_req(user, args):
     ns = mapStatuses(request['status'])
 
     if (rq := await glob.players.get(name=request['requester'])):
-        rq.enqueue(writer.sendMessage(fromname=glob.bot.name, msg=f'Your request to make {_map.embed} {ns.name.lower()} was denied by {user.name}!', tarname=rq.name, fromid=glob.bot.id))
+        rq.enqueue(
+            writer.sendMessage(
+                fromname=glob.bot.name, 
+                msg=f'Your request to make {_map.embed} {ns.name.lower()} was denied by {user.name}!', 
+                tarname=rq.name, 
+                fromid=glob.bot.id
+            )
+        )
 
     await glob.db.execute('DELETE FROM requests WHERE id = %s', [int(args[0])])
 
@@ -555,63 +677,48 @@ async def d_req(user, args):
 
 #####################
 
-async def process(user, msg, public = False):
+async def process(user: Player, msg: str, public: bool = False) -> Optional[str]:
     start = time.time()
     args = msg.split()
-    ct = args[0].split(glob.config.prefix)[1]
-    for c in cmds:
-        cmd = c['name']
-        
-        if cmd == ct:
+
+    cmd = args[0].split(glob.config.prefix)[1]
+
+    for c in cmds:     
+        if c['name'] == cmd or cmd in c['aliases']:
             if not user.priv & c['priv']:
                 return 'You have insufficient permissions to perform this command!'
             
             if public and not c['allow_public']:
                 return
 
-            cb = c['cb']
-            o = await cb(user, args[1:])
-            
-            elapsed = ''
+            o = await c['cb'](user, args[1:])
 
+            ret = o
             if c['elapsed']:
-                elapsed = f' | Time Elapsed: {(time.time() - start) * 1000:.2f}ms'
-
-            if o:
-                return f'{o}{elapsed}'
+                ret += f' | Time Elapsed: {(time.time() - start) * 1000:.2f}ms'
             
-            return # we still wanna end the loop even if theres no text to return
+            return ret or None
     else:
         return f'Unknown command! Use {glob.config.prefix}help for a list of available commands.'
 
-def mp_command(name: str = None, host: bool = True):
+def mp_command(name: str, aliases: list = None, host: bool = True):
     def wrapper(cmd_cb):
-        if name is not None:
-            if not isinstance(name, list):
-                mp_cmds.append({
-                    'name': name,
-                    'cb': cmd_cb,
-                    'host': host,
-                    'desc': cmd_cb.__doc__
-                })
-            else:
-                for n in name:
-                    mp_cmds.append({
-                        'name': n,
-                        'cb': cmd_cb,
-                        'host': host,
-                        'desc': cmd_cb.__doc__
-                    })
-        else:
-            log(f'Tried to add multiplayer command with no name!', Ansi.LRED)
+        mp_cmds.append({
+            'name': name,
+            'aliases': aliases,
+            'cb': cmd_cb,
+            'host': host,
+            'desc': cmd_cb.__doc__
+        })
 
         return cmd_cb
     return wrapper
 
 @mp_command(name='help', host=False)
-async def mp_help(user, args, match):
+async def mp_help(user: Player, args: list, match: Match) -> str:
     """Displays all available multiplayer commands to the user"""
     allowed_cmds = []
+
     for cmd in cmds:
         if user.priv & cmd['priv']:
             s = f'{glob.config.prefix}mp {cmd["name"]} - {cmd["desc"]}'
@@ -621,7 +728,7 @@ async def mp_help(user, args, match):
     return f'List of available multiplayer commands:\n\n{cmd_list}'
 
 @mp_command(name='start')
-async def mp_start(user, args, match):
+async def mp_start(user: Player, args: list, match: Match) -> str:
     """Starts the current match, either forcefully or on a timer"""
     if len(args) < 1:
         return 'Please provide either a timer to start or cancel/force'
@@ -648,7 +755,7 @@ async def mp_start(user, args, match):
         match.alert_tasks = [
             loop.call_later(
                 timer - countdown, lambda countdown = countdown: alert_timer(countdown)
-            ) for countdown in (30, 10, 5, 4, 3, 2, 1) if countdown < timer
+            ) for countdown in (30, 15, 5, 4, 3, 2, 1) if countdown < timer
         ]
         
         return f'Starting match in {timer} seconds'
@@ -670,7 +777,7 @@ async def mp_start(user, args, match):
         return 'Unknown argument. Please use seconds/force/cancel'
     
 @mp_command(name='abort')
-async def mp_abort(user, args, match):
+async def mp_abort(user: Player, args: list, match: Match) -> str:
     """Abort current multiplayer session"""
     if not match.in_prog:
         return
@@ -684,7 +791,7 @@ async def mp_abort(user, args, match):
     return 'Match aborted.'
 
 @mp_command(name='mods')
-async def mp_mods(user, args, match):
+async def mp_mods(user: Player, args: list, match: Match) -> str:
     """Set the mods of the lobby"""
     if len(args) < 1:
         return 'You must provide the mods to set!'
@@ -708,8 +815,8 @@ async def mp_mods(user, args, match):
     match.enqueue_state()
     return 'Updated mods.'
 
-@mp_command(name=['freemod', 'fm'])
-async def mp_fm(user, args, match):
+@mp_command(name='freemod', aliases=['fm'])
+async def mp_fm(user: Player, args: list, match: Match) -> str:
     if len(args) < 1:
         return 'Please provide whether to turn freemod on or off!'
     
@@ -735,7 +842,7 @@ async def mp_fm(user, args, match):
     return 'Freemod state toggled.'
 
 @mp_command(name='host', host=False)
-async def mp_host(user, args, match):
+async def mp_host(user: Player, args: list, match: Match) -> str:
     if user not in (match.host, match.first_host):
         return
     
@@ -757,22 +864,17 @@ async def mp_host(user, args, match):
     
     return f'Match host given to {u.name}'
 
-async def process_multiplayer(user, msg):
+async def process_multiplayer(user: Player, msg: str) -> Optional[str]:
     args = msg.split()
-    ct = args[1]
-    for c in mp_cmds:
-        cmd = c['name']
+    cmd = args[1]
 
-        if cmd == ct:
-            if user is not user.match.host:
+    for c in mp_cmds:
+        if c['name'] == cmd or cmd in c['aliases']:
+            if user is not user.match.host and cmd['host']:
                 return 'You must be the host to perform this command!'
 
-            cb = c['cb']
-            o = await cb(user, args[2:], user.match)
+            o = await c['cb'](user, args[2:], user.match)
 
-            if o:
-                return f'{o}'
-
-            return # we still wanna end the loop even if theres no text to return
+            return o or None
     else:
         return f'Unknown command! Use {glob.config.prefix}mp help for a list of available multiplayer commands.'

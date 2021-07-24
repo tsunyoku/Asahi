@@ -42,7 +42,7 @@ ACHIEVEMENTS_PATH = Path.cwd() / 'resources/achievements'
 #asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 @app.before_serving()
-async def connect(): # ran before server startup, used to do things like connecting to mysql :D
+async def connect() -> None: # ran before server startup, used to do things like connecting to mysql :D
     log(f'==== Asahi v{glob.version} starting ====', Ansi.GREEN)
 
     glob.web = ClientSession() # aiohttp session for external web requests
@@ -122,7 +122,7 @@ async def connect(): # ran before server startup, used to do things like connect
     log(f'==== Asahi v{glob.version} started ====', Ansi.GREEN)
 
 @app.after_serving()
-async def disconnect():
+async def disconnect() -> None:
     log(f'==== Asahi v{glob.version} stopping ====', Ansi.GREEN)
 
     await glob.web.close()

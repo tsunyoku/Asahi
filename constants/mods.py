@@ -1,4 +1,5 @@
 from enum import IntFlag
+from functools import cache
 
 class Mods(IntFlag):
     NOMOD       = 0
@@ -38,6 +39,19 @@ class Mods(IntFlag):
     GAME_CHANGING = RELAX | AUTOPILOT
     
     UNRANKED = SCOREV2 | AUTOPLAY | TARGET
+
+    @cache
+    def __repr__(self):
+        if not self.value:
+            return 'NM'
+
+        _str = []
+
+        for mod in Mods:
+            if self.value & mod:
+                _str.append(str_mods[mod])
+
+        return ''.join_str
     
     @classmethod
     def convert_str(self, mods: str):
@@ -49,32 +63,46 @@ class Mods(IntFlag):
         split_mods = [mods[char:char + 2].upper() for char in range(0, len(mods), 2)]
         
         for mod in split_mods:
-            if mod in mods_str:
-                _mods |= mods_str[mod]
+            if not mod in mods_str:
+                continue
+
+            _mods |= mods_str[mod]
                 
         return _mods
 
-def convert(m: int):
-    if not m:
-        return 'NM'
-
-    r = []
-
-    if m & Mods.NOFAIL:      r.append('NF')
-    if m & Mods.EASY:        r.append('EZ')
-    if m & Mods.HIDDEN:      r.append('HD')
-    if m & Mods.NIGHTCORE:   r.append('NC')
-    elif m & Mods.DOUBLETIME:  r.append('DT')
-    if m & Mods.HARDROCK:    r.append('HR')
-    if m & Mods.HALFTIME:    r.append('HT')
-    if m & Mods.FLASHLIGHT:  r.append('FL')
-    if m & Mods.SPUNOUT:     r.append('SO')
-    if m & Mods.RELAX:       r.append('RX')
-    if m & Mods.AUTOPILOT:       r.append('AP')
-    if m & Mods.TOUCHSCREEN: r.append('TD')
-    if m & Mods.SCOREV2:     r.append('V2')
-    return ''.join(r)
-
+str_mods = {
+    Mods.NOFAIL: 'NF',
+    Mods.EASY: 'EZ',
+    Mods.TOUCHSCREEN: 'TD',
+    Mods.HIDDEN: 'HD',
+    Mods.HARDROCK: 'HR',
+    Mods.SUDDENDEATH: 'SD',
+    Mods.DOUBLETIME: 'DT',
+    Mods.RELAX: 'RX',
+    Mods.HALFTIME: 'HT',
+    Mods.NIGHTCORE: 'NC',
+    Mods.FLASHLIGHT: 'FL',
+    Mods.AUTOPLAY: 'AU',
+    Mods.SPUNOUT: 'SO',
+    Mods.AUTOPILOT: 'AP',
+    Mods.PERFECT: 'PF',
+    Mods.FADEIN: 'FI',
+    Mods.RANDOM: 'RN',
+    Mods.CINEMA: 'CN',
+    Mods.TARGET: 'TP',
+    Mods.SCOREV2: 'V2',
+    Mods.MIRROR: 'MR',
+    Mods.KEY1: '1K',
+    Mods.KEY2: '2K',
+    Mods.KEY3: '3K',
+    Mods.KEY4: '4K',
+    Mods.KEY5: '5K',
+    Mods.KEY6: '6K',
+    Mods.KEY7: '7K',
+    Mods.KEY8: '8K',
+    Mods.KEY9: '9K',
+    Mods.KEYCOOP: 'CO'
+}
 mods_str = {
     'NF': Mods.NOFAIL,
     'EZ': Mods.EASY,
@@ -97,7 +125,6 @@ mods_str = {
     'TP': Mods.TARGET,
     'V2': Mods.SCOREV2,
     'MR': Mods.MIRROR,
-
     '1K': Mods.KEY1,
     '2K': Mods.KEY2,
     '3K': Mods.KEY3,
