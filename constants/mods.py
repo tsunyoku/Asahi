@@ -45,13 +45,13 @@ class Mods(IntFlag):
         if not self.value:
             return 'NM'
 
-        _str = []
+        _str = ''
 
         for mod in Mods:
             if self.value & mod and (m := str_mods.get(mod)):
-                _str.append(m)
+                _str += m
 
-        return ''.join(_str)
+        return _str
     
     @classmethod
     def convert_str(self, mods: str):
