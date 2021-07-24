@@ -47,7 +47,7 @@ class Beatmap:
         self.lb: 'Leaderboard' = minfo.get('lb')
         self.lb_rx: 'Leaderboard' = minfo.get('lb_rx')
         self.lb_ap: 'Leaderboard' = minfo.get('lb_ap')
-        
+
         self.plays: int = minfo.get('plays', 0)
         self.passes: int = minfo.get('passes', 0)
 
@@ -58,7 +58,7 @@ class Beatmap:
     @property
     def url(self) -> str:
         return f'https://osu.{glob.config.domain}/beatmaps/{self.id}'
-    
+
     @property
     def set_url(self) -> str:
         return f'https://osu.{glob.config.domain}/beatmapsets/{self.sid}'
@@ -86,7 +86,7 @@ class Beatmap:
         if (bmap := glob.cache['maps'].get(md5)):
             return bmap
 
-        return # not in cache, return nothing so we know to get from sql/api    
+        return # not in cache, return nothing so we know to get from sql/api
 
     async def np_msg(self, user) -> str:
         pp = {}
@@ -105,25 +105,25 @@ class Beatmap:
                 _id_reql = self.sid + 2
 
                 request_rank = Menu(
-                    id=_id_reqr, 
-                    name='Request to get Ranked', 
-                    callback=req, 
-                    args=(user, ('rank',)), 
+                    id=_id_reqr,
+                    name='Request to get Ranked',
+                    callback=req,
+                    args=(user, ('rank',)),
                     destroy=True
                 )
 
                 glob.menus[_id_reqr] = request_rank
-        
+
                 request_love = Menu(
-                    id=self.sid + 2, 
-                    name='Request to get Loved', 
-                    callback=req, 
-                    args=(user, ('love',)), 
+                    id=self.sid + 2,
+                    name='Request to get Loved',
+                    callback=req,
+                    args=(user, ('love',)),
                     destroy=True
                 )
 
                 glob.menus[self.sid + 2] = request_love
-                    
+
                 msg += f' // {request_rank.embed}  {request_love.embed}'
         else:
             from constants.commands import _map
@@ -131,41 +131,41 @@ class Beatmap:
             if self.status < mapStatuses.Ranked:
                 _id_rank = self.sid + self.id + 1
                 _id_love = self.sid + self.id + 2
-    
+
                 rank = Menu(
                     id=_id_rank,
-                    name='Rank', 
-                    callback=_map, 
-                    args=(user, ('rank', 'set',)), 
+                    name='Rank',
+                    callback=_map,
+                    args=(user, ('rank', 'set',)),
                     destroy=True
                 )
 
                 glob.menus[_id_rank] = rank
 
                 love = Menu(
-                    id=_id_love, 
-                    name='Love', 
-                    callback=_map, 
-                    args=(user, ('love', 'set',)), 
+                    id=_id_love,
+                    name='Love',
+                    callback=_map,
+                    args=(user, ('love', 'set',)),
                     destroy=True
                 )
 
                 glob.menus[_id_love] = love
-                    
+
                 msg += f' // {rank.embed}  {love.embed}'
             else:
                 _id_unrank = self.sid + self.id + 3
 
                 unrank = Menu(
-                    id=_id_unrank, 
-                    name='Unrank', 
-                    callback=_map, 
-                    args=(user, ('unrank', 'set',)), 
+                    id=_id_unrank,
+                    name='Unrank',
+                    callback=_map,
+                    args=(user, ('unrank', 'set',)),
                     destroy=True
                 )
 
                 glob.menus[_id_unrank] = unrank
-                    
+
                 msg += f' // {unrank.embed}'
 
         return msg
@@ -207,7 +207,7 @@ class Beatmap:
             ot, _ = await pr.communicate()
             o = orjson.loads(ot.decode('utf-8'))
             return round(o['pp'])
-    
+
     @classmethod
     async def from_md5(self, md5: str):
         if (bmap := self.cache(md5)): # first attempt cache
@@ -218,7 +218,7 @@ class Beatmap:
 
         if (bmap := await self.api(md5)):
             return bmap
-        
+
         return # can't find from cache, sql or api so map must be unsubmitted by this point
 
     @classmethod
@@ -242,13 +242,13 @@ class Beatmap:
         async with glob.web.get(api, params=params) as resp:
             if resp.status != 200 or not resp:
                 return # request failed, map prob doesnt exist
-            
+
             data = await resp.json()
             if not data:
                 return
 
             bmap = data[0] # i hate this idea but o well
-        
+
         b = self()
         b.id = int(bmap['beatmap_id'])
         b.sid = int(bmap['beatmapset_id'])
@@ -384,7 +384,7 @@ class Beatmap:
             if resp.status != 200 or not resp:
                 glob.cache['unsub'] = self.md5
                 return # request failed, map prob doesnt exist anymore
-            
+
             data = await resp.json()
             if not data:
                 glob.cache['unsub'] = self.md5
@@ -419,7 +419,7 @@ class Beatmap:
         await glob.db.execute(
             'REPLACE INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, `update`, nc, plays, passes) '
             'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
-            [self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value, 
+            [self.id, self.sid, self.md5, self.bpm, self.cs, self.ar, self.od, self.hp, self.sr, self.mode.value,
             self.artist, self.title, self.diff, self.mapper, int(self.status), self.frozen, self.update, self.nc,
             self.plays, self.passes]
         )

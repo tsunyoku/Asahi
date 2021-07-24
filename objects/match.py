@@ -123,10 +123,10 @@ class Match:
         self.battle_ready: bool = False
         self.clan_1_users: list = []
         self.clan_2_users: list = []
-        
+
         self.start_task = None
         self.alert_tasks = None
-    
+
     @property
     def invite(self) -> str:
         return f'osump://{self.id}/{self.pw}'
@@ -188,17 +188,17 @@ class Match:
         self.battle_ready = True
 
         self.chat.send(
-            glob.bot, 
+            glob.bot,
             CLAN_BATTLE_EXPLAIN,
             False
         )
 
         self.chat.send(
-            glob.bot, 
+            glob.bot,
             f'Players fighting:'
             f'\n{self.clan_1.name}: {", ".join(u.name for u in self.clan_1_users)}'
             f'\n{self.clan_2.name}: {", ".join(u.name for u in self.clan_2_users)}'
-            '\n\nAny clan members who come online at this point will be unable to participate!', 
+            '\n\nAny clan members who come online at this point will be unable to participate!',
             False
         )
 
@@ -214,7 +214,7 @@ class Match:
         for m in self.clan_1_users:
             if m.id not in ignore:
                 score = await glob.db.fetchval(
-                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', 
+                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1',
                     [m.id, self.bmd5]
                 )
 
@@ -228,7 +228,7 @@ class Match:
         for m in self.clan_2_users:
             if m.id not in ignore:
                 score = await glob.db.fetchval(
-                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', 
+                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1',
                     [m.id, self.bmd5]
                 )
 
@@ -241,7 +241,7 @@ class Match:
         for uid in clan1_retry:
             if uid not in ignore:
                 score = await glob.db.fetchval(
-                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', 
+                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1',
                     [m.id, self.bmd5]
                 )
 
@@ -252,7 +252,7 @@ class Match:
         for uid in clan2_retry:
             if uid not in ignore:
                 score = await glob.db.fetchval(
-                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', 
+                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1',
                     [m.id, self.bmd5]
                 )
 
@@ -271,7 +271,7 @@ class Match:
             for uid in clan1_retry:
                 if uid not in ignore:
                     score = await glob.db.fetchval(
-                        f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', 
+                        f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1',
                         [m.id, self.bmd5]
                     )
 
@@ -282,7 +282,7 @@ class Match:
             for uid in clan2_retry:
                 if uid not in ignore:
                     score = await glob.db.fetchval(
-                        f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', 
+                        f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1',
                         [m.id, self.bmd5]
                     )
 
@@ -317,7 +317,7 @@ class Match:
             winner = self.clan_1
         elif self.clan_2_wins >= 5:
             winner = self.clan_2
-        
+
         if winner:
             self.chat.send(
                 glob.bot,
@@ -326,14 +326,14 @@ class Match:
                 f'Congratulations! {winner.name} will receive their extra clan points soon.',
                 False
             )
-            
+
             self.clan_battle = False
             self.battle_ready = False
-            
+
             for clan in (self.clan_1, self.clan_2):
                 del glob.clan_battles[clan]
                 clan.battle = None
-                
+
             return await glob.db.execute('UPDATE clans SET score = score + 50 WHERE id = %s', [winner.id])
 
         if self.host in self.clan_1_users:
@@ -346,7 +346,7 @@ class Match:
         self.host = new_host # alternate turns for map picks
 
         self.chat.send(
-            glob.bot, 
+            glob.bot,
             f'Next Clan to Pick: {next_pick.name}\n\n'
             f'Current Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})',
             False

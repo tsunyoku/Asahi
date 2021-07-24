@@ -8,9 +8,9 @@ class mapStatuses(IntEnum):
     Approved = 3
     Qualified = 4
     Loved = 5
-    
+
     GIVE_PP = Ranked | Approved
-    
+
     @classmethod
     def from_str(self, status: str):
         return {
@@ -30,14 +30,14 @@ class mapStatuses(IntEnum):
             7: self.Ranked,
             8: self.Loved
         }.get(status)
-        
+
         return self.to_api(_status)
-    
+
     @classmethod
     def from_api(self, status: int):
         if status in (-2, -1, 0):
             return self.Pending
-        
+
         if status in (1, 2, 3, 4):
             return self(status + 1)
 

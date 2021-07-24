@@ -37,7 +37,7 @@ class Mods(IntFlag):
 
     SPEED_MODS = DOUBLETIME | NIGHTCORE | HALFTIME
     GAME_CHANGING = RELAX | AUTOPILOT
-    
+
     UNRANKED = SCOREV2 | AUTOPLAY | TARGET
 
     @cache
@@ -52,22 +52,22 @@ class Mods(IntFlag):
                 _str += m
 
         return _str
-    
+
     @classmethod
     def convert_str(self, mods: str):
         _mods = self.NOMOD # in case theres none to match
-        
+
         if not mods or mods == 'NM':
             return _mods
-        
+
         split_mods = [mods[char:char + 2].upper() for char in range(0, len(mods), 2)]
-        
+
         for mod in split_mods:
             if mod not in mods_str:
                 continue
 
             _mods |= mods_str[mod]
-                
+
         return _mods
 
 str_mods = {

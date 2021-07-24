@@ -43,7 +43,7 @@ then
   read username
   echo "Please read your desired password"
   read password
-  
+
   sudo mariadb -e "CREATE USER IF NOT EXISTS $username IDENTIFIED BY "$password;""
   sudo mariadb -e "GRANT ALL PRIVILEGES ON *.* TO $username;"
 fi

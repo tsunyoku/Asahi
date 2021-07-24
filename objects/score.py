@@ -51,25 +51,25 @@ class Score:
         self.time: int = None
 
         self.old_best: Score = None
-        
+
         self.osuver: int = None
         self.ur: float = None
 
     async def format(self) -> str:
         msg = f'{self.user.name} | {self.map.name} +{self.readable_mods} {self.acc:.2f}% {"FC" if not self.miss else f"{self.miss}xMiss"} {round(self.pp):,}pp'
-        
+
         if self.miss:
             fc_score = copy.copy(self)
-            
+
             fc_score.fc = True
             fc_score.combo = 0 # oppai will take max combo
             pp, _ = await fc_score.calc_pp(self.mode.as_vn)
-            
+
             msg += f' (~{round(pp):,}pp for FC)'
-            
+
         if self.mode.value == 0 and self.ur:
             msg += f' | {self.ur:.2f} (cv)UR'
-            
+
         return msg
 
     @classmethod
@@ -78,7 +78,7 @@ class Score:
 
         if not score:
             return
-        
+
         s = self()
 
         s.id = sid
@@ -114,12 +114,12 @@ class Score:
 
         s.time = score['time']
         s.passed = s.status.value != 0
-        
+
         if not s.user.restricted:
             s.rank = await s.calc_lb(table, sort, t)
         else:
             s.rank = 0
-            
+
         s.osuver = score['osuver']
 
         return s
@@ -141,7 +141,7 @@ class Score:
 
         if (u := await glob.players.get(name=data[1].rstrip())) and u.pw == pw:
             s.user = u
-        
+
         if not s.user:
             return s # even if user isnt found, may be related to connection and we want to tell the client to retry
 
@@ -170,10 +170,10 @@ class Score:
         await s.calc_info()
         s.pp, s.sr = await s.calc_pp(s.mode.as_vn)
         await s.score_order()
-        
+
         if s.user.restricted:
             s.rank = 0
-            
+
         s.osuver = float(re.sub("[^0-9]", "", ver)) # lol
 
         return s
@@ -190,12 +190,12 @@ class Score:
             rx = 0
 
         url = f'https://api.{glob.config.domain}/get_replay?id={self.id}&rx={rx}'
-        
+
         async with glob.web.get(url) as resp:
             rp = await resp.read()
 
         threading.Thread(target=self.replay_check, args=(rp,), daemon=True).start()
-            
+
     def replay_check(self, rp: str) -> None:
         cg = Circleguard(glob.config.api_key)
         replay = ReplayString(rp)
@@ -205,7 +205,7 @@ class Score:
             # TODO: check replays on private servers
             if self.map.status >= mapStatuses.Ranked: # has bancho lb
                 _map = cg.Map(self.map.id, span='1-100')# maybe ill increase this to the top 1000?
-    
+
                 for mreplay in _map:
                     sim = cg.similarity(replay, mreplay)
                     if sim < 17: # suggested circlecore value, idk if this should change
@@ -220,7 +220,7 @@ class Score:
         # there is a fix in the works for detecting false positives
         if (ft := cg.frametime(replay)) < 14:
             asyncio.run(self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f}) on {self.map.name}', fr=glob.bot))
-            
+
     async def announce_n1(self) -> None:
         msg = f'[{self.mode!r}] {self.user.embed} achieved #1 on {self.map.embed} +{self.readable_mods}'
 
@@ -255,7 +255,7 @@ class Score:
             f'SELECT COUNT(*) AS r FROM {table} '
             f'LEFT OUTER JOIN users ON users.id = {table}.uid '
             f'WHERE {table}.md5 = %s AND {table}.mode = %s AND {table}.status = 2 '
-            f'AND NOT users.priv & {Privileges.Disallowed} AND {table}.{sort} > %s', 
+            f'AND NOT users.priv & {Privileges.Disallowed} AND {table}.{sort} > %s',
             [self.map.md5, self.mode.value, value]
         )
 
@@ -277,9 +277,9 @@ class Score:
             with OppaiWrapper('oppai-ng/liboppai.so') as ezpp:
                 if self.mods:
                     ezpp.set_mods(int(self.mods))
-                    
+
                 ezpp.set_mode(int(mode_vn))
-                
+
                 if self.combo:
                     ezpp.set_combo(int(self.combo))
 
@@ -306,13 +306,13 @@ class Score:
         else: # ctb: use shitty osu-tools
 
             cmd = [f'./osu-tools/compiled/PerformanceCalculator simulate catch {str(path)}']
-            
+
             if self.combo:
                 cmd.append(f'-c {self.combo}') # max combo
 
             cmd.append(f'-X {self.miss}') # miss count
 
-            cmd.append(f'-D {self.n50}') # 50s equivalent for catch? 
+            cmd.append(f'-D {self.n50}') # 50s equivalent for catch?
             # hey note from len4ee here 50s for ctb is droplets xd
 
             for mod in re.findall('.{1,2}', self.readable_mods):
@@ -350,7 +350,7 @@ class Score:
 
         score = await glob.db.fetchrow(
             f'SELECT id, pp, score FROM {self.mode.table}'
-            f' WHERE uid = %s AND md5 = %s AND mode = %s AND status = 2', 
+            f' WHERE uid = %s AND md5 = %s AND mode = %s AND status = 2',
             [self.user.id, self.map.md5, mode]
         )
 
@@ -364,7 +364,7 @@ class Score:
                 self.status = scoreStatuses.Submitted # not best submitted score
         else:
             self.status = scoreStatuses.Best # no previous scores on the map
-        
+
         if not self.passed:
             self.status = scoreStatuses.Failed
 
@@ -379,8 +379,8 @@ class Score:
                 return
             else:
                 self.acc = 100.0 * (
-                        (self.n50 * 50.0) + 
-                        (self.n100 * 100.0) + 
+                        (self.n50 * 50.0) +
+                        (self.n100 * 100.0) +
                         (self.n300 * 300.0)
                 ) / (hits * 300.0)
 
@@ -408,8 +408,8 @@ class Score:
                 return
             else:
                 self.acc = 100.0 * (
-                        (self.n50 * 50.0) + 
-                        (self.n100 * 100.0) + 
+                        (self.n50 * 50.0) +
+                        (self.n100 * 100.0) +
                         (self.katu * 200.0) +
                         ((self.n300 + self.geki) * 300.0)
                 ) / (hits * 300.0)

@@ -8,7 +8,7 @@ class Achievement:
         self.desc: str = ainfo.get('desc')
         self.cond: eval = ainfo.get('cond')
         self.custom: bool = ainfo.get('custom')
-    
+
     @cached_property
     def format(self):
         return f'{self.image}+{self.name}+{self.desc}'

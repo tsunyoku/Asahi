@@ -38,7 +38,7 @@ rdr = database.Reader('ext/geoloc.mmdb')
 def packet(pck: Packets, allow_res: bool = False):
     def wrapper(_cb):
         glob.packets |= {pck: _cb}
-        
+
         if allow_res:
             glob.packets_restricted |= {pck: _cb}
 
@@ -47,39 +47,39 @@ def packet(pck: Packets, allow_res: bool = False):
 @packet(Packets.OSU_REQUEST_STATUS_UPDATE, allow_res=True)
 async def update_stats(user: Player, _) -> None:
     user.enqueue(writer.userStats(user))
-        
+
 @packet(Packets.OSU_USER_STATS_REQUEST, allow_res=True)
 async def request_stats(user: Player, p: bytes) -> None:
     uids = (reader.handle_packet(p, (('uids', osuTypes.i32_list),)))['uids']
-    
+
     for o in glob.players.unrestricted_users:
         if o.id != user.id and o.id in uids:
             user.enqueue(writer.userStats(o))
-            
+
 @packet(Packets.OSU_USER_PRESENCE_REQUEST)
 async def presence_request(user: Player, p: bytes) -> None:
     uids = (reader.handle_packet(p, (('uids', osuTypes.i32_list),)))['uids']
-    
+
     for u in uids:
         if o := await glob.players.get(id=u):
             user.enqueue(writer.userPresence(o))
-        
+
 @packet(Packets.OSU_USER_PRESENCE_REQUEST_ALL)
 async def presence_request_all(user: Player, _) -> None:
     for o in glob.players:
         if o.id != user.id:
             user.enqueue(writer.userPresence(o))
-            
+
 @packet(Packets.OSU_FRIEND_ADD)
 async def friend_add(user: Player, p: bytes) -> None:
     tar = (reader.handle_packet(p, (('uid', osuTypes.i32),)))['uid']
-    
+
     if tar in user.friends:
         return
 
     user.friends.append(tar)
     await glob.db.execute('INSERT INTO friends (user1, user2) VALUES (%s, %s)', [user.id, tar])
-    
+
     log(f"{user.name} added UID {tar} into their friends list.", Ansi.LCYAN)
 
 @packet(Packets.OSU_FRIEND_REMOVE)
@@ -93,19 +93,19 @@ async def friend_remove(user: Player, p: bytes) -> None:
     await glob.db.execute('DELETE FROM friends WHERE user1 = %s AND user2 = %s', [user.id, tar])
 
     log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LCYAN)
-    
+
 @packet(Packets.OSU_LOGOUT, allow_res=True)
 async def logout(user: Player, _) -> None:
     if (time.time() - user.login_time) < 1:
         return
-    
+
     user.logout()
     log(f'{user.name} logged out.', Ansi.LBLUE)
 
 @packet(Packets.OSU_SEND_PRIVATE_MESSAGE)
 async def send_pm(user: Player, p: bytes) -> None:
     d = reader.handle_packet(p, (('msg', osuTypes.message),))
-    
+
     msg = d['msg'].msg
     tarname = d['msg'].tarname
 
@@ -113,13 +113,13 @@ async def send_pm(user: Player, p: bytes) -> None:
         log(f'{user.name} tried to send message to offline user {tarname}', Ansi.LRED)
         return
 
-    if target is glob.bot: 
+    if target is glob.bot:
         if msg.startswith(glob.config.prefix) and (cmd := await commands.process(user, msg)):
             user.enqueue(
                 writer.sendMessage(
-                    fromname = target.name, 
-                    msg = cmd, 
-                    tarname = user.name, 
+                    fromname = target.name,
+                    msg = cmd,
+                    tarname = user.name,
                     fromid = target.id
                 )
             )
@@ -130,9 +130,9 @@ async def send_pm(user: Player, p: bytes) -> None:
 
             user.enqueue(
                 writer.sendMessage(
-                    fromname = target.name, 
-                    msg = np, 
-                    tarname = user.name, 
+                    fromname = target.name,
+                    msg = np,
+                    tarname = user.name,
                     fromid = target.id
                 )
             )
@@ -140,22 +140,22 @@ async def send_pm(user: Player, p: bytes) -> None:
     else:
         target.enqueue(
             writer.sendMessage(
-                fromname = user.name, 
-                msg = msg, 
-                tarname = target.name, 
+                fromname = user.name,
+                msg = msg,
+                tarname = target.name,
                 fromid = user.id
             )
         )
 
         log(f'{user.name} sent message "{msg}" to {tarname}', Ansi.LCYAN)
-        
+
 @packet(Packets.OSU_SEND_PUBLIC_MESSAGE)
 async def send_msg(user: Player, p: bytes) -> None:
     d = reader.handle_packet(p, (('msg', osuTypes.message),))
 
     msg = d['msg'].msg
     chan = d['msg'].tarname
-    
+
     if chan == '#spectator':
         if user.spectating:
             sid = user.spectating.id
@@ -169,7 +169,7 @@ async def send_msg(user: Player, p: bytes) -> None:
     elif chan == '#multiplayer':
         if not user.match:
             return
-    
+
         m = user.match.id
         c = glob.channels.get(f'#multi_{m}')
 
@@ -180,12 +180,12 @@ async def send_msg(user: Player, p: bytes) -> None:
     elif chan == '#clan':
         if not user.clan:
             return
-    
+
         c = user.clan.chan
 
     elif chan not in ['#highlight', '#userlog']:
         c = glob.channels.get(chan)
-    
+
     if not c:
         return
 
@@ -229,7 +229,7 @@ async def join_chan(user: Player, p: bytes) -> None:
         return
 
     user.join_chan(chan)
-    
+
 @packet(Packets.OSU_CHANNEL_PART, allow_res=True)
 async def leave_chan(user: Player, p: bytes) -> None:
     name = (reader.handle_packet(p, (('chan', osuTypes.string),)))['chan']
@@ -274,63 +274,63 @@ async def leave_chan(user: Player, p: bytes) -> None:
 
     for o in chan.players: #TODO: playerlist instances for channels/multiplayer rooms etc..?
         o.enqueue(chan_leave)
-        
+
 @packet(Packets.OSU_CHANGE_ACTION, allow_res=True)
 async def update_action(user: Player, p: bytes) -> None:
     d = reader.handle_packet(p, (
-        ('actionid', osuTypes.u8), 
+        ('actionid', osuTypes.u8),
         ('info', osuTypes.string),
         ('md5', osuTypes.string),
         ('mods', osuTypes.u32),
         ('mode', osuTypes.u8),
         ('mid', osuTypes.i32)
     ))
-    
+
     if d['actionid'] == 0 and d['mods'] & Mods.RELAX:
         d['info'] = 'on Relax'
     elif d['actionid'] == 0 and d['mods'] & Mods.AUTOPILOT:
         d['info'] = 'on Autopilot'
-        
+
     user.action = d['actionid']
     user.info = d['info']
     user.map_md5 = d['md5']
     user.mods = d['mods']
-    
+
     m = lbModes(d['mode'], d['mods'])
     user.mode = m.value
     user.mode_vn = m.as_vn
 
     user.map_id = d['mid']
-    
+
     if d['actionid'] == 2:
         user.info += f' +{d["mods"]!r}' # TODO when im home: fix this
-        
+
     if not user.restricted:
         glob.players.enqueue(writer.userStats(user))
-        
+
 @packet(Packets.OSU_START_SPECTATING)
 async def start_spec(user: Player, p: bytes) -> None:
     tid = (reader.handle_packet(p, (('tid', osuTypes.i32),)))['tid']
-    
+
     if tid == 1:
         return
-    
+
     if not (target := await glob.players.get(id=tid)):
         return
-    
+
     target.add_spectator(user)
-    
+
 @packet(Packets.OSU_STOP_SPECTATING)
 async def stop_spec(user: Player, _) -> None:
     if not (host := user.spectating):
         return
-    
+
     host.remove_spectator(user)
-    
+
 @packet(Packets.OSU_SPECTATE_FRAMES)
 async def spec_frames(user: Player, p: bytes) -> None:
     frames = (reader.handle_packet(p, (('frames', osuTypes.raw),)))['frames']
-    
+
     frames_packet = writer.spectateFrames(frames)
     for u in user.spectators: # playerlist instances for spectators?
         u.enqueue(frames_packet)
@@ -339,7 +339,7 @@ async def spec_frames(user: Player, p: bytes) -> None:
 async def join_lobby(user: Player, _) -> None:
     for m in glob.matches:
         user.enqueue(writer.newMatch(m))
-        
+
 @packet(Packets.OSU_PART_LOBBY)
 async def leave_lobby(_, __) -> None:
     pass # lol
@@ -347,37 +347,37 @@ async def leave_lobby(_, __) -> None:
 @packet(Packets.OSU_CREATE_MATCH)
 async def create_match(user: Player, p: bytes) -> None:
     match = (reader.handle_packet(p, (('match', osuTypes.match),)))['match']
-    
+
     glob.matches[match.id] = match
     if not glob.matches.get(match.id):
         return user.enqueue(writer.matchJoinFail())
-    
+
     mp_chan = Channel(name='#multiplayer', desc=f'Multiplayer channel for match ID {match.id}', auto=False, perm=False)
     glob.channels[f'#multi_{match.id}'] = mp_chan
     match.chat = mp_chan
-    
+
     user.join_match(match, match.pw)
     log(f'{user.name} created a new multiplayer lobby.', Ansi.LBLUE)
-    
+
 @packet(Packets.OSU_JOIN_MATCH)
 async def join_match(user: Player, p: bytes) -> None:
     d = reader.handle_packet(p, (('id', osuTypes.i32), ('pw', osuTypes.string),))
     _id = d['id']
     pw = d['pw']
-    
+
     if _id >= 1000:
         if not (menu := glob.menus.get(_id)): # TODO: use pw instead of id
             return user.enqueue(writer.matchJoinFail())
-        
+
         ret = await menu.handle(user)
 
         # if we don't return a join failure also, its gonna think we are still in lobby
         if isinstance(ret, str): # return string message?
             user.enqueue(
                 writer.sendMessage(
-                    fromname = glob.bot.name, 
-                    msg = ret, 
-                    tarname = user.name, 
+                    fromname = glob.bot.name,
+                    msg = ret,
+                    tarname = user.name,
                     fromid = glob.bot.id
                 )
             )
@@ -386,76 +386,76 @@ async def join_match(user: Player, p: bytes) -> None:
 
         user.enqueue(writer.matchJoinFail())
         return ret
-    
+
     if not (match := glob.matches.get(_id)):
         return user.enqueue(writer.matchJoinFail())
-    
+
     if match.clan_battle and user.clan not in (match.clan_1, match.clan_2) or match.battle_ready:
             return user.enqueue(writer.matchJoinFail())
-        
+
     user.join_match(match, pw)
-    
+
     if match.clan_battle:
         total = []
         for slot in match.slots:
             if slot.status & slotStatus.has_player:
                 total.append(slot.player)
-                
+
         battle = glob.clan_battles[user.clan]
         if set(total) == set(battle['total']):
             await match.strat_battle()
-            
+
 @packet(Packets.OSU_PART_MATCH)
 async def leave_match(user: Player, _) -> None:
     user.leave_match()
-        
+
 @packet(Packets.OSU_MATCH_CHANGE_SLOT)
 async def change_slot(user: Player, p: bytes) -> None:
     _id = (reader.handle_packet(p, (('id', osuTypes.i32),)))['id']
-    
+
     if not (match := user.match):
         return
-    
+
     if match.slots[_id] != slotStatus.open:
         return
-    
+
     old = match.get_slot(user)
     new = match.slots[_id]
-    
+
     new.copy(old)
     old.reset()
-    
+
     match.enqueue_state()
-    
+
 @packet(Packets.OSU_MATCH_READY)
 async def user_ready(user: Player, _) -> None:
     if not (match := user.match):
         return
-    
+
     slot = match.get_slot(user)
     slot.status = slotStatus.ready
-    
+
     match.enqueue_state(lobby=False)
-    
+
 @packet(Packets.OSU_MATCH_LOCK)
 async def lock_slot(user: Player, p: bytes) -> None:
     _id = (reader.handle_packet(p, (('id', osuTypes.i32),)))['id']
-    
+
     if not (match := user.match) or match.clan_battle or user is not match.host:
         return
-    
+
     slot = match.slots[_id]
-    
+
     if slot.status == slotStatus.locked:
         slot.status = slotStatus.open
     else:
         if slot.player is match.host:
             return
-        
+
         slot.status = slotStatus.locked
-        
+
     match.enqueue_state()
-    
+
 @packet(Packets.OSU_MATCH_CHANGE_SETTINGS)
 async def match_settings(user: Player, p: bytes) -> None:
     m = (reader.handle_packet(p, (('m', osuTypes.match),)))['m']
@@ -519,26 +519,26 @@ async def match_settings(user: Player, p: bytes) -> None:
         match.name = m.name
 
     match.enqueue_state()
-    
+
 @packet(Packets.OSU_MATCH_START)
 async def start_match(user: Player, _) -> None:
     if not (match := user.match) or user is not match.host:
         return
-    
+
     match.start()
-    
+
 @packet(Packets.OSU_MATCH_SCORE_UPDATE)
 async def match_score(user: Player, p: bytes) -> None:
     data = (reader.handle_packet(p, (('data', osuTypes.raw),)))['data']
-    
+
     if not (match := user.match):
         return
-    
+
     r = bytearray(b'0\x00\x00')
     r += len(data).to_bytes(4, 'little')
     r += data
     r[11] = match.get_slot_id(user)
-    
+
     match.enqueue(bytes(r), lobby=False)
 
 @packet(Packets.OSU_MATCH_COMPLETE)
@@ -548,29 +548,29 @@ async def finish_match(user: Player, _) -> None:
 
     slot = match.get_slot(user)
     slot.status = slotStatus.complete
-    
+
     if any((s.status is slotStatus.playing for s in match.slots)):
         return
-    
+
     no_play = []
-    
+
     for slot in match.slots:
         if slot.status & slotStatus.has_player and slot.status != slotStatus.complete:
             no_play.append(slot.player.id)
-    
+
     match.unready_players(slotStatus.complete)
     match.in_prog = False
-    
+
     match.enqueue(writer.matchComplete(), lobby=False, ignore=no_play)
     match.enqueue_state()
-    
+
     if match.clan_battle:
         await match.clan_scores(no_play)
-        
+
 @packet(Packets.OSU_MATCH_CHANGE_MODS)
 async def match_mods(user: Player, p: bytes) -> None:
     mods = (reader.handle_packet(p, (('mods', osuTypes.i32),)))['mods']
-    
+
     if not (match := user.match):
         return
 
@@ -587,7 +587,7 @@ async def match_mods(user: Player, p: bytes) -> None:
         match.mods = mods
 
     match.enqueue_state()
-    
+
 @packet(Packets.OSU_MATCH_LOAD_COMPLETE)
 async def match_loaded(user: Player, _) -> None:
     if not (match := user.match):
@@ -599,7 +599,7 @@ async def match_loaded(user: Player, _) -> None:
     slot_bools = [s.playing for s in match.slots]
     if not any(slot_bools):
         match.enqueue(writer.matchAllLoaded(), lobby=False)
-        
+
 @packet(Packets.OSU_MATCH_NO_BEATMAP)
 async def match_nomap(user: Player, _) -> None:
     if not (match := user.match):
@@ -608,8 +608,8 @@ async def match_nomap(user: Player, _) -> None:
     slot = match.get_slot(user)
     slot.status = slotStatus.no_map
 
-    match.enqueue_state(lobby=False) 
-    
+    match.enqueue_state(lobby=False)
+
 @packet(Packets.OSU_MATCH_NOT_READY)
 async def user_unready(user: Player, _) -> None:
     if not (match := user.match):
@@ -619,7 +619,7 @@ async def user_unready(user: Player, _) -> None:
     slot.status = slotStatus.not_ready
 
     match.enqueue_state(lobby=False)
-    
+
 @packet(Packets.OSU_MATCH_FAILED)
 async def user_failed(user: Player, _) -> None:
     if not (match := user.match):
@@ -627,7 +627,7 @@ async def user_failed(user: Player, _) -> None:
 
     slot = match.get_slot_id(user)
     match.enqueue(writer.matchPlayerFailed(slot), lobby=False)
-    
+
 @packet(Packets.OSU_MATCH_HAS_BEATMAP)
 async def user_map(user: Player, _) -> None:
     if not (match := user.match):
@@ -637,7 +637,7 @@ async def user_map(user: Player, _) -> None:
     slot.status = slotStatus.not_ready
 
     match.enqueue_state(lobby=False)
-    
+
 @packet(Packets.OSU_MATCH_SKIP_REQUEST)
 async def user_skip(user: Player, _) -> None:
     if not (match := user.match):
@@ -653,19 +653,19 @@ async def user_skip(user: Player, _) -> None:
             return
 
     match.enqueue(writer.matchSkip(), lobby=False)
-    
+
 @packet(Packets.OSU_MATCH_TRANSFER_HOST)
 async def match_host(user: Player, p: bytes) -> None:
     slot = (reader.handle_packet(p, (('slot', osuTypes.i32),)))['slot']
-    
-    if (not (match := user.match) or user is not match.host 
+
+    if (not (match := user.match) or user is not match.host
         or not (host := match.slots[slot].player) or match.clan_battle):
         return
-    
+
     match.host = host
     match.host.enqueue(writer.matchTransferHost())
     match.enqueue_state()
-    
+
 @packet(Packets.OSU_MATCH_CHANGE_TEAM)
 async def match_team(user: Player, _) -> None:
     if not (match := user.match):
@@ -685,23 +685,23 @@ async def match_team(user: Player, _) -> None:
         slot.team = Teams.blue
 
     match.enqueue_state(lobby=False)
-    
+
 @packet(Packets.OSU_MATCH_INVITE)
 async def match_invite(user: Player, p: bytes) -> None:
     uid = (reader.handle_packet(p, (('uid', osuTypes.i32),)))['uid']
-    
+
     if not user.match or not (target := await glob.players.get(id=uid)) or target is glob.bot:
         return
-    
+
     target.enqueue(writer.matchInvite(user, target.name))
-    
+
 @packet(Packets.OSU_MATCH_CHANGE_PASSWORD)
 async def match_pw(user: Player, p: bytes) -> None:
     m = (reader.handle_packet(p, (('m', osuTypes.match),)))['m']
-    
+
     if not (match := user.match) or user is not match.host:
         return
-    
+
     match.pw = m.pw
     match.enqueue_state()
 
@@ -733,8 +733,8 @@ async def root_client(request: Request) -> bytes:
             return writer.userID(-2)
 
         username = info[0]
-        pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later    
-         
+        pw = info[1].encode() # password in md5 form, we will use this to compare against db's stored bcrypt later
+
         user = await glob.db.fetchrow("SELECT * FROM users WHERE name = %s", [username])
         if not user: # ensure user actually exists before attempting to do anything else
             if glob.config.debug:
@@ -757,7 +757,7 @@ async def root_client(request: Request) -> bytes:
                 k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'', backend=backend())
                 new_pw = k.derive(pw).decode('unicode-escape')
                 await glob.db.execute('UPDATE users SET pw = %s WHERE id = %s', [new_pw, user['id']])
-                
+
                 # add to cache for the future
                 glob.cache['pw'][new_pw] = pw
 
@@ -769,7 +769,7 @@ async def root_client(request: Request) -> bytes:
                 if pw != bcache[user_pw]: # compare provided md5 with the stored (cached) pw to ensure they have provided the correct password
                     if glob.config.debug:
                         log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
-    
+
                     request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
                     return writer.userID(-1)
             else:
@@ -780,10 +780,10 @@ async def root_client(request: Request) -> bytes:
                 except Exception:
                     if glob.config.debug:
                         log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
-    
+
                     request.resp_headers['cho-token'] = 'no' # client knows there is something up if we set token to 'no'
                     return writer.userID(-1)
-    
+
                 bcache[user_pw] = pw # cache pw for future
 
         if user['priv'] & Privileges.Banned:
@@ -799,7 +799,7 @@ async def root_client(request: Request) -> bytes:
         user['token'] = str(token) # this may be useful in the future
         user['ltime'] = time.time() # useful for handling random logouts
         user['md5'] = pw # used for auth on /web/
-        
+
         # i hate it here
         if 'CF-Connecting-IP' in headers:
             ip = headers['CF-Connecting-IP']
@@ -829,24 +829,24 @@ async def root_client(request: Request) -> bytes:
 
             await glob.db.execute("UPDATE users SET country = %s WHERE id = %s", [p.country_iso.lower(), p.id]) # set country code in db
             log(f'{p.name} has been successfully verified.', Ansi.LBLUE)
-            
+
         if glob.config.anticheat and not p.priv & Privileges.BypassAnticheat:
             a = cinfo[3][:-1].split(':') # client-provided adapters
             adapters = {'osu_md5': a[0], 'mac_address': a[1], 'uninstall_id': a[2], 'disk_serial': a[3], 'ip': ip} # prepare adapters for abtucgeat
 
             checks = Anticheat(osuver=cinfo[0], adapters=adapters, player=p, headers=headers)
-            
+
             # we want to check multi stuff before any cheats just in case
             await checks.multi_check()
 
-            # this is probably confusing syntax. 
-            # client_check will restrict if a client is custom and if that's the case we want to ignore any update checks. 
-            # if an update check is made, this will send update required packet if thats what the function returns. 
+            # this is probably confusing syntax.
+            # client_check will restrict if a client is custom and if that's the case we want to ignore any update checks.
+            # if an update check is made, this will send update required packet if thats what the function returns.
             # i should probably rename these funcs in the future
             if not await checks.client_check() and await checks.version_check():
                 request.resp_headers['cho-token'] = 'no'
                 return writer.versionUpdateForced() + writer.userID(-2)
-            
+
         # start enqueueing login data to the client
         data = bytearray(writer.userID(p.id)) # initiate login by providing the user's id
         data += writer.protocolVersion(19) # no clue what this does
@@ -867,7 +867,7 @@ async def root_client(request: Request) -> bytes:
 
         # add user to cache?
         glob.players.append(p)
-        
+
         if not p.restricted:
             glob.players.enqueue(writer.userPresence(p) + writer.userStats(p))
 
@@ -890,12 +890,12 @@ async def root_client(request: Request) -> bytes:
                 else:
                     against = m.clan_1
                     add = 'online2'
-                
+
                 data += writer.sendMessage(
-                    fromname=glob.bot.name, 
+                    fromname=glob.bot.name,
                     msg=f'Your clan has initiated in a clan battle against the clan {against.name}! '
-                        f'Please join the battle here: {m.embed}', 
-                    tarname=p.name, 
+                        f'Please join the battle here: {m.embed}',
+                    tarname=p.name,
                     fromid=glob.bot.id
                 )
 
@@ -903,44 +903,44 @@ async def root_client(request: Request) -> bytes:
                 battle = glob.clan_battles[m.clan_1]
                 battle['total'].append(p)
                 battle[add].append(p)
-                
+
         if p.restricted:
             reason = await glob.db.fetchval(
                 "SELECT reason FROM punishments WHERE type = 'restrict' AND target = %s "
-                "ORDER BY time DESC LIMIT 1", 
+                "ORDER BY time DESC LIMIT 1",
                 [p.id]
             )
 
             data += writer.sendMessage(
-                fromname=glob.bot.name, 
-                msg=f'Your account is currently restricted for reason "{reason}"!', 
-                tarname=p.name, 
+                fromname=glob.bot.name,
+                msg=f'Your account is currently restricted for reason "{reason}"!',
+                tarname=p.name,
                 fromid=glob.bot.id
             )
-            
+
         if p.frozen and not p.restricted:
             if p.freeze_timer.timestamp() < start: # freeze timer has expired lol
                 await p.remove_priv(Privileges.Frozen)
                 await p.restrict(reason='Expired freeze timer')
 
                 data += writer.sendMessage(
-                    fromname=glob.bot.name, 
-                    msg='Your freeze timer has expired and you have not submitted any liveplay, you have been restricted as a result!', 
-                    tarname=p.name, 
+                    fromname=glob.bot.name,
+                    msg='Your freeze timer has expired and you have not submitted any liveplay, you have been restricted as a result!',
+                    tarname=p.name,
                     fromid=glob.bot.id
                 )
 
             else:
                 reason = await glob.db.fetchval(
-                    "SELECT reason FROM punishments WHERE type = 'freeze' AND target = %s ORDER BY time DESC LIMIT 1", 
+                    "SELECT reason FROM punishments WHERE type = 'freeze' AND target = %s ORDER BY time DESC LIMIT 1",
                     [p.id]
                 )
 
                 data += writer.sendMessage(
-                    fromname=glob.bot.name, 
+                    fromname=glob.bot.name,
                     msg=f'Your account is currently frozen for reason "{reason}"! '
-                        f'If you do not provide a liveplay by {p.freeze_timer.strftime("%d/%m/%Y %H:%M:%S")}, you will be autorestricted.', 
-                    tarname=p.name, 
+                        f'If you do not provide a liveplay by {p.freeze_timer.strftime("%d/%m/%Y %H:%M:%S")}, you will be autorestricted.',
+                    tarname=p.name,
                     fromid=glob.bot.id
                 )
 
@@ -949,12 +949,12 @@ async def root_client(request: Request) -> bytes:
             await p.remove_priv(Privileges.Supporter)
 
             data += writer.sendMessage(
-                fromname=glob.bot.name, 
-                msg='Your supporter has expired! Your support perks have been removed.', 
-                tarname=p.name, 
+                fromname=glob.bot.name,
+                msg='Your supporter has expired! Your support perks have been removed.',
+                tarname=p.name,
                 fromid=glob.bot.id
             )
-    
+
         elapsed = (time.time() - start) * 1000
         data += writer.notification(f'Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed:.2f}ms') # send notification as indicator they've logged in i guess
         log(f'{p.name} successfully logged in.', Ansi.LBLUE)
@@ -970,7 +970,7 @@ async def root_client(request: Request) -> bytes:
 
     # handle any packets the client has sent
     body = request.body
-    
+
     if p.restricted:
         pm = glob.packets_restricted
     else:
@@ -980,7 +980,7 @@ async def root_client(request: Request) -> bytes:
         for pck, cb in pm.items():
             if body[0] == pck:
                 await cb(p, bytes(body))
-    
+
                 if glob.config.debug:
                     log(f'Packet {pck.name} handled for user {p.name}', Ansi.LMAGENTA)
 

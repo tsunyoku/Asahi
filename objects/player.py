@@ -51,7 +51,7 @@ class Player:
         self.map_md5: str = ''
         self.mods: int = 0
         self.mode: int = 0
-        self.mode_vn: int = 0 
+        self.mode_vn: int = 0
         self.map_id: int = 0
         self.stats: dict[osuModes.value, Stats] = {}
         self.achievements: list = []
@@ -68,12 +68,12 @@ class Player:
         self.clan: Optional[Clan] = None
 
         self.last_ping: int = 0
-        
+
         self.restricted: bool = False
         self.frozen: bool = False
-        
+
         self.freeze_timer: int = uinfo.get('freeze_timer', 0)
-        
+
         self.registered_at: int = uinfo.get('registered_at', 0)
         self.silence_end: int = uinfo.get('silence_end', 0)
         self.donor_end: int = uinfo.get('donor_end', 0)
@@ -90,10 +90,10 @@ class Player:
     @classmethod
     async def login(self, user: dict):
         p = self(
-            id=user['id'], 
-            name=user['name'], 
-            token=user['token'], 
-            offset=user['offset'], 
+            id=user['id'],
+            name=user['name'],
+            token=user['token'],
+            offset=user['offset'],
             login_time=user['ltime'],
             country_iso=user['country_iso'],
             country=user['country'],
@@ -111,24 +111,24 @@ class Player:
         clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = %s', [p.id])
         if clan:
             p.clan = glob.clans.get(clan)
-            
+
         if p.priv & Privileges.Restricted:
             p.restricted = True
-            
+
         if p.priv & Privileges.Frozen:
             p.frozen = True
-            
+
         db_achs = await glob.db.fetch('SELECT ach FROM user_achievements WHERE uid = %s', [p.id])
         for db in db_achs:
             for ach in glob.achievements:
                 if db['ach'] == ach.id:
                     p.achievements.append(ach)
-            
+
         return p
-    
+
     @classmethod
     async def from_sql(self, spc: Union[str, int], discord = False):
-        
+
         if discord:
             typ = 'discord'
         elif isinstance(spc, str):
@@ -139,10 +139,10 @@ class Player:
             return # ?
 
         user = await glob.db.fetchrow(f'SELECT * FROM users WHERE {typ} = %s', [spc])
-        
+
         if not user:
             return
-        
+
         p = self(
             id=user['id'],
             name=user['name'],
@@ -160,15 +160,15 @@ class Player:
 
         if (clan := user['clan']):
             p.clan = glob.clans.get(clan)
-        
+
         if p.priv & Privileges.Disallowed:
             p.restricted = True
-            
+
         if p.priv & Privileges.Frozen:
             p.frozen = True
-            
+
         await p.set_stats()
-        
+
         return p
 
     async def set_stats(self) -> None:
@@ -180,21 +180,21 @@ class Player:
 
             if not self.restricted: # might do my own aioredis wrapper just to solve this ugly
                 r = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}', self.id)
-    
+
                 if r is None:
                     if stat['pp'] > 0:
                         stat['rank'] = 1
                 else:
                     stat['rank'] += 1
-    
+
                 cr = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}:{self.country_iso}', self.id)
-    
+
                 if cr is None:
                     if stat['pp'] > 0:
                         stat['country_rank'] = 1
                 else:
                     stat['country_rank'] =  cr + 1
-                
+
             self.stats[mode.value] = Stats(**stat)
 
     async def update_stats(self, mode: osuModes, table: str, mode_vn: int) -> None:
@@ -205,7 +205,7 @@ class Player:
             f'SELECT {table}.acc, {table}.pp FROM {table} '
             f'LEFT OUTER JOIN maps ON maps.md5 = {table}.md5 '
             f'WHERE {table}.uid = %s AND {table}.mode = %s AND {table}.status = 2 AND maps.status IN (2, 3) '
-            f'ORDER BY {table}.pp DESC', 
+            f'ORDER BY {table}.pp DESC',
             [self.id, mode_vn]
         )
 
@@ -225,16 +225,16 @@ class Player:
 
             r = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}', self.id)
             cr = await glob.redis.zrevrank(f'asahi:leaderboard:{mode_name}:{self.country_iso}', self.id)
-            
+
             stats.rank = 0
             stats.country_rank = 0
-    
+
             if r is None:
                 if stats.pp > 0:
                     stats.rank = 1
             else:
                 stats.rank = r + 1
-    
+
             if cr is None:
                 if stats.pp > 0:
                     stats.country_rank = 1
@@ -243,13 +243,13 @@ class Player:
 
         await glob.db.execute(
             'UPDATE stats SET rscore_{0} = %s, acc_{0} = %s, pc_{0} = %s, tscore_{0} = %s,'
-            ' pp_{0} = %s, mc_{0} = %s, pt_{0} = %s WHERE id = %s'.format(mode_name), 
-            [stats.rscore, stats.acc, stats.pc, stats.tscore, 
+            ' pp_{0} = %s, mc_{0} = %s, pt_{0} = %s WHERE id = %s'.format(mode_name),
+            [stats.rscore, stats.acc, stats.pc, stats.tscore,
              stats.pp, stats.max_combo, stats.playtime, self.id]
         )
 
         self.enqueue(writer.userStats(self))
-        
+
         if not self.restricted:
             glob.players.enqueue(writer.userStats(self))
 
@@ -273,7 +273,7 @@ class Player:
     def client_priv(self) -> ClientPrivileges:
         priv = ClientPrivileges(0)
         priv |= ClientPrivileges.Player
-        
+
         if self.restricted:
             return priv
 
@@ -283,7 +283,7 @@ class Player:
             priv |= ClientPrivileges.Developer
         if self.priv & Privileges.Owner:
             priv |= ClientPrivileges.Owner
-        
+
         return priv
 
     async def add_priv(self, priv: Privileges) -> None:
@@ -306,13 +306,13 @@ class Player:
             spec = Channel(name='#spectator', desc=f'Spectator chat for {self.name}', auto=False, perm=False)
             self.join_chan(spec)
             glob.channels[sname] = spec
-        
+
         user.join_chan(spec)
 
         for u in self.spectators:
             u.enqueue(joiner)
             user.enqueue(writer.spectatorJoined(u.id))
-        
+
         self.spectators.append(user)
         user.spectating = self
         self.enqueue(writer.hostSpectatorJoined(user.id))
@@ -335,21 +335,21 @@ class Player:
                 u.enqueue(cinfo)
 
             self.enqueue(cinfo)
-        
+
         self.enqueue(writer.hostSpectatorLeft(user.id))
         log(f'{user.name} stopped spectating {self.name}.', Ansi.LBLUE)
 
     def join_chan(self, chan: Channel) -> None:
         if self in chan.players:
             return
-        
+
         chan.add_player(self)
         self.channels.append(chan)
 
         self.enqueue(writer.channelJoin(chan.name))
         for o in chan.players:
             o.enqueue(writer.channelInfo(chan))
-        
+
         log(f'{self.name} joined channel {chan.name}', Ansi.LBLUE)
 
     def leave_chan(self, chan: Channel) -> None:
@@ -426,12 +426,12 @@ class Player:
                         break
 
             self.match.enqueue_state()
-        
+
         self.match = None
 
     def logout(self) -> None:
         glob.players.remove(self)
-        
+
         self.token = ''
 
         if host := self.spectating:
@@ -454,10 +454,10 @@ class Player:
 
         if self.token:
             self.enqueue(writer.userID(-3))
-            
+
         await glob.db.execute(
             'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES '
-            '(%s, %s, %s, %s, %s)', 
+            '(%s, %s, %s, %s, %s)',
             ['ban', reason, self.id, fr.id, time.time()]
         )
 
@@ -466,72 +466,72 @@ class Player:
 
             await glob.redis.zrem(f'asahi:leaderboard:{mode_name}', self.id)
             await glob.redis.zrem(f'asahi:leaderboard:{mode_name}:{self.country_iso}', self.id)
-            
+
             stat.rank = 0
             stat.country_rank = 0
 
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
-            
+
             embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
             embed.add_field(name='New banned user', value=f'{self.name} has been banned by {fr.name} for {reason}.', inline=True)
-            
+
             wh.add_embed(embed)
             await wh.post()
-            
+
         log(f'{self.name} has been banned for {reason}.', Ansi.LBLUE)
-        
+
     async def freeze(self, reason: str, fr) -> None:
         expire = datetime.now() + timedelta(days=7)
-        
+
         if self.frozen:
             return # ?
-        
+
         self.frozen = True
         self.freeze_timer = expire
-        
+
         await self.add_priv(Privileges.Frozen)
         await glob.db.execute('UPDATE users SET freeze_timer = %s WHERE id = %s', [self.freeze_timer.timestamp(), self.id])
 
         await glob.db.execute(
             'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES '
-            '(%s, %s, %s, %s, %s)', 
+            '(%s, %s, %s, %s, %s)',
             ['freeze', reason, self.id, fr.id, time.time()]
         )
-        
+
         if self.token:
             self.enqueue(writer.restartServer(0))
 
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
-    
+
             embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
             embed.add_field(name='New frozen user', value=f'{self.name} has been frozen by {fr.name} for {reason}.', inline=True)
-    
+
             wh.add_embed(embed)
             await wh.post()
-        
+
         log(f'{self.name} has been frozen for {reason}.', Ansi.LBLUE)
-        
+
     async def flag(self, reason: str, fr) -> None:
         await glob.db.execute(
             'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES '
-            '(%s, %s, %s, %s, %s)', 
+            '(%s, %s, %s, %s, %s)',
             ['flag', reason, self.id, fr.id, time.time()]
         )
 
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
-        
+
             embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
             embed.add_field(name='New flagged user', value=f'{self.name} has been flagged by {fr.name} for {reason}.', inline=True)
-        
+
             wh.add_embed(embed)
             await wh.post()
-        
+
         log(f'{self.name} has been flagged for {reason}.', Ansi.LBLUE)
 
     async def unfreeze(self, reason: str, fr) -> None:
@@ -540,58 +540,58 @@ class Player:
 
         self.frozen = False
         self.freeze_timer = 0
-        
+
         await self.remove_priv(Privileges.Frozen)
         await glob.db.execute('UPDATE users SET freeze_timer = 0 WHERE id = %s', [self.id])
 
         await glob.db.execute(
             'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES '
-            '(%s, %s, %s, %s, %s)', 
+            '(%s, %s, %s, %s, %s)',
             ['unfreeze', reason, self.id, fr.id, time.time()]
         )
-        
+
         if self.token:
             self.enqueue(writer.restartServer(0))
 
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
-    
+
             embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
             embed.add_field(name='New unfrozen user', value=f'{self.name} has been unfrozen by {fr.name} for {reason}.', inline=True)
-    
+
             wh.add_embed(embed)
             await wh.post()
-        
+
         log(f'{self.name} has been unfrozen for {reason}.', Ansi.LBLUE)
-        
+
     async def unban(self, reason: str, fr) -> None:
         await self.remove_priv(Privileges.Banned)
 
         await glob.db.execute(
             'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES '
-            '(%s, %s, %s, %s, %s)', 
+            '(%s, %s, %s, %s, %s)',
             ['unban', reason, self.id, fr.id, time.time()]
         )
 
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
-        
+
             embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
             embed.add_field(name='New unbanned user', value=f'{self.name} has been unbanned by {fr.name} for {reason}.', inline=True)
-        
+
             wh.add_embed(embed)
             await wh.post()
 
         log(f'{self.name} has been unbanned for {reason}.', Ansi.LBLUE)
-        
+
     async def restrict(self, reason: str, fr) -> None:
         if self.restricted:
             return # ?
 
         await self.add_priv(Privileges.Restricted)
-        
+
         self.restricted = True
 
         if self.token:
@@ -599,7 +599,7 @@ class Player:
 
         await glob.db.execute(
             'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES '
-            '(%s, %s, %s, %s, %s)', 
+            '(%s, %s, %s, %s, %s)',
             ['restrict', reason, self.id, fr.id, time.time()]
         )
 
@@ -615,10 +615,10 @@ class Player:
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
-    
+
             embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
             embed.add_field(name='New restricted user', value=f'{self.name} has been restricted by {fr.name} for {reason}.', inline=True)
-    
+
             wh.add_embed(embed)
             await wh.post()
 
@@ -626,7 +626,7 @@ class Player:
 
     async def unrestrict(self, reason: str, fr) -> None:
         await self.remove_priv(Privileges.Restricted)
-        
+
         self.restricted = False
 
         if self.token:
@@ -641,15 +641,15 @@ class Player:
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
-    
+
             embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
             embed.add_field(name='New unrestricted user', value=f'{self.name} has been unrestricted by {fr.name} for {reason}.', inline=True)
-    
+
             wh.add_embed(embed)
             await wh.post()
 
         log(f'{self.name} has been unrestricted for {reason}.', Ansi.LBLUE)
-        
+
     async def unlock_ach(self, ach) -> None:
         await glob.db.execute('INSERT INTO user_achievements (uid, ach) VALUES (%s, %s)', [self.id, ach.id])
         self.achievements.append(ach)

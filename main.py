@@ -75,11 +75,11 @@ async def connect() -> None: # ran before server startup, used to do things like
     glob.bot = bot
     if glob.config.debug:
         log(f"==== Added bot {bot.name} to player list ====", Ansi.GREEN)
-        
+
     async for ach in glob.db.iter('SELECT * FROM achievements'):
         achievement = Achievement(id=ach['id'], image=ach['image'], name=ach['name'], desc=ach['descr'], cond=eval(f'lambda s: {ach["cond"]}'), custom=ach['custom'])
         glob.achievements.append(achievement)
-            
+
     init_customs() # set custom achievements list for assets proxy
 
     # add all channels to cache
@@ -91,7 +91,7 @@ async def connect() -> None: # ran before server startup, used to do things like
         glob.channels[channel.name] = channel
         if glob.config.debug:
             log(f'==== Added channel {channel.name} to channel list ====', Ansi.GREEN)
-    
+
     # add announce channel to cache
     announce = Channel(name='#announce', desc='#1 scores and public announcements will be posted here', auto=True, perm=True)
     glob.channels[announce.name] = announce
@@ -116,7 +116,7 @@ async def connect() -> None: # ran before server startup, used to do things like
 
         if glob.config.debug:
             log(f'==== Added clan {clan.name} to clan list ====', Ansi.GREEN)
-                
+
     await prepare_tasks() # make new db conn for donor/freeze tasks
 
     log(f'==== Asahi v{glob.version} started ====', Ansi.GREEN)
