@@ -114,17 +114,15 @@ async def send_pm(user: Player, p: bytes) -> None:
         return
 
     if target is glob.bot: 
-        if msg.startswith(glob.config.prefix):
-            if (cmd := await commands.process(user, msg)):
-
-                user.enqueue(
-                    writer.sendMessage(
-                        fromname = target.name, 
-                        msg = cmd, 
-                        tarname = user.name, 
-                        fromid = target.id
-                    )
+        if msg.startswith(glob.config.prefix) and (cmd := await commands.process(user, msg)):
+            user.enqueue(
+                writer.sendMessage(
+                    fromname = target.name, 
+                    msg = cmd, 
+                    tarname = user.name, 
+                    fromid = target.id
                 )
+            )
 
         elif m := regexes.np_regex.match(msg):
             user.np = await Beatmap.bid_fetch(int(m['bid']))
@@ -175,10 +173,9 @@ async def send_msg(user: Player, p: bytes) -> None:
         m = user.match.id
         c = glob.channels.get(f'#multi_{m}')
 
-        if msg.startswith(glob.config.prefix):
-            if (cmd := await commands.process_multiplayer(user, msg)):
-                msg = cmd
-                user = glob.bot
+        if msg.startswith(glob.config.prefix) and (cmd := await commands.process_multiplayer(user, msg)):
+            msg = cmd
+            user = glob.bot
 
     elif chan == '#clan':
         if not user.clan:
@@ -192,10 +189,9 @@ async def send_msg(user: Player, p: bytes) -> None:
     if not c:
         return
 
-    if not chan == '#multiplayer' and msg.startswith(glob.config.prefix):
-        if (cmd := await commands.process(user, msg, True)):
-            msg = cmd
-            user = glob.bot # bot returns the message
+    if not chan == '#multiplayer' and msg.startswith(glob.config.prefix) and (cmd := await commands.process(user, msg, True)):
+        msg = cmd
+        user = glob.bot # bot returns the message
 
     c.send(user, msg, False)
 
@@ -394,8 +390,7 @@ async def join_match(user: Player, p: bytes) -> None:
     if not (match := glob.matches.get(_id)):
         return user.enqueue(writer.matchJoinFail())
     
-    if match.clan_battle:
-        if user.clan not in (match.clan_1, match.clan_2) or match.battle_ready:
+    if match.clan_battle and user.clan not in (match.clan_1, match.clan_2) or match.battle_ready:
             return user.enqueue(writer.matchJoinFail())
         
     user.join_match(match, pw)
@@ -795,9 +790,8 @@ async def root_client(request: Request) -> bytes:
             request.resp_headers['cho-token'] = 'no'
             return writer.userID(-3)
 
-        if (p := await glob.players.get(id=user['id'])):
-            if (start - p.last_ping) > 10: # game crashes n shit
-                p.logout()
+        if (p := await glob.players.get(id=user['id'])) and (start - p.last_ping) > 10: # game crashes n shit
+            p.logout()
 
         token = uuid.uuid4() # generate token for client to use as auth
         user['offset'] = int(cinfo[1]) # utc offset for time
@@ -844,12 +838,14 @@ async def root_client(request: Request) -> bytes:
             
             # we want to check multi stuff before any cheats just in case
             await checks.multi_check()
-            
-            client = await checks.client_check()
-            if not client: # skip version check for modified clients lol
-                if await checks.version_check(): # client needs updating
-                    request.resp_headers['cho-token'] = 'no'
-                    return writer.versionUpdateForced() + writer.userID(-2)
+
+            # this is probably confusing syntax. 
+            # client_check will restrict if a client is custom and if that's the case we want to ignore any update checks. 
+            # if an update check is made, this will send update required packet if thats what the function returns. 
+            # i should probably rename these funcs in the future
+            if not await checks.client_check() and await checks.version_check():
+                request.resp_headers['cho-token'] = 'no'
+                return writer.versionUpdateForced() + writer.userID(-2)
             
         # start enqueueing login data to the client
         data = bytearray(writer.userID(p.id)) # initiate login by providing the user's id
@@ -886,28 +882,27 @@ async def root_client(request: Request) -> bytes:
             data += writer.channelInfo(p.clan.chan)
 
             # check if clan is in battle, if so: send invite to them too
-            if (m := p.clan.battle):
-                if not m.battle_ready:
-                    # battle hasn't started/isn't ready yet, lets invite them too!
-                    if p.clan == m.clan_1:
-                        against = m.clan_2
-                        add = 'online1'
-                    else:
-                        against = m.clan_1
-                        add = 'online2'
-                    
-                    data += writer.sendMessage(
-                        fromname=glob.bot.name, 
-                        msg=f'Your clan has initiated in a clan battle against the clan {against.name}! '
-                            f'Please join the battle here: {m.embed}', 
-                        tarname=p.name, 
-                        fromid=glob.bot.id
-                    )
+            if (m := p.clan.battle) and not m.battle_ready:
+                # battle hasn't started/isn't ready yet, lets invite them too!
+                if p.clan == m.clan_1:
+                    against = m.clan_2
+                    add = 'online1'
+                else:
+                    against = m.clan_1
+                    add = 'online2'
+                
+                data += writer.sendMessage(
+                    fromname=glob.bot.name, 
+                    msg=f'Your clan has initiated in a clan battle against the clan {against.name}! '
+                        f'Please join the battle here: {m.embed}', 
+                    tarname=p.name, 
+                    fromid=glob.bot.id
+                )
 
-                    # update player lists for the battle
-                    battle = glob.clan_battles[m.clan_1]
-                    battle['total'].append(p)
-                    battle[add].append(p)
+                # update player lists for the battle
+                battle = glob.clan_battles[m.clan_1]
+                battle['total'].append(p)
+                battle[add].append(p)
                 
         if p.restricted:
             reason = await glob.db.fetchval(

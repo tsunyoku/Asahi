@@ -363,16 +363,15 @@ class Beatmap:
                 current = in_db[mid]['status']
                 api = mapStatuses.from_api(int(m['approved']))
 
-                if current != api:
-                    if m['file_md5'] == self.md5:
-                        self.status = api
+                if current != api and m['file_md5'] == self.md5:
+                    self.status = api
 
-                        self.nc = time.time() + 3600
+                    self.nc = time.time() + 3600
 
-                        await glob.db.execute('UPDATE maps SET status = %s, nc = %s WHERE md5 = %s', [self.status, self.nc, self.md5])
-                        if (cached := glob.cache['maps'].get(self.md5)):
-                            cached.status = self.status
-                            cached.nc = self.nc
+                    await glob.db.execute('UPDATE maps SET status = %s, nc = %s WHERE md5 = %s', [self.status, self.nc, self.md5])
+                    if (cached := glob.cache['maps'].get(self.md5)):
+                        cached.status = self.status
+                        cached.nc = self.nc
 
     async def save(self):
         await glob.db.execute(

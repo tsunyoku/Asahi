@@ -139,9 +139,8 @@ class Score:
 
         s.map = await Beatmap.from_md5(data[0])
 
-        if (u := await glob.players.get(name=data[1].rstrip())): # faster i think?
-            if u.pw == pw:
-                s.user = u
+        if (u := await glob.players.get(name=data[1].rstrip())) and u.pw == pw:
+            s.user = u
         
         if not s.user:
             return s # even if user isnt found, may be related to connection and we want to tell the client to retry
