@@ -734,7 +734,7 @@ async def mp_start(user: Player, args: list, match: Match) -> str:
         return 'Please provide either a timer to start or cancel/force'
     
     if not args[0]: # start now
-        if any([s.status == slotStatus.not_ready for s in match.slots]):
+        if any(s.status == slotStatus.not_ready for s in match.slots):
             return 'Not all players are ready. You can force start with `!mp start force`'
 
     elif args[0] == 'force':
