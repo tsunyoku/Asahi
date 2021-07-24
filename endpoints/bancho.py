@@ -341,7 +341,7 @@ async def join_lobby(user: Player, _) -> None:
         user.enqueue(writer.newMatch(m))
         
 @packet(Packets.OSU_PART_LOBBY)
-async def leave_lobby(_, _) -> None:
+async def leave_lobby(_, __) -> None:
     pass # lol
 
 @packet(Packets.OSU_CREATE_MATCH)

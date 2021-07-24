@@ -713,7 +713,7 @@ def mp_command(name: str, aliases: list = [], host: bool = True):
     return wrapper
 
 @mp_command(name='help', host=False)
-async def mp_help(user: Player, _, _) -> str:
+async def mp_help(user: Player, _, __) -> str:
     """Displays all available multiplayer commands to the user"""
     allowed_cmds = []
 
@@ -775,7 +775,7 @@ async def mp_start(_, args: list, match: Match) -> str:
         return 'Unknown argument. Please use seconds/force/cancel'
     
 @mp_command(name='abort')
-async def mp_abort(_, _, match: Match) -> str:
+async def mp_abort(_, __, match: Match) -> str:
     """Abort current multiplayer session"""
     if not match.in_prog:
         return
