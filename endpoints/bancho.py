@@ -45,7 +45,7 @@ def packet(pck: Packets, allow_res: bool = False):
     return wrapper
 
 @packet(Packets.OSU_REQUEST_STATUS_UPDATE, allow_res=True)
-async def update_stats(user: Player, p: bytes) -> None:
+async def update_stats(user: Player, _) -> None:
     user.enqueue(writer.userStats(user))
         
 @packet(Packets.OSU_USER_STATS_REQUEST, allow_res=True)
@@ -64,8 +64,8 @@ async def presence_request(user: Player, p: bytes) -> None:
         if o := await glob.players.get(id=u):
             user.enqueue(writer.userPresence(o))
         
-@packet(Packets.OSU_USER_PRESENCE_REQUEST)
-async def presence_request_all(user: Player, p: bytes) -> None:
+@packet(Packets.OSU_USER_PRESENCE_REQUEST_ALL)
+async def presence_request_all(user: Player, _) -> None:
     for o in glob.players:
         if o.id != user.id:
             user.enqueue(writer.userPresence(o))
@@ -95,7 +95,7 @@ async def friend_remove(user: Player, p: bytes) -> None:
     log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LCYAN)
     
 @packet(Packets.OSU_LOGOUT, allow_res=True)
-async def logout(user: Player, p: bytes) -> None:
+async def logout(user: Player, _) -> None:
     if (time.time() - user.login_time) < 1:
         return
     
@@ -276,7 +276,7 @@ async def leave_chan(user: Player, p: bytes) -> None:
     user.leave_chan(chan)
     chan_leave = writer.channelInfo(chan)
 
-    for o in chan.players: # TODO: playerlist instances for channels/multiplayer rooms etc..?
+    for o in chan.players: #TODO: playerlist instances for channels/multiplayer rooms etc..?
         o.enqueue(chan_leave)
         
 @packet(Packets.OSU_CHANGE_ACTION, allow_res=True)
@@ -325,7 +325,7 @@ async def start_spec(user: Player, p: bytes) -> None:
     target.add_spectator(user)
     
 @packet(Packets.OSU_STOP_SPECTATING)
-async def stop_spec(user: Player, p: bytes) -> None:
+async def stop_spec(user: Player, _) -> None:
     if not (host := user.spectating):
         return
     
@@ -340,12 +340,12 @@ async def spec_frames(user: Player, p: bytes) -> None:
         u.enqueue(spec_frames)
 
 @packet(Packets.OSU_JOIN_LOBBY)
-async def join_lobby(user: Player, p: bytes) -> None:
+async def join_lobby(user: Player, _) -> None:
     for m in glob.matches:
         user.enqueue(writer.newMatch(m))
         
 @packet(Packets.OSU_PART_LOBBY)
-async def leave_lobby(user: Player, p: bytes) -> None:
+async def leave_lobby(_, _unused) -> None:
     pass # lol
 
 @packet(Packets.OSU_CREATE_MATCH)
@@ -411,7 +411,7 @@ async def join_match(user: Player, p: bytes) -> None:
             await match.strat_battle()
             
 @packet(Packets.OSU_PART_MATCH)
-async def leave_match(user: Player, p: bytes) -> None:
+async def leave_match(user: Player, _) -> None:
     user.leave_match()
         
 @packet(Packets.OSU_MATCH_CHANGE_SLOT)
@@ -433,7 +433,7 @@ async def change_slot(user: Player, p: bytes) -> None:
     match.enqueue_state()
     
 @packet(Packets.OSU_MATCH_READY)
-async def user_ready(user: Player, p: bytes) -> None:
+async def user_ready(user: Player, _) -> None:
     if not (match := user.match):
         return
     
@@ -526,7 +526,7 @@ async def match_settings(user: Player, p: bytes) -> None:
     match.enqueue_state()
     
 @packet(Packets.OSU_MATCH_START)
-async def start_match(user: Player, p: bytes) -> None:
+async def start_match(user: Player, _) -> None:
     if not (match := user.match) or user is not match.host:
         return
     
@@ -547,7 +547,7 @@ async def match_score(user: Player, p: bytes) -> None:
     match.enqueue(bytes(r), lobby=False)
 
 @packet(Packets.OSU_MATCH_COMPLETE)
-async def finish_match(user: Player, p: bytes) -> None:
+async def finish_match(user: Player, _) -> None:
     if not (match := user.match):
         return
 
@@ -594,7 +594,7 @@ async def match_mods(user: Player, p: bytes) -> None:
     match.enqueue_state()
     
 @packet(Packets.OSU_MATCH_LOAD_COMPLETE)
-async def match_loaded(user: Player, p: bytes) -> None:
+async def match_loaded(user: Player, _) -> None:
     if not (match := user.match):
         return
 
@@ -606,7 +606,7 @@ async def match_loaded(user: Player, p: bytes) -> None:
         match.enqueue(writer.matchAllLoaded(), lobby=False)
         
 @packet(Packets.OSU_MATCH_NO_BEATMAP)
-async def match_nomap(user: Player, p: bytes) -> None:
+async def match_nomap(user: Player, _) -> None:
     if not (match := user.match):
         return
 
@@ -616,7 +616,7 @@ async def match_nomap(user: Player, p: bytes) -> None:
     match.enqueue_state(lobby=False) 
     
 @packet(Packets.OSU_MATCH_NOT_READY)
-async def user_unready(user: Player, p: bytes) -> None:
+async def user_unready(user: Player, _) -> None:
     if not (match := user.match):
         return
 
@@ -626,7 +626,7 @@ async def user_unready(user: Player, p: bytes) -> None:
     match.enqueue_state(lobby=False)
     
 @packet(Packets.OSU_MATCH_FAILED)
-async def user_failed(user: Player, p: bytes) -> None:
+async def user_failed(user: Player, _) -> None:
     if not (match := user.match):
         return
 
@@ -634,7 +634,7 @@ async def user_failed(user: Player, p: bytes) -> None:
     match.enqueue(writer.matchPlayerFailed(slot), lobby=False)
     
 @packet(Packets.OSU_MATCH_HAS_BEATMAP)
-async def user_map(user: Player, p: bytes) -> None:
+async def user_map(user: Player, _) -> None:
     if not (match := user.match):
         return
 
@@ -644,7 +644,7 @@ async def user_map(user: Player, p: bytes) -> None:
     match.enqueue_state(lobby=False)
     
 @packet(Packets.OSU_MATCH_SKIP_REQUEST)
-async def user_skip(user: Player, p: bytes) -> None:
+async def user_skip(user: Player, _) -> None:
     if not (match := user.match):
         return
 
@@ -672,7 +672,7 @@ async def match_host(user: Player, p: bytes) -> None:
     match.enqueue_state()
     
 @packet(Packets.OSU_MATCH_CHANGE_TEAM)
-async def match_team(user: Player, p: bytes) -> None:
+async def match_team(user: Player, _) -> None:
     if not (match := user.match):
         return
 
