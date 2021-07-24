@@ -271,7 +271,7 @@ async def getReplay(request: Request) -> Union[tuple, bytes]:
         [sid]
     )
 
-    hash = hashlib.md5(
+    _hash = hashlib.md5(
         (f'{score["n100"] + score["n300"]}p{score["n50"]}o'
         f'{score["geki"]}o{score["katu"]}t'
         f'{score["miss"]}a{score["md5"]}r'
@@ -287,7 +287,7 @@ async def getReplay(request: Request) -> Union[tuple, bytes]:
     rp += writer.write_string(score["md5"])
 
     rp += writer.write_string(score["name"])
-    rp += writer.write_string(hash)
+    rp += writer.write_string(_hash)
 
     rp += struct.pack('<hhhhhhihBi',
         score["n300"], score["n100"],
@@ -442,9 +442,9 @@ async def mostPlayed(req: Request) -> Union[tuple, dict]:
     
     maps = await glob.db.fetch(query, [user.id, mode.value, limit])
     
-    for map in maps:
-        bmap = await Beatmap.from_md5(map.pop('md5'))
-        map['map'] = {
+    for _map in maps:
+        bmap = await Beatmap.from_md5(_map.pop('md5'))
+        _map['map'] = {
             'md5': bmap.md5,
             'id': bmap.id,
             'set_id': bmap.sid,

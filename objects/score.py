@@ -205,9 +205,9 @@ class Score:
             # get bancho leaderboards and compare replay
             # TODO: check replays on private servers
             if self.map.status >= mapStatuses.Ranked: # has bancho lb
-                map = cg.Map(self.map.id, span='1-100')# maybe ill increase this to the top 1000?
+                _map = cg.Map(self.map.id, span='1-100')# maybe ill increase this to the top 1000?
     
-                for mreplay in map:
+                for mreplay in _map:
                     sim = cg.similarity(replay, mreplay)
                     if sim < 17: # suggested circlecore value, idk if this should change
                         # THIS CAN FLAG LEGIT HENCE WHY IT FLAGS, PLEASE CHECK A REPLAY MANUALLY IF FLAGGED!

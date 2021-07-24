@@ -36,7 +36,7 @@ def command(priv: Privileges = Privileges.Normal, name: str = None, aliases: lis
     return wrapper
 
 @command(name='help', elapsed=False)
-async def help(user: Player, args: list) -> str:
+async def _help(user: Player, _) -> str:
     """Displays all available commands to the user"""
     allowed_cmds = []
 
@@ -49,7 +49,7 @@ async def help(user: Player, args: list) -> str:
     return f'List of available commands:\n\n{cmd_list}'
 
 @command(name='last', aliases=['l', 'recent', 'r', 'rs'], elapsed=False, allow_public=True)
-async def last_score(user: Player, args: list) -> str:
+async def last_score(user: Player, _) -> str:
     if (score := user.last_score):
         return await score.format()
     
@@ -71,7 +71,7 @@ async def link_discord(user, args) -> str:
     return 'Discord account linked!'
 
 @command(priv=Privileges.Owner, name='addpriv')
-async def add_priv(user: Player, args: list) -> str:
+async def add_priv(_, args: list) -> str:
     """Adds (a list of) privileges to a user"""
     if len(args) < 2:
         return "You haven't provided a username and privileges!"
@@ -90,7 +90,7 @@ async def add_priv(user: Player, args: list) -> str:
     return f"Added new privilege(s) to {name}."
 
 @command(priv=Privileges.Owner, name='rmpriv')
-async def rm_priv(user: Player, args: list) -> str:
+async def rm_priv(_, args: list) -> str:
     """Removes (a list of) privileges from a user"""
     if len(args) < 2:
         return "You haven't provided a username and privileges!"
@@ -317,7 +317,7 @@ async def _map(user: Player, args: list) -> str:
     return 'Status updated!'
 
 @command(priv=Privileges.Nominator, name=['requests', 'reqs'], elapsed=False)
-async def reqs(user: Player, args: list) -> str:
+async def reqs(user: Player, _) -> str:
     """View all map status requests on the server"""
     if (requests := await glob.db.fetch('SELECT * FROM requests')):
         ret = []
@@ -511,7 +511,7 @@ async def unfreeze(user: Player, args: list) -> str:
     return 'User unfrozen!'
 
 @command(priv=Privileges.Developer, name='crash')
-async def crash(user: Player, args: list) -> str:
+async def crash(_, args: list) -> str:
     """Crash a user's client"""
     if len(args) < 1:
         return 'You must provide a username to crash!'
@@ -713,7 +713,7 @@ def mp_command(name: str, aliases: list = [], host: bool = True):
     return wrapper
 
 @mp_command(name='help', host=False)
-async def mp_help(user: Player, args: list, match: Match) -> str:
+async def mp_help(user: Player, _, _unused) -> str:
     """Displays all available multiplayer commands to the user"""
     allowed_cmds = []
 
@@ -726,7 +726,7 @@ async def mp_help(user: Player, args: list, match: Match) -> str:
     return f'List of available multiplayer commands:\n\n{cmd_list}'
 
 @mp_command(name='start')
-async def mp_start(user: Player, args: list, match: Match) -> str:
+async def mp_start(_, args: list, match: Match) -> str:
     """Starts the current match, either forcefully or on a timer"""
     if len(args) < 1:
         return 'Please provide either a timer to start or cancel/force'
@@ -775,7 +775,7 @@ async def mp_start(user: Player, args: list, match: Match) -> str:
         return 'Unknown argument. Please use seconds/force/cancel'
     
 @mp_command(name='abort')
-async def mp_abort(user: Player, args: list, match: Match) -> str:
+async def mp_abort(_, _, match: Match) -> str:
     """Abort current multiplayer session"""
     if not match.in_prog:
         return
@@ -789,7 +789,7 @@ async def mp_abort(user: Player, args: list, match: Match) -> str:
     return 'Match aborted.'
 
 @mp_command(name='mods')
-async def mp_mods(user: Player, args: list, match: Match) -> str:
+async def mp_mods(_, args: list, match: Match) -> str:
     """Set the mods of the lobby"""
     if len(args) < 1:
         return 'You must provide the mods to set!'

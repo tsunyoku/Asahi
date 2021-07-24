@@ -156,8 +156,8 @@ app.add_router(api)
 app.add_router(assets)
 
 if __name__ == '__main__':
-    filter = lambda x: bool(x.endswith('.py')) # load all available cogs
-    files = plazy.list_files(root='disc', filter_func=filter, is_include_root=True)
+    _filter = lambda x: bool(x.endswith('.py')) # load all available cogs
+    files = plazy.list_files(root='disc', filter_func=_filter, is_include_root=True)
     for file in files:
             cog_name = file.replace('/', '.')
             dc.load_extension(cog_name[:-3])
