@@ -81,7 +81,6 @@ async def add_priv(user: Player, args: list) -> str:
     if not (user := await glob.players.get(name=name, sql=True)):
         return 'Couldn\'t find this user!'
 
-    new_privs = Privileges(0)
     for npriv in args[1:]:
         if not (new_priv := Privileges.get(npriv)):
             return f'Privilege {npriv} not found.'
@@ -101,7 +100,6 @@ async def rm_priv(user: Player, args: list) -> str:
     if not (user := await glob.players.get(name=name, sql=True)):
         return 'Couldn\'t find this user!'
 
-    new_privs = Privileges(0)
     for npriv in args[1:]:
         if not (new_priv := Privileges.get(npriv)):
             return f'Privilege {npriv} not found.'

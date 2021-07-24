@@ -782,7 +782,7 @@ async def root_client(request: Request) -> bytes:
 
                 try:
                     k.verify(pw, user_pw)
-                except Exception as e:
+                except Exception:
                     if glob.config.debug:
                         log(f"{username}'s login attempt failed: provided an incorrect password", Ansi.LRED)
     
