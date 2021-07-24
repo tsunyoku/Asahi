@@ -66,7 +66,7 @@ class Anticheat:
         self.ver = matched_ver
         
         if (stream := self.ver['stream']):
-            self.stream = self.ver['stream']
+            self.stream = stream
 
         if not (real_md5 := glob.cache['vers'].get(self.ver)):
             year = self.ver['ver'][0:4]
