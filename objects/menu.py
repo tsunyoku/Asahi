@@ -18,10 +18,10 @@ class Menu:
         self.destroy: bool = args.get('destroy', False) # one-time usage
 
     @property
-    def embed(self):
+    def embed(self) -> str:
         return f'[osump://{self.id}/ {self.name}]'
 
-    async def handle(self, player):
+    async def handle(self, player): # ok i definitely need to fix this one day
         # user has clicked on menu, we now return the callback
         
         if self.destroy:
