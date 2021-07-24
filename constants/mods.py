@@ -48,10 +48,10 @@ class Mods(IntFlag):
         _str = []
 
         for mod in Mods:
-            if self.value & mod:
-                _str.append(str_mods[mod])
+            if self.value & mod and (m := str_mods.get(mod)):
+                _str.append(m)
 
-        return ''.join_str
+        return ''.join(_str)
     
     @classmethod
     def convert_str(self, mods: str):
@@ -103,6 +103,7 @@ str_mods = {
     Mods.KEY9: '9K',
     Mods.KEYCOOP: 'CO'
 }
+
 mods_str = {
     'NF': Mods.NOFAIL,
     'EZ': Mods.EASY,

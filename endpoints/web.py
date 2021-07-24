@@ -484,7 +484,9 @@ async def scoreSubmit(request: Request) -> bytes:
         
         # update lb cache
         lb = getattr(s.map, s.mode.leaderboard)
-        threading.Thread(target=lb.set_user_pb, args=(s.user, s,)).start()
+        
+        if lb:
+            threading.Thread(target=lb.set_user_pb, args=(s.user, s,)).start()
         
     s.user.last_score = s
 

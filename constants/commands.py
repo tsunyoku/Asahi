@@ -20,7 +20,7 @@ import asyncio
 cmds = []
 mp_cmds = []
 
-def command(priv: Privileges = Privileges.Normal, name: str = None, aliases: list = None, elapsed: bool = True, allow_public: bool = False):
+def command(priv: Privileges = Privileges.Normal, name: str = None, aliases: list = [], elapsed: bool = True, allow_public: bool = False):
     def wrapper(cmd_cb):
         cmds.append({
             'name': name,
@@ -701,7 +701,7 @@ async def process(user: Player, msg: str, public: bool = False) -> Optional[str]
     else:
         return f'Unknown command! Use {glob.config.prefix}help for a list of available commands.'
 
-def mp_command(name: str, aliases: list = None, host: bool = True):
+def mp_command(name: str, aliases: list = [], host: bool = True):
     def wrapper(cmd_cb):
         mp_cmds.append({
             'name': name,
