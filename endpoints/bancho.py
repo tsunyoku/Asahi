@@ -837,8 +837,8 @@ async def root_client(request: Request) -> bytes:
             log(f'{p.name} has been successfully verified.', Ansi.LBLUE)
             
         if glob.config.anticheat and not p.priv & Privileges.BypassAnticheat:
-            a = cinfo[3][:-1].split(':')
-            adapters = {'osu_md5': a[0], 'mac_address': a[1], 'uninstall_id': a[2], 'disk_serial': a[3], 'ip': ip}
+            a = cinfo[3][:-1].split(':') # client-provided adapters
+            adapters = {'osu_md5': a[0], 'mac_address': a[1], 'uninstall_id': a[2], 'disk_serial': a[3], 'ip': ip} # prepare adapters for abtucgeat
 
             checks = Anticheat(osuver=cinfo[0], adapters=adapters, player=p, headers=headers)
             
@@ -850,7 +850,8 @@ async def root_client(request: Request) -> bytes:
                 if await checks.version_check(): # client needs updating
                     request.resp_headers['cho-token'] = 'no'
                     return writer.versionUpdateForced() + writer.userID(-2)
-                
+            
+        # start enqueueing login data to the client
         data = bytearray(writer.userID(p.id)) # initiate login by providing the user's id
         data += writer.protocolVersion(19) # no clue what this does
         data += writer.banchoPrivileges(p.client_priv | ClientPrivileges.Supporter)
@@ -870,11 +871,9 @@ async def root_client(request: Request) -> bytes:
 
         # add user to cache?
         glob.players.append(p)
-
-        own_presence = writer.userPresence(p) + writer.userStats(p)
         
         if not p.restricted:
-            glob.players.enqueue(own_presence)
+            glob.players.enqueue(writer.userPresence(p) + writer.userStats(p))
 
         for o in glob.players:
             data += (writer.userPresence(o) + writer.userStats(o)) # enqueue every other logged in user to this user

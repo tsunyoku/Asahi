@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from .player import Player
@@ -46,7 +46,7 @@ class Slot:
     # i actually kind of like this setup
 
     def __init__(self):
-        self.player: Player = None
+        self.player: 'Player' = None
 
         self.status: slotStatus = slotStatus.open
         self.team: Teams = Teams.teamless
@@ -57,14 +57,14 @@ class Slot:
         self.skipped: bool = False
 
     @property
-    def empty(self):
+    def empty(self) -> bool:
         return self.player is None
 
     @property
-    def playing(self):
+    def playing(self) -> bool:
         return self.status is slotStatus.playing and not self.loaded
 
-    def reset(self):
+    def reset(self) -> None:
         self.player = None
 
         self.status = slotStatus.open
@@ -75,7 +75,7 @@ class Slot:
         self.loaded = False
         self.skipped = False
 
-    def copy(self, s):
+    def copy(self, s) -> None:
         self.player = s.player
 
         self.status = s.status
@@ -91,8 +91,8 @@ class Match:
         self.name: str = ''
         self.pw: str = ''
 
-        self.first_host: Player = None
-        self.host: Player = None
+        self.first_host: 'Player' = None
+        self.host: 'Player' = None
 
         self.mods: Mods = Mods.NOMOD
         self.mode: osuModes = osuModes.std
@@ -128,34 +128,34 @@ class Match:
         self.alert_tasks = None
     
     @property
-    def invite(self):
+    def invite(self) -> str:
         return f'osump://{self.id}/{self.pw}'
 
     @property
     def embed(self):
         return f'[{self.invite} {self.name}]'
 
-    def next_free(self):
+    def next_free(self) -> int:
         for sn, s in enumerate(self.slots):
             if s.status == slotStatus.open:
                 return sn
 
-    def get_slot(self, user):
+    def get_slot(self, user: 'Player') -> Optional[Slot]:
         for slot in self.slots:
             if user is slot.player:
                 return slot
 
-    def get_slot_id(self, user):
+    def get_slot_id(self, user: 'Player') -> int:
         for sn, slot in enumerate(self.slots):
             if user is slot.player:
                 return sn
 
-    def unready_players(self, wanted):
+    def unready_players(self, wanted: slotStatus) -> None:
         for slot in self.slots:
             if slot.status is wanted:
                 slot.status = slotStatus.not_ready
 
-    def start(self):
+    def start(self) -> None:
         missing_map = []
 
         for slot in self.slots:
@@ -169,13 +169,15 @@ class Match:
         self.enqueue(writer.matchStart(self), ignore=missing_map)
         self.enqueue_state()
 
-    async def start_battle(self):
+    async def start_battle(self) -> None:
         for slot in self.slots:
             if slot.status & slotStatus.has_player:
+
                 if slot.team is Teams.red:
                     self.clan_1_users.append(slot.player)
                 else:
                     self.clan_2_users.append(slot.player)
+
             else:
                 slot.status = slotStatus.locked
 
@@ -200,25 +202,22 @@ class Match:
             False
         )
 
-    async def clan_scores(self, ignore: list = []):
+    async def clan_scores(self, ignore: list = []) -> None:
         time_waited = 0
 
-        if self.mods & Mods.RELAX:
-            table = 'scores_rx'
-            sort = 'pp'
-        elif self.mods & Mods.AUTOPILOT:
-            table = 'scores_ap'
-            sort = 'pp'
-        else:
-            table = 'scores'
-            sort = 'score'
+        table = self.mode.table
+        sort = self.mode.sort
 
         # average of 1st clan's scores
         clan1_scores = []
         clan1_retry = []
         for m in self.clan_1_users:
             if m.id not in ignore:
-                score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', [m.id, self.bmd5])
+                score = await glob.db.fetchval(
+                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', 
+                    [m.id, self.bmd5]
+                )
+
                 if not score:
                     clan1_retry.append(m.id)
                 else:
@@ -228,7 +227,11 @@ class Match:
         clan2_retry = []
         for m in self.clan_2_users:
             if m.id not in ignore:
-                score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', [m.id, self.bmd5])
+                score = await glob.db.fetchval(
+                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', 
+                    [m.id, self.bmd5]
+                )
+
                 if not score:
                     clan2_retry.append(m.id)
                 else:
@@ -237,14 +240,22 @@ class Match:
         # retry those that missed
         for uid in clan1_retry:
             if uid not in ignore:
-                score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', [m.id, self.bmd5])
+                score = await glob.db.fetchval(
+                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', 
+                    [m.id, self.bmd5]
+                )
+
                 if score:
                     clan1_scores.append(score)
                     clan1_retry.remove(uid)
 
         for uid in clan2_retry:
             if uid not in ignore:
-                score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', [m.id, self.bmd5])
+                score = await glob.db.fetchval(
+                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', 
+                    [m.id, self.bmd5]
+                )
+
                 if score:
                     clan2_scores.append(score)
                     clan2_retry.remove(uid)
@@ -259,14 +270,22 @@ class Match:
         while True:
             for uid in clan1_retry:
                 if uid not in ignore:
-                    score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', [m.id, self.bmd5])
+                    score = await glob.db.fetchval(
+                        f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', 
+                        [m.id, self.bmd5]
+                    )
+
                     if score:
                         clan1_scores.append(score)
                         clan1_retry.remove(uid)
 
             for uid in clan2_retry:
                 if uid not in ignore:
-                    score = await glob.db.fetchval(f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', [m.id, self.bmd5])
+                    score = await glob.db.fetchval(
+                        f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1', 
+                        [m.id, self.bmd5]
+                    )
+
                     if score:
                         clan2_scores.append(score)
                         clan2_retry.remove(uid)
@@ -275,7 +294,7 @@ class Match:
                 await self.clan_sort(clan1_scores, clan2_scores)
                 break
 
-    async def clan_sort(self, clan1_scores, clan2_scores):
+    async def clan_sort(self, clan1_scores: list, clan2_scores: list) -> None:
         if len(clan1_scores) == 0 or len(clan2_scores) == 0:
             return
 
@@ -290,30 +309,32 @@ class Match:
         elif clan2_avg > clan1_avg:
             self.clan_2_wins += 1
 
-        if (self.clan_1_wins >= 5 and self.clan_2_wins >= 5) and (self.clan_1_wins == self.clan_2_wins):
-            # they are drawing, lets continue the match
+        winner = None
+
+        if (self.clan_1_wins >= 5 and self.clan_2_wins >= 5) and (self.clan_1_wins == self.clan_2_wins): # they are drawing, lets continue the match
             pass
         elif self.clan_1_wins >= 5:
-            # clan 1 wins, lets end the match
-            self.chat.send(glob.bot, f'{self.clan_1.name} wins!\n\nFinal Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})\n\nCongratulations! {self.clan_1.name} will receive their extra clan points soon.', False)
-            self.clan_battle = False
-            self.battle_ready = False
-            del glob.clan_battles[self.clan_1]
-            del glob.clan_battles[self.clan_2]
-            self.clan_1.battle = None
-            self.clan_2.battle = None
-            await glob.db.execute('UPDATE clans SET score = score + 50 WHERE id = %s', [self.clan_1.id])
-            return
+            winner = self.clan_1
         elif self.clan_2_wins >= 5:
-            self.chat.send(glob.bot, f'{self.clan_2.name} wins!\n\nFinal Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})\n\nCongratulations! {self.clan_2.name} will receive their extra clan points soon.', False)
+            winner = self.clan_2
+        
+        if winner:
+            self.chat.send(
+                glob.bot,
+                f'{winner.name} wins!\n\n'
+                f'Final Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})\n\n'
+                f'Congratulations! {winner.name} will receive their extra clan points soon.',
+                False
+            )
+            
             self.clan_battle = False
             self.battle_ready = False
-            del glob.clan_battles[self.clan_1]
-            del glob.clan_battles[self.clan_2]
-            self.clan_1.battle = None
-            self.clan_2.battle = None
-            await glob.db.execute('UPDATE clans SET score = score + 50 WHERE id = %s', [self.clan_2.id])
-            return
+            
+            for clan in (self.clan_1, self.clan_2):
+                del glob.clan_battles[clan]
+                clan.battle = None
+                
+            return await glob.db.execute('UPDATE clans SET score = score + 50 WHERE id = %s', [winner.id])
 
         if self.host in self.clan_1_users:
             new_host = await glob.players.get(id=self.clan_2.owner)
@@ -323,16 +344,23 @@ class Match:
             next_pick = self.clan_1
 
         self.host = new_host # alternate turns for map picks
-        self.chat.send(glob.bot, f'Next Clan to Pick: {next_pick.name}\n\nCurrent Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})', False)
+
+        self.chat.send(
+            glob.bot, 
+            f'Next Clan to Pick: {next_pick.name}\n\n'
+            f'Current Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})',
+            False
+        )
+
         self.enqueue_state()
 
-    def enqueue_state(self, lobby: bool = True):
+    def enqueue_state(self, lobby: bool = True) -> None:
         self.chat.enqueue(writer.updateMatch(self, send_pw=True))
 
         if lobby:
             glob.channels['#lobby'].enqueue(writer.updateMatch(self, send_pw=False))
 
-    def enqueue(self, packet, lobby: bool = True, ignore = []):
+    def enqueue(self, packet, lobby: bool = True, ignore = []) -> None:
         self.chat.enqueue(packet, ignore_list=ignore)
 
         if lobby:
