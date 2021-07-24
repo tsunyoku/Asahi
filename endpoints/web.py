@@ -285,11 +285,7 @@ async def getMapScores(request: Request) -> bytes:
         await bmap.check_status()
 
     if not (lb := getattr(bmap, mode.leaderboard)):
-        lb = Leaderboard(bmap, mode)
-
-        # i wish i could do this in one line
-        mlb = getattr(bmap, mode.leaderboard)
-        mlb = lb
+        setattr(bmap, mode.leaderboard, lb := Leaderboard(bmap, mode)) # cursed 1 line lol
         
     return await lb.return_leaderboard(player, lbm, mods)
 
