@@ -306,7 +306,7 @@ class Score:
             return (c.pp, c.sr)
         else: # ctb: use shitty osu-tools
 
-            cmd = [f'./osu-tools/compiled/PerformanceCalculator simulate {nm} {str(path)}']
+            cmd = [f'./osu-tools/compiled/PerformanceCalculator simulate catch {str(path)}']
             
             if self.combo:
                 cmd.append(f'-c {self.combo}') # max combo
