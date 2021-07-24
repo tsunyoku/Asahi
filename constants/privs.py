@@ -27,8 +27,6 @@ class Privileges(IntFlag):
     def get(self, name):
         if name in self.__members__:
             return self[name]
-        else:
-            return None
 
 class ClientPrivileges(IntFlag):
     Player = 1 << 0

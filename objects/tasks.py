@@ -10,13 +10,13 @@ from cmyui import log
 donors = None
 frozen = None
 
-async def prepare_tasks():
+async def prepare_tasks() -> None:
     global donors
     global frozen
     donors = await glob.db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Supporter}')
     frozen = await glob.db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Frozen}')
 
-async def expired_donor():
+async def expired_donor() -> None:
     while True: # this sux   
         for user in list(donors):
             if user['donor_end'] < time.time(): # donor expired
@@ -34,7 +34,7 @@ async def expired_donor():
                 
         await asyncio.sleep(600) # run every 10 mins
         
-async def freeze_timers():
+async def freeze_timers() -> None:
     while True: # this sux v2  
         for user in list(frozen):
             if user['freeze_timer'] < time.time(): # freeze timer passed

@@ -4,7 +4,7 @@ from .player import Player
 
 class Anticheat:
     def __init__(self, **info):
-        self.ver: int = osu_ver.match(info.get('osuver', None))
+        self.ver: int = info.get('osuver', None)
         self.adapters: dict = info.get('adapters', None)
         self.player: Player = info.get('player', None)
         self.headers: dict = info.get('headers', None)
@@ -58,7 +58,15 @@ class Anticheat:
         if not self.ver or any(v in self.ver for v in ('ainu', 'skooter')) or 'ainu' in self.headers:
             return await self.player.restrict(reason='Modified client', fr=glob.bot)
 
-        self.stream = self.ver['stream']
+        matched_ver = osu_ver.match(self.ver)
+        
+        if not matched_ver:
+            return await self.player.restrict(reason='Modified client', fr=glob.bot)
+        
+        self.ver = matched_ver
+        
+        if (stream := self.ver['stream']):
+            self.stream = self.ver['stream']
 
         if not (real_md5 := glob.cache['vers'].get(self.ver)):
             year = self.ver['ver'][0:4]
@@ -73,7 +81,7 @@ class Anticheat:
                     if file_info['filename'] == 'osu!.exe': # found osu client's info, let's check it
                         latest_md5 = file_info['file_hash'] # we know this will be the latest version for this stream
                         date = file_info['timestamp'].split(' ')[0] # we don't want the time, only the date
-                        latest_ver = date.strip('-') # we know this will be the latest version for this stream
+                        latest_ver = date.replace('-', '') # we know this will be the latest version for this stream
 
                         if date == formatted_date:
                             real_md5 = file_info['file_hash']
