@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from aiohttp import ClientSession
     from cmyui import Version
     from objects.player import Player
+    from lists.players import PlayerList
 
     from fatFuckSQL import fatFawkSQL
     import aioredis
@@ -27,7 +28,7 @@ cache = {
     'latest_ver': {}
 }
 
-players = None # player list
+players: 'PlayerList' # player list
 
 geoloc = {} # geoloc dict | geoloc[ip] = geoloc
 channels = {} # channels dict | channel[name] = channel

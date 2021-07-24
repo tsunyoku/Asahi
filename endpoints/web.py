@@ -270,7 +270,10 @@ async def getMapScores(request: Request) -> bytes:
             glob.cache['unsub'].append(md5)
             return b'-1|false'
 
-        exists = await glob.db.fetchval('SELECT 1 FROM maps WHERE artist = %s AND title = %s AND diff = %s AND mapper = %s', [info['artist'], info['title'], info['diff'], info['mapper']])
+        exists = await glob.db.fetchval(
+            'SELECT 1 FROM maps WHERE artist = %s AND title = %s AND diff = %s AND mapper = %s', 
+            [info['artist'], info['title'], info['diff'], info['mapper']]
+        )
 
         if exists:
             return b'1|false' # bmap submitted but not up to date, send update available
@@ -284,6 +287,7 @@ async def getMapScores(request: Request) -> bytes:
     if not (lb := getattr(bmap, mode.leaderboard)):
         lb = Leaderboard(bmap, mode)
 
+        # i wish i could do this in one line
         mlb = getattr(bmap, mode.leaderboard)
         mlb = lb
         
@@ -310,11 +314,20 @@ async def scoreSubmit(request: Request) -> bytes:
         glob.players.enqueue(writer.userStats(s.user))
 
     # submit score and get id xd
-    s.id = await glob.db.execute(f'INSERT INTO {s.mode.table} (md5, score, acc, pp, combo, mods, n300, geki, n100, katu, n50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', [s.map.md5, s.score, s.acc, s.pp, s.combo, int(s.mods), s.n300, s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status.value, s.mode.as_vn, s.time, s.user.id, s.readable_mods, s.fc])
+    s.id = await glob.db.execute(
+        f'INSERT INTO {s.mode.table} (md5, score, acc, pp, combo, mods, n300, '
+        f'geki, n100, katu, n50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES '
+        f'(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', 
+        [s.map.md5, s.score, s.acc, s.pp, s.combo, int(s.mods), s.n300, 
+         s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status.value, s.mode.as_vn, s.time, s.user.id, s.readable_mods, s.fc]
+    )
     
     if s.status == scoreStatuses.Best:
         # set any other best scores to submitted ones as they've been overwritten
-        await glob.db.execute(f'UPDATE {s.mode.table} SET status = 1 WHERE status = 2 AND uid = %s AND md5 = %s AND mode = %s AND id != %s', [s.user.id, s.map.md5, s.mode.as_vn, s.id])
+        await glob.db.execute(
+            f'UPDATE {s.mode.table} SET status = 1 WHERE status = 2 AND uid = %s AND md5 = %s AND mode = %s AND id != %s', 
+            [s.user.id, s.map.md5, s.mode.as_vn, s.id]
+        )
 
     # save replay if not a failed score
     if s.status != scoreStatuses.Failed:
@@ -337,7 +350,10 @@ async def scoreSubmit(request: Request) -> bytes:
     
     cap = glob.config.pp_caps[s.mode.value]
 
-    if cap is not None and s.pp >= cap and s.map.status & mapStatuses.GIVE_PP and glob.config.anticheat and not s.user.restricted and not s.user.priv & Privileges.Whitelisted: # ugly
+    if cap is not None and s.pp >= cap \
+        and s.map.status & mapStatuses.GIVE_PP and glob.config.anticheat \
+        and not s.user.restricted and not s.user.priv & Privileges.Whitelisted: # ugly
+
         await s.user.restrict(reason=f'Exceeding PP cap ({s.pp:,}pp) on {s.map.name}', fr=glob.bot)
 
     # update stats EEEEEEE
@@ -468,7 +484,7 @@ async def scoreSubmit(request: Request) -> bytes:
         
         # update lb cache
         lb = getattr(s.map, s.mode.leaderboard)
-        threading.Thread(target=lb, args=(s.user, s,)).start()
+        threading.Thread(target=lb.set_user_pb, args=(s.user, s,)).start()
         
     s.user.last_score = s
 

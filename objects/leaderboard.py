@@ -8,6 +8,7 @@ from constants.privs import Privileges
 from objects import glob
 
 from functools import cached_property
+from typing import Optional
 
 class Leaderboard:
     def __init__(self, bmap: Beatmap, mode: osuModes):
@@ -21,104 +22,120 @@ class Leaderboard:
         self.country_cache = {}
 
     @cached_property
-    def base_body(self):
+    def base_body(self) -> str:
         return f'{self.map.status}|false|{self.map.id}|{self.map.sid}'
 
     @cached_property
-    def map_body(self):
+    def map_body(self) -> str:
         return f'0\n{self.map.name}\n10.0'
 
-    async def return_leaderboard(self, user: Player, lb, mods):
+    async def return_leaderboard(self, user: Player, lb: int, mods: int) -> bytes:
         if self.map.status < mapStatuses.Ranked:
             return f'{self.map.status}|false'.encode()
 
         mode_vn = self.mode.as_vn
 
-        query = [f'SELECT t.id, {self.mode.sort} as s FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE md5 = %s AND mode = %s AND status = 2 AND (NOT users.priv & {int(Privileges.Disallowed)} OR users.id = {user.id})']
+        query = [
+            f'SELECT t.id, {self.mode.sort} as s FROM {self.mode.table} t'
+            f'LEFT OUTER JOIN users ON users.id = t.uid '
+            f'WHERE md5 = %s AND mode = %s AND status = 2 AND '
+            f'(NOT users.priv & {int(Privileges.Disallowed)} OR users.id = {user.id})'
+        ]
+
         p = [self.map.md5, mode_vn]
+        
+        score_cache = None # init value, some lb types won't provide a cache anyways
 
         if lb == 2:
             query.append('AND t.mods = %s')
             p.append(mods)
-            sc = self.mods_cache.get(mods)
+
+            score_cache = self.mods_cache.get(mods)
         elif lb == 3:
             f = user.friends + [user.id]
             query.append(f'AND t.uid IN ({",".join(str(e) for e in f)})')
-            sc = None
         elif lb == 4:
             query.append('AND users.country = %s')
             p.append(user.country_iso.lower())
-            sc = self.country_cache.get(user.country_iso)
-        else:
-            sc = self.score_cache
 
-        query.append('ORDER BY s DESC LIMIT 100')
+            score_cache = self.country_cache.get(user.country_iso)
+        else:
+            score_cache = self.score_cache # global lb so just get all scores lol
+
+        query.append('ORDER BY s DESC LIMIT 100') # we only want the top 100, maybe ill increase this for donators?
 
         scores = await glob.db.fetch(' '.join(query), p)
 
-        mbody = self.base_body + f'|{len(scores)}'
+        map_body = self.base_body + f'|{len(scores)}' # basic info about the map
 
-        base = []
-        base.append(mbody)
-        base.append(self.map_body)
+        base = [] # base info to return (map info + score count)
 
-        pb = await self.get_personal(user)
+        base.append(map_body)
+        base.append(self.map_body) # could be confusing considering we have map_body above... this one is static while the other is not (amount of scores changes)
+
+        pb = await self.get_personal(user) # user's best score (if any)
 
         if pb:
             base.append(pb.calc_lb_format(user))
         else:
-            base.append('')
+            base.append('') # osu! client still expects an empty return if they have no pb
 
-        scrs = []
+        scrs = [] # full list of scores to return
 
-        if sc:
-            scrs.extend(sc)
+        if score_cache:
+            scrs.extend(score_cache) # add the cached scores to our list of scores to return if there's any
         else:
             for s in scores:
-                score = await Score.sql(s['id'], self.mode.table, self.mode.sort, s['s'], ensure=True)
+                score = await Score.sql(s['id'], self.mode.table, self.mode.sort, s['s'], ensure=True) # get score objects from sql, useful for cache
 
-                scrs.append(score)
+                scrs.append(score) # add to list to return
 
-        if sc != scrs:
-            sc = scrs
+        if not score_cache:
+            score_cache = scrs # add scores to cache if they weren't cached previously
 
         s = [s.calc_lb_format(user) for s in scrs]
 
         return '\n'.join(base + s).encode()
 
-    def set_user_pb(self, user: Player, score: Score):
-        self.user_cache[user.name] = score
+    def set_user_pb(self, user: Player, score: Score) -> None:
+        self.user_cache[user.name] = score # set personal cached score
 
-        for s in self.score_cache or []:
-            if s.user.name == user.name:
-                self.score_cache.remove(s)
-                break
+        if (score_cache := self.score_cache):
+            for s in score_cache: 
+                if s.user.name == user.name:
+                    score_cache.remove(s)
+                    break
 
-        for s in self.mods_cache.get(score.mods) or {}:
-            if s.user.name == user.name:
-                self.mods_cache[score.mods].remove(s)
-                break
+        if (mods_cache := self.mods_cache.get(score.mods)):
+            for s in self.mods_cache.get(score.mods) or {}:
+                if s.user.name == user.name:
+                    self.mods_cache[score.mods].remove(s)
+                    break
+        
+        if (country_cache := self.country_cache.get(user.country_iso)):
+            for s in country_cache:
+                if s.user.name == user.name:
+                    country_cache.remove(s)
+                    break
 
-        for s in self.country_cache.get(user.country_iso) or {}:
-            if s.user.name == user.name:
-                self.country_cache[user.country_iso].remove(s)
-                break
+        self.score_cache.append(score) # always add to full cache, even if it is empty
 
-        self.score_cache.append(score)
+        if mods_cache:
+            mods_cache.append(score)
+        
+        if country_cache:
+            country_cache.append(score)
 
-        try:
-            self.mods_cache.get(score.mods).append(score)
-            self.country_cache.get(user.country_iso).append(score)
-        except Exception:
-            pass # no mods/country cache, simply do nothing
-
-    async def get_personal(self, user: Player):
+    async def get_personal(self, user: Player) -> Optional[Score]:
         if user.name in self.user_cache:
             return self.user_cache[user.name]
 
-        mode_vn = self.mode.as_vn
-
-        pbd = await glob.db.fetchrow(f'SELECT {self.mode.table}.id, {self.mode.sort} as s FROM {self.mode.table} WHERE md5 = %s AND mode = %s AND status = 2 AND uid = %s ORDER BY s DESC LIMIT 1', [self.map.md5, mode_vn, user.id])
+        pbd = await glob.db.fetchrow(
+            f'SELECT {self.mode.table}.id, {self.mode.sort} as s FROM {self.mode.table} '
+            f'WHERE md5 = %s AND mode = %s AND status = 2 AND uid = %s '
+            f'ORDER BY s DESC LIMIT 1', 
+            [self.map.md5, self.mode.as_vn, user.id]
+        )
 
         if pbd:
             # score found xd

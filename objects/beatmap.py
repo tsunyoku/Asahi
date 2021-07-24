@@ -1,5 +1,5 @@
 from constants.modes import osuModes
-from constants.statuses import mapStatuses, apiStatuses
+from constants.statuses import mapStatuses
 from constants.privs import Privileges
 from . import glob
 from .menu import Menu
@@ -38,7 +38,7 @@ class Beatmap:
         self.diff: str = minfo.get('diff', '')
         self.mapper: str = minfo.get('mapper', '')
 
-        self.status: int = mapStatuses(minfo.get('status', 0))
+        self.status: 'mapStatuses' = mapStatuses(minfo.get('status', 0))
         self.frozen: bool = minfo.get('frozen', 'False') == 1
         self.update: int = minfo.get('update', 0)
 
@@ -52,19 +52,19 @@ class Beatmap:
         self.passes: int = minfo.get('passes', 0)
 
     @property
-    def name(self):
+    def name(self) -> str:
         return f'{self.artist} - {self.title} [{self.diff}]'
 
     @property
-    def url(self):
+    def url(self) -> str:
         return f'https://osu.{glob.config.domain}/beatmaps/{self.id}'
     
     @property
-    def set_url(self):
+    def set_url(self) -> str:
         return f'https://osu.{glob.config.domain}/beatmapsets/{self.sid}'
 
     @property
-    def embed(self):
+    def embed(self) -> str:
         return f'[{self.url} {self.name}]'
 
     @classmethod
@@ -87,7 +87,7 @@ class Beatmap:
 
         return # not in cache, return nothing so we know to get from sql/api    
 
-    async def np_msg(self, user):
+    async def np_msg(self, user) -> str:
         pp = {}
         for acc in (95, 98, 99, 100):
             pp[acc] = await self.calc_acc(acc)
@@ -95,43 +95,81 @@ class Beatmap:
         msg = (f'{self.embed}  // 95%: {pp[95]}pp | 98%: {pp[98]}pp | 99%: {pp[99]}pp | 100%: {pp[100]}pp'
               f' // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od}')
 
-        # CURSED 1-100 REAL FAST
+        # TODO: CLEAN!!!!!
         if not user.priv & Privileges.Staff:
             if self.status < mapStatuses.Ranked:
                 from constants.commands import req
+
                 _id_reqr = self.sid + 1
                 _id_reql = self.sid + 2
 
-                request_rank = Menu(id=_id_reqr, name='Request to get Ranked', callback=req, args=(user, ('rank',)), destroy=True)
+                request_rank = Menu(
+                    id=_id_reqr, 
+                    name='Request to get Ranked', 
+                    callback=req, 
+                    args=(user, ('rank',)), 
+                    destroy=True
+                )
+
                 glob.menus[_id_reqr] = request_rank
         
-                request_love = Menu(id=self.sid + 2, name='Request to get Loved', callback=req, args=(user, ('love',)), destroy=True)
+                request_love = Menu(
+                    id=self.sid + 2, 
+                    name='Request to get Loved', 
+                    callback=req, 
+                    args=(user, ('love',)), 
+                    destroy=True
+                )
+
                 glob.menus[self.sid + 2] = request_love
                     
                 msg += f' // {request_rank.embed}  {request_love.embed}'
         else:
             from constants.commands import _map
+
             if self.status < mapStatuses.Ranked:
                 _id_rank = self.sid + self.id + 1
                 _id_love = self.sid + self.id + 2
     
-                rank = Menu(id=_id_rank, name='Rank', callback=_map, args=(user, ('rank', 'set',)), destroy=True)
+                rank = Menu(
+                    id=_id_rank,
+                    name='Rank', 
+                    callback=_map, 
+                    args=(user, ('rank', 'set',)), 
+                    destroy=True
+                )
+
                 glob.menus[_id_rank] = rank
 
-                love = Menu(id=_id_love, name='Love', callback=_map, args=(user, ('love', 'set',)), destroy=True)
+                love = Menu(
+                    id=_id_love, 
+                    name='Love', 
+                    callback=_map, 
+                    args=(user, ('love', 'set',)), 
+                    destroy=True
+                )
+
                 glob.menus[_id_love] = love
                     
                 msg += f' // {rank.embed}  {love.embed}'
             else:
                 _id_unrank = self.sid + self.id + 3
-                unrank = Menu(id=_id_unrank, name='Unrank', callback=_map, args=(user, ('unrank', 'set',)), destroy=True)
+
+                unrank = Menu(
+                    id=_id_unrank, 
+                    name='Unrank', 
+                    callback=_map, 
+                    args=(user, ('unrank', 'set',)), 
+                    destroy=True
+                )
+
                 glob.menus[_id_unrank] = unrank
                     
                 msg += f' // {unrank.embed}'
 
         return msg
 
-    async def calc_acc(self, acc: float):
+    async def calc_acc(self, acc: float) -> float:
         path = Path.cwd() / f'resources/maps/{self.id}.osu'
         if not path.exists():
             url = f'https://old.ppy.sh/osu/{self.id}'
@@ -228,7 +266,7 @@ class Beatmap:
         b.diff = bmap['version']
         b.mapper = bmap['creator']
 
-        b.status = int(apiStatuses(int(bmap['approved'])))
+        b.status = mapStatuses.from_api(int(bmap['approved']))
         b.update = dt.strptime(bmap['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
 
         b.nc = time.time()
@@ -287,7 +325,7 @@ class Beatmap:
             b.diff = bmap['version']
             b.mapper = bmap['creator']
 
-            b.status = int(apiStatuses(int(bmap['approved'])))
+            b.status = mapStatuses.from_api(int(bmap['approved']))
             b.update = dt.strptime(bmap['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
             b.frozen = True
 
@@ -302,32 +340,31 @@ class Beatmap:
 
         async with glob.web.get(api, params=params) as resp:
             if resp.status != 200 or not resp:
-                return # request failed, map prob doesnt exist
+                glob.cache['unsub'] = self.md5
+                return # request failed, map prob doesnt exist anymore
             
             data = await resp.json()
             if not data:
-                return
+                glob.cache['unsub'] = self.md5
+                return # request failed, map prob doesnt exist anymore
 
         bmap = await glob.db.fetchrow('SELECT id, status, frozen, `update` FROM maps WHERE id = %s', [self.id])
 
-        exist = {}
-        try:
-            exist[bmap['id']] = {}
-            for k, v in bmap.items():
-                exist[bmap['id']][k] = v
-        except (AttributeError, TypeError):
-            pass
+        in_db = {}
+        in_db[bmap['id']] = {}
+
+        for k, v in bmap.items():
+            in_db[bmap['id']][k] = v
 
         for m in data:
             mid = int(m['beatmap_id'])
-            if mid in exist:
-                current = exist[mid]['status']
-                api = apiStatuses(int(m['approved']))
+
+            if mid in in_db:
+                current = in_db[mid]['status']
+                api = mapStatuses.from_api(int(m['approved']))
 
                 if current != api:
-                    md5 = m['file_md5']
-                
-                    if md5 == self.md5:
+                    if m['file_md5'] == self.md5:
                         self.status = api
 
                         self.nc = time.time() + 3600

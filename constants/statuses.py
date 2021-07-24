@@ -30,13 +30,14 @@ class mapStatuses(IntEnum):
             7: self.Ranked,
             8: self.Loved
         }.get(status)
-
-def apiStatuses(status: int) -> int:
-    if status in (-2, -1, 0):
-        return 0
-
-    if status in (1, 2, 3, 4):
-        return status + 1
+    
+    @classmethod
+    def from_api(self, status: int):
+        if status in (-2, -1, 0):
+            return self.Pending
+        
+        if status in (1, 2, 3, 4):
+            return self(status + 1)
 
 def apiFromDirect(d_status: int) -> int:
     status = mapStatuses.from_direct(d_status)
