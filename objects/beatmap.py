@@ -44,9 +44,9 @@ class Beatmap:
 
         self.nc: int = minfo.get('nc', 0) # nc = next check (for status update)
 
-        self.lb: 'Leaderboard' = minfo.get('lb', None)
-        self.lb_rx: 'Leaderboard' = minfo.get('lb_rx', None)
-        self.lb_ap: 'Leaderboard' = minfo.get('lb_ap', None)
+        self.lb: 'Leaderboard' = minfo.get('lb')
+        self.lb_rx: 'Leaderboard' = minfo.get('lb_rx')
+        self.lb_ap: 'Leaderboard' = minfo.get('lb_ap')
         
         self.plays: int = minfo.get('plays', 0)
         self.passes: int = minfo.get('passes', 0)

@@ -4,10 +4,10 @@ from .player import Player
 
 class Anticheat:
     def __init__(self, **info):
-        self.ver: int = info.get('osuver', None)
-        self.adapters: dict = info.get('adapters', None)
-        self.player: Player = info.get('player', None)
-        self.headers: dict = info.get('headers', None)
+        self.ver: int = info.get('osuver')
+        self.adapters: dict = info.get('adapters')
+        self.player: Player = info.get('player')
+        self.headers: dict = info.get('headers')
         
         self.stream: str = 'stable40' # will be default stream if not ce etc.
         
