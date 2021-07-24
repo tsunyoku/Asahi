@@ -750,7 +750,7 @@ async def root_client(request: Request) -> bytes:
 
         # if server is migrated then passwords are previously stored as bcrypt
         # lets check if we need to convert and do so if needed
-        if glob.config.server_migration and ('$' in user['pw'] and len(user['pw'] == 60)):
+        if glob.config.server_migration and ('$' in user['pw'] and len(user['pw']) == 60):
             user_pw = user['pw'].encode()
             if not bcrypt.checkpw(pw, user_pw):
                 if glob.config.debug:
