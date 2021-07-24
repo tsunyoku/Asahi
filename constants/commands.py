@@ -775,7 +775,7 @@ async def mp_start(_, args: list, match: Match) -> str:
         return 'Unknown argument. Please use seconds/force/cancel'
     
 @mp_command(name='abort')
-async def mp_abort(_, _, match: Match) -> str:
+async def mp_abort(_, _unused, match: Match) -> str:
     """Abort current multiplayer session"""
     if not match.in_prog:
         return
