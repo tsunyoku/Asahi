@@ -7,6 +7,7 @@ from packets import writer
 from constants.privs import Privileges, ClientPrivileges
 from constants.modes import osuModes
 from constants.types import teamTypes
+from constants.mods import Mods
 
 from typing import Optional, TYPE_CHECKING, Union
 from dataclasses import dataclass
@@ -49,7 +50,7 @@ class Player:
         self.action: int = 0
         self.info: str = ''
         self.map_md5: str = ''
-        self.mods: int = 0
+        self.mods: Mods = 0
         self.mode: int = 0
         self.mode_vn: int = 0 
         self.map_id: int = 0
