@@ -12,8 +12,8 @@ class Menu:
         self.name: str = args.get('name', '')
         self.priv: Privileges = args.get('priv', 0)
 
-        self.callback: Union[Coroutine, eval] = args.get('callback', None) # ??
-        self.args: Optional[list] = args.get('args', None)
+        self.callback: Union[Coroutine, eval] = args.get('callback') # ??
+        self.args: Optional[list] = args.get('args')
         
         self.destroy: bool = args.get('destroy', False) # one-time usage
 
