@@ -428,6 +428,25 @@ CREATE TABLE `user_hashes` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --
+-- Table structure for table `favourites`
+--
+
+CREATE TABLE `favourites` (
+  `uid` int(11) NOT NULL,
+  `sid` bigint(20) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Table structure for table `ratings`
+--
+
+CREATE TABLE `ratings` (
+  `uid` int(11) NOT NULL,
+  `md5` varchar(64) NOT NULL,
+  `rating` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
 -- Indexes for dumped tables
 --
 
@@ -518,6 +537,18 @@ ALTER TABLE `user_hashes`
   ADD UNIQUE KEY `uid` (`uid`,`mac_address`,`uninstall_id`,`disk_serial`,`ip`);
 
 --
+-- Indexes for table `favourites`
+--
+ALTER TABLE `favourites`
+  ADD UNIQUE KEY `uid` (`uid`,`sid`);
+
+--
+-- Indexes for table `ratings`
+--
+ALTER TABLE `ratings`
+  ADD UNIQUE KEY `uid` (`uid`,`md5`,`rating`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -576,6 +607,7 @@ ALTER TABLE `users`
 --
 ALTER TABLE `user_achievements`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

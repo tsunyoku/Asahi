@@ -73,9 +73,10 @@ class Beatmap:
             if bid == c.id:
                 return c
 
-        bmap = await glob.db.fetchrow('SELECT * FROM maps WHERE id = $1', bid)
+        bmap = await glob.db.fetchrow('SELECT * FROM maps WHERE id = %s', [bid])
         if not bmap:
-            return
+            await self.cache_from_map(bid)
+            bmap = await glob.db.fetchrow('SELECT * FROM maps WHERE id = %s', [bid])
 
         m = self(**bmap)
         return m
@@ -297,6 +298,47 @@ class Beatmap:
     async def cache_set(self, sid: int):
         api = 'https://old.ppy.sh/api/get_beatmaps'
         params = {'k': glob.config.api_key, 's': sid}
+
+        async with glob.web.get(api, params=params) as resp:
+            if resp.status != 200 or not resp:
+                return
+
+            data = await resp.json()
+            if not data:
+                return
+
+        for bmap in data:
+            b = self()
+            b.id = int(bmap['beatmap_id'])
+            b.sid = int(bmap['beatmapset_id'])
+            b.md5 = bmap['file_md5']
+
+            b.bpm = float(bmap['bpm'])
+            b.cs = float(bmap['diff_size'])
+            b.ar = float(bmap['diff_approach'])
+            b.od = float(bmap['diff_overall'])
+            b.hp = float(bmap['diff_drain'])
+            b.sr = float(bmap['difficultyrating'])
+            b.mode = osuModes(int(bmap['mode']))
+
+            b.artist = bmap['artist']
+            b.title = bmap['title']
+            b.diff = bmap['version']
+            b.mapper = bmap['creator']
+
+            b.status = mapStatuses.from_api(int(bmap['approved']))
+            b.update = dt.strptime(bmap['last_update'], '%Y-%m-%d %H:%M:%S').timestamp()
+            b.frozen = True
+
+            b.nc = time.time()
+
+            await b.save()
+            glob.cache['maps'][b.md5] = b
+
+    @classmethod
+    async def cache_from_map(self, _id: int):
+        api = 'https://old.ppy.sh/api/get_beatmaps'
+        params = {'k': glob.config.api_key, 'b': _id}
 
         async with glob.web.get(api, params=params) as resp:
             if resp.status != 200 or not resp:

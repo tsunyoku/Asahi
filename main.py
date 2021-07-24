@@ -27,7 +27,7 @@ from objects.tasks import expired_donor, freeze_timers, prepare_tasks
 
 app = Xevel(glob.config.socket, loop=asyncio.get_event_loop(), gzip=4) # handler for webserver :D
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
-glob.version = Version(0, 3, 9) # set Asahi version, mainly for future updater but also for tracking
+glob.version = Version(0, 4, 0) # set Asahi version, mainly for future updater but also for tracking
 
 AVA_PATH = Path.cwd() / 'resources/avatars'
 SS_PATH = Path.cwd() / 'resources/screenshots'
@@ -156,11 +156,11 @@ app.add_router(api)
 app.add_router(assets)
 
 if __name__ == '__main__':
-    _filter = lambda x: bool(x.endswith('.py')) # load all available cogs
+    _filter = lambda x: x.endswith('.py') # load all available cogs
     files = plazy.list_files(root='disc', filter_func=_filter, is_include_root=True)
     for file in files:
-            cog_name = file.replace('/', '.')
-            dc.load_extension(cog_name[:-3])
+        cog_name = file.replace('/', '.')
+        dc.load_extension(cog_name[:-3])
 
     app.add_task((dc.start, glob.config.token))
     app.add_task(expired_donor)

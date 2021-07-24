@@ -27,7 +27,7 @@ class Leaderboard:
 
     @cached_property
     def map_body(self) -> str:
-        return f'0\n{self.map.name}\n10.0'
+        return f'0\n{self.map.name}\n'
 
     async def return_leaderboard(self, user: Player, lb: int, mods: int) -> bytes:
         if self.map.status < mapStatuses.Ranked:
@@ -71,7 +71,12 @@ class Leaderboard:
         base = [] # base info to return (map info + score count)
 
         base.append(map_body)
-        base.append(self.map_body) # could be confusing considering we have map_body above... this one is static while the other is not (amount of scores changes)
+        
+        rating = await glob.db.fetchval('SELECT AVG(rating) AS rating FROM ratings WHERE md5 = %s', [self.map.md5])
+        if not rating:
+            rating = 10.0
+
+        base.append(self.map_body + f'{rating:.1f}') # could be confusing considering we have map_body above... this one is static while the other is not (amount of scores changes)
 
         pb = await self.get_personal(user) # user's best score (if any)
 

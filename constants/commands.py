@@ -316,7 +316,7 @@ async def _map(user: Player, args: list) -> str:
 
     return 'Status updated!'
 
-@command(priv=Privileges.Nominator, name=['requests', 'reqs'], elapsed=False)
+@command(priv=Privileges.Nominator, name='requests', aliases=['reqs'], elapsed=False)
 async def reqs(user: Player, _) -> str:
     """View all map status requests on the server"""
     if (requests := await glob.db.fetch('SELECT * FROM requests')):
@@ -732,7 +732,7 @@ async def mp_start(_, args: list, match: Match) -> str:
         return 'Please provide either a timer to start or cancel/force'
     
     if not args[0]: # start now
-        if any(s.status == slotStatus.not_ready for s in match.slots):
+        if any([s.status == slotStatus.not_ready for s in match.slots]):
             return 'Not all players are ready. You can force start with `!mp start force`'
 
     elif args[0] == 'force':

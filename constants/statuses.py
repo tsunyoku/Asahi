@@ -22,7 +22,7 @@ class mapStatuses(IntEnum):
 
     @classmethod
     def from_direct(self, status: int):
-        return {
+        _status = {
             0: self.Ranked,
             2: self.Pending,
             3: self.Qualified,
@@ -30,6 +30,8 @@ class mapStatuses(IntEnum):
             7: self.Ranked,
             8: self.Loved
         }.get(status)
+        
+        return self.to_api(_status)
     
     @classmethod
     def from_api(self, status: int):
@@ -39,16 +41,14 @@ class mapStatuses(IntEnum):
         if status in (1, 2, 3, 4):
             return self(status + 1)
 
-def apiFromDirect(d_status: int) -> int:
-    status = mapStatuses.from_direct(d_status)
-
-    return {
-        mapStatuses.Pending: 0,
-        mapStatuses.Ranked: 1,
-        mapStatuses.Approved: 2,
-        mapStatuses.Qualified: 3,
-        mapStatuses.Loved: 4
-    }.get(status)
+    def to_api(self) -> int:
+        return {
+            self.Pending: 0,
+            self.Ranked: 1,
+            self.Approved: 2,
+            self.Qualified: 3,
+            self.Loved: 4
+        }.get(self)
 
 class scoreStatuses(Enum):
     Failed = 0

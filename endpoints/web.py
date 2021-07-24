@@ -16,12 +16,13 @@ import time
 import copy
 import threading
 import asyncio
+import orjson
 
 from objects import glob
 from objects.beatmap import Beatmap
 from objects.score import Score
 from constants.modes import lbModes
-from constants.statuses import mapStatuses, scoreStatuses, apiFromDirect
+from constants.statuses import mapStatuses, scoreStatuses
 from constants.mods import Mods
 from constants.privs import Privileges
 from constants.flags import osuFlags
@@ -94,11 +95,11 @@ async def getScreenshot(request: Request, scr: str) -> bytes:
         return b'could not find screenshot'
 
 @web.route("/web/osu-getseasonal.php")
-async def seasonalBG(request: Request) -> list:
+async def seasonalBG(_) -> list:
     return glob.config.menu_bgs
 
 @web.route("/web/bancho_connect.php")
-async def banchoConnect(request: Request) -> bytes:
+async def banchoConnect(_) -> bytes:
     return b'asahi is gamer owo'
 
 @web.route("/web/osu-getfriends.php")
@@ -116,7 +117,7 @@ async def mapDownload(request: Request, mid: str) -> tuple[int, bytes]:
     return (301, b'') # redirect
 
 def directMapFormat(diff: dict) -> str:
-    return f'{diff["DiffName"]} ({diff["DifficultyRating"]}⭐)@{diff["Mode"]}'
+    return f'{diff["DiffName"]} ({diff["DifficultyRating"]:.2f}⭐)@{diff["Mode"]}'
 
 def directSetFormat(bmap: dict, diffs: list) -> str:
     return (f'{bmap["SetID"]}.osz|{bmap["Artist"]}|{bmap["Title"]}|{bmap["Creator"]}'
@@ -139,7 +140,7 @@ async def osuSearch(request: Request) -> Union[tuple, bytes]:
         request_args['mode'] = mode
 
     if (d_status := int(args['r'])) != 4:
-        request_args['status'] = apiFromDirect(d_status)
+        request_args['status'] = mapStatuses.from_direct(d_status)
 
     async with glob.web.get(f"{glob.config.map_api}/api/search", params=request_args) as resp:
         if resp.status != 200:
@@ -158,23 +159,34 @@ async def osuSearch(request: Request) -> Union[tuple, bytes]:
 
     return '\n'.join(ret).encode()
 
-# commenting out til i redo for mirror lol
-# @web.route("/web/osu-search-set.php")
-# async def osuSearchSet(request: Request):
-#     args = request.args
-#     if not await auth(args['u'], args['h'], request):
-#         return b''
-
-#     args['u'] = glob.config.bancho_username
-#     args['h'] = glob.config.bancho_hashed_password
-
-#     async with glob.web.get("https://osu.ppy.sh/web/osu-search-set.php", params=args) as resp:
-#         if resp.status != 200:
-#             return (resp.status, b'0')
-
-#         ret = await resp.read()
-
-#     return (resp.status, ret)
+@web.route("/web/osu-search-set.php")
+async def osuSearchSet(request: Request) -> bytes:
+    args = request.args
+    if not await auth(args['u'], args['h'], request):
+        return b''
+    
+    if 'b' in args: # wants beatmap
+        _type, value = ('id', args['b'])
+    elif 's' in args: # wants beatmapset
+        _type, value = ('sid', args['s'])
+    else:
+        return
+        
+    _set = await glob.db.fetchrow(f'SELECT DISTINCT * FROM maps WHERE {_type} = %s', [value])
+    
+    if not _set: # get it from api and then grab it again!
+        if 's' in args:
+            await Beatmap.cache_set(args['s'])
+        elif 'b' in args:
+            await Beatmap.cache_from_map(args['b'])
+        
+        _set = await glob.db.fetchrow(f'SELECT DISTINCT * FROM maps WHERE {_type} = %s', [value])
+        
+    return (
+        f'{_set["sid"]}.osz|{_set["artist"]}|{_set["title"]}|'
+        f'{_set["mapper"]}|{_set["status"]}|10.0|{_set["update"]}|'
+        f'{_set["sid"]}|0|0|0|0|0'
+    ).encode()
 
 @web.route("/users", ['POST'])
 async def ingameRegistration(request: Request) -> Union[dict, bytes]:
@@ -230,13 +242,46 @@ async def osuUpdates(request: Request) -> bytes:
     return ret
 
 @web.route("/web/osu-getbeatmapinfo.php")
-async def osuMapInfo(request: Request) -> None: # TODO
+async def osuMapInfo(request: Request) -> bytes:
     args = request.args
     if not await auth(args['u'], args['h'], request):
         return b''
 
-    data = request.body
-    ...
+    data = orjson.loads(request.body)
+    player = request.extras.get('player')
+    
+    ret = []
+
+    for idx, file in enumerate(data['Filenames']):
+        if not (info := regexes.map_file.match(unquote(file))): # once again osu why
+            continue
+
+        _map = await glob.db.fetchrow(
+            'SELECT id, sid, md5, status FROM maps WHERE artist = %s AND title = %s AND diff = %s AND mapper = %s',
+            [info['artist'], info['title'], info['diff'], info['mapper']]
+        )
+        
+        if not _map:
+            continue
+        
+        status = mapStatuses(_map['status'])
+        _map['status'] = status.to_api()
+        
+        grades = ['N', 'N', 'N', 'N'] # 1 per mode, N = no score?
+        
+        mode_table = osuModes(player.mode).table # use grades for their current mode
+
+        async for s in glob.db.iter(f'SELECT grade, mode FROM {mode_table} WHERE md5 = %s AND uid = %s AND status = 2', [_map['md5'], player.id]):
+            grades[s['mode']] = s['grade']
+            
+        ret.append(
+            f'{idx}|'
+            f'{_map["id"]}|{_map["sid"]}|{_map["md5"]}|'
+            f'{_map["status"]}|{"|".join(grades)}'
+        )
+        
+    return '\n'.join(ret).encode()
+        
 
 @web.route("/web/osu-osz2-getscores.php")
 async def getMapScores(request: Request) -> bytes:
@@ -542,3 +587,66 @@ async def lastFM(request: Request) -> Optional[bytes]:
         return await player.restrict(reason='osu!anticheat flags (aqn)', fr=glob.bot)
 
     return b'-3'
+
+@web.route("/web/osu-addfavourite.php")
+async def osuAddSetFavourite(request: Request) -> bytes:
+    args = request.args
+    if not await auth(args['u'], args['h'], request):
+        return b'Please login to add favourites!' # request-specific auth error? XD
+    
+    player = request.extras.get('player')
+    
+    sid = int(args['a'])
+    
+    if await glob.db.fetchval('SELECT 1 FROM favourites WHERE uid = %s AND sid = %s', [player.id, sid]):
+        return b'You\'ve already favourited this beatmap!' # request-specific return? XD
+    
+    await glob.db.execute(
+        'INSERT INTO favourites '
+        'VALUES (%s, %s)',
+        [player.id, sid]
+    )
+
+@web.route("/web/osu-getfavourites.php")
+async def osuGetSetFavourites(request: Request) -> bytes:
+    args = request.args
+    if not await auth(args['u'], args['h'], request):
+        return b''
+    
+    player = request.extras.get('player')
+    favourites = await glob.db.fetchall('SELECT sid FROM favourites WHERE uid = %s', [player.id])
+    
+    return '\n'.join(favourites).encode()
+
+@web.route("/web/osu-rate.php")
+async def osuAddMapRating(request: Request) -> bytes:
+    args = request.args
+    if not await auth(args['u'], args['h'], request):
+        return b'auth fail' # request-specific auth error? XD
+    
+    md5 = args['c']
+    player = request.extras.get('player')
+    
+    if 'v' not in args: # verifying we can rate the map?
+        if md5 in glob.cache['unsub']:
+            return b'no exist'
+        
+        _map = await Beatmap.from_md5(md5)
+        
+        if _map.status < mapStatuses.Ranked:
+            return b'not ranked'
+        
+        if not await glob.db.fetchval('SELECT 1 FROM ratings WHERE md5 = %s AND uid = %s', [md5, player.id]):
+            return b'ok'
+    else: # already verified, we just need to add the rating
+        rating = int(args['v'])
+        
+        await glob.db.execute(
+            'INSERT INTO ratings '
+            'VALUES (%s, %s, %s)',
+            [player.id, md5, rating]
+        )
+        
+    # already voted/just voted, we'll return the average rating
+    avg = await glob.db.fetchval('SELECT AVG(rating) AS average FROM ratings WHERE md5 = %s', [md5])
+    return f'alreadyvoted\n{avg}'.encode()
