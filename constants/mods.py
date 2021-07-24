@@ -63,7 +63,7 @@ class Mods(IntFlag):
         split_mods = [mods[char:char + 2].upper() for char in range(0, len(mods), 2)]
         
         for mod in split_mods:
-            if not mod in mods_str:
+            if mod not in mods_str:
                 continue
 
             _mods |= mods_str[mod]
