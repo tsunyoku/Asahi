@@ -55,7 +55,7 @@ class Score:
         self.osuver: int = None
         self.ur: float = None
 
-    async def format(self):
+    async def format(self) -> str:
         msg = f'{self.user.name} | {self.map.name} +{self.readable_mods} {self.acc:.2f}% {"FC" if not self.miss else f"{self.miss}xMiss"} {round(self.pp):,}pp'
         
         if self.miss:
@@ -179,7 +179,7 @@ class Score:
 
         return s
 
-    async def analyse(self):
+    async def analyse(self) -> None:
         # BIG NOTE: THIS IS MORE OF A PREVENTATIVE MEASURE TO STOP BLATANT CHEATERS. SOME VERY GOOD LEGIT PLAYERS COULD GET FLAGGED BY THIS SO PLEASE BE AWARE
         # however: 9 times out of 10 this shouldn't false ban, most players getting e.g sub 60 ur will be relax cheats. but maybe you have umbre playing on your server, i don't know.
 
@@ -197,7 +197,7 @@ class Score:
 
         threading.Thread(target=self.replay_check, args=(rp,), daemon=True).start()
             
-    def replay_check(self, rp):
+    def replay_check(self, rp: str) -> None:
         cg = Circleguard(glob.config.api_key)
         replay = ReplayString(rp)
 
@@ -222,7 +222,7 @@ class Score:
         if (ft := cg.frametime(replay)) < 14:
             asyncio.run(self.user.restrict(reason=f'timewarp cheating (frametime: {ft:.2f}) on {self.map.name}', fr=glob.bot))
             
-    async def announce_n1(self):
+    async def announce_n1(self) -> None:
         msg = f'[{self.mode!r}] {self.user.embed} achieved #1 on {self.map.embed} +{self.readable_mods}'
 
         if self.map.status != mapStatuses.Loved:
@@ -236,7 +236,7 @@ class Score:
         chan = glob.channels['#announce']
         chan.send(glob.bot, msg, True)
 
-    def calc_lb_format(self, user):
+    def calc_lb_format(self, user: Player) -> str:
         if self.mode.value > 3:
             val = round(self.pp)
         else:
@@ -247,13 +247,22 @@ class Score:
         else:
             nm = self.user.full_name
 
-        return f'{self.id}|{nm}|{val}|{self.combo}|{self.n50}|{self.n100}|{self.n300}|{self.miss}|{self.katu}|{self.geki}|{int(self.fc)}|{self.mods}|{self.user.id}|{self.rank}|{self.time}|1'
+        return (f'{self.id}|{nm}|{val}|{self.combo}|{self.n50}|{self.n100}|{self.n300}|'
+                f'{self.miss}|{self.katu}|{self.geki}|{int(self.fc)}|'
+                f'{self.mods}|{self.user.id}|{self.rank}|{self.time}|1')
 
-    async def calc_lb(self, table, sort, value):
-        lb = await glob.db.fetchval(f'SELECT COUNT(*) AS r FROM {table} LEFT OUTER JOIN users ON users.id = {table}.uid WHERE {table}.md5 = %s AND {table}.mode = %s AND {table}.status = 2 AND NOT users.priv & {Privileges.Disallowed} AND {table}.{sort} > %s', [self.map.md5, self.mode.value, value])
+    async def calc_lb(self, table: str, sort: str, value: int) -> int:
+        lb = await glob.db.fetchval(
+            f'SELECT COUNT(*) AS r FROM {table} '
+            f'LEFT OUTER JOIN users ON users.id = {table}.uid '
+            f'WHERE {table}.md5 = %s AND {table}.mode = %s AND {table}.status = 2 '
+            f'AND NOT users.priv & {Privileges.Disallowed} AND {table}.{sort} > %s', 
+            [self.map.md5, self.mode.value, value]
+        )
+
         return lb + 1 if lb else 1
 
-    async def calc_pp(self, mode_vn):
+    async def calc_pp(self, mode_vn: int) -> tuple[float, float]:
         path = Path.cwd() / f'resources/maps/{self.map.id}.osu'
         if not path.exists():
             url = f'https://old.ppy.sh/osu/{self.map.id}'
@@ -320,7 +329,7 @@ class Score:
             o = orjson.loads(ot.decode('utf-8'))
             return o['pp'], 0.0
 
-    async def score_order(self):
+    async def score_order(self) -> None:
         mode = self.mode.as_vn
 
         if self.mods & Mods.RELAX:
@@ -330,10 +339,22 @@ class Score:
         else:
             t = self.score
 
-        lb = await glob.db.fetchval(f'SELECT COUNT(*) AS r FROM {self.mode.table} t LEFT OUTER JOIN users ON users.id = t.uid WHERE t.md5 = %s AND t.mode = %s AND t.status = 2 AND NOT users.priv & {Privileges.Disallowed} AND t.{self.mode.sort} > %s', [self.map.md5, mode, t])
+        lb = await glob.db.fetchval(
+            f'SELECT COUNT(*) AS r FROM {self.mode.table} t '
+            f'LEFT OUTER JOIN users ON users.id = t.uid '
+            f'WHERE t.md5 = %s AND t.mode = %s AND t.status = 2 '
+            f'AND NOT users.priv & {Privileges.Disallowed} AND t.{self.mode.sort} > %s',
+            [self.map.md5, mode, t]
+        )
+
         self.rank = lb + 1 if lb else 1
 
-        score = await glob.db.fetchrow(f'SELECT id, pp, score FROM {self.mode.table} WHERE uid = %s AND md5 = %s AND mode = %s AND status = 2', [self.user.id, self.map.md5, mode])
+        score = await glob.db.fetchrow(
+            f'SELECT id, pp, score FROM {self.mode.table}'
+            f' WHERE uid = %s AND md5 = %s AND mode = %s AND status = 2', 
+            [self.user.id, self.map.md5, mode]
+        )
+
         if score: # they already have a (best) submitted score
             self.old_best = await Score.sql(score['id'], self.mode.table, self.mode.sort, t)
 
@@ -348,7 +369,7 @@ class Score:
         if not self.passed:
             self.status = scoreStatuses.Failed
 
-    async def calc_info(self):
+    async def calc_info(self) -> None:
         mode = self.mode.as_vn
 
         if mode == 0:
@@ -356,13 +377,20 @@ class Score:
 
             if hits == 0:
                 self.acc = 0.0
+                return
             else:
-                self.acc = 100.0 * ((self.n50 * 50.0) + (self.n100 * 100.0) + (self.n300 * 300.0)) / (hits * 300.0) # ugly asffffff
+                self.acc = 100.0 * (
+                        (self.n50 * 50.0) + 
+                        (self.n100 * 100.0) + 
+                        (self.n300 * 300.0)
+                ) / (hits * 300.0)
+
         elif mode == 1:
             hits = self.n300 + self.n100 + self.miss
 
             if hits == 0:
                 self.acc = 0.0
+                return
             else:
                 self.acc = 100.0 * ((self.n100 * 0.5) + self.n300) / hits
         elif mode == 2:
@@ -370,6 +398,7 @@ class Score:
 
             if hits == 0:
                 self.acc = 0.0
+                return
             else:
                 self.acc = 100.0 * (self.n300 + self.n100 + self.n50) / hits
         elif mode == 3:
@@ -377,5 +406,11 @@ class Score:
 
             if hits == 0:
                 self.acc = 0.0
+                return
             else:
-                self.acc = 100.0 * ((self.n50 * 50.0) + (self.n100 * 100.0) + (self.katu * 200.0) + ((self.n300 + self.geki) * 300.0)) / (hits * 300.0)
+                self.acc = 100.0 * (
+                        (self.n50 * 50.0) + 
+                        (self.n100 * 100.0) + 
+                        (self.katu * 200.0) +
+                        ((self.n300 + self.geki) * 300.0)
+                ) / (hits * 300.0)
