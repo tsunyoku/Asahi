@@ -25,12 +25,12 @@ class osuModes(Enum):
     catch_rx = 6
     std_ap = 7
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return m_str[self.value]
 
     @property
     @cache
-    def table(self):
+    def table(self) -> str:
         if self.value in (4, 5, 6):
             return 'scores_rx'
         elif self.value in (0, 1, 2, 3):
@@ -40,7 +40,7 @@ class osuModes(Enum):
 
     @property
     @cache
-    def as_vn(self):
+    def as_vn(self) -> int:
         if self.value in (0, 4, 7):
             return 0
         elif self.value in (1, 5):
@@ -52,7 +52,7 @@ class osuModes(Enum):
     
     @property
     @cache
-    def sort(self):
+    def sort(self) -> str:
         if self.value > 3:
             return 'pp'
         else:
@@ -60,7 +60,7 @@ class osuModes(Enum):
         
     @property
     @cache
-    def leaderboard(self):
+    def leaderboard(self) -> str:
         if self.value in (4, 5, 6):
             return 'lb_rx'
         elif self.value in (0, 1, 2, 3):
@@ -68,7 +68,7 @@ class osuModes(Enum):
         else:
             return 'lb_ap'
 
-def lbModes(mode: int, mods: int):
+def lbModes(mode: int, mods: int) -> osuModes:
     if mods & Mods.RELAX:
         if mode == 3:
             return osuModes(3)
