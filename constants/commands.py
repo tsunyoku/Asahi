@@ -12,7 +12,7 @@ from .privs import Privileges
 from .types import teamTypes
 from .modes import osuModes
 from .mods import Mods
-from .statuses import strStatuses, mapStatuses
+from .statuses import mapStatuses
 
 import time
 import asyncio
@@ -264,7 +264,7 @@ async def _map(user: Player, args: list) -> str:
         return 'Invalid syntax! Command: !map <rank/love/unrank> <set/map>'
 
     bmap = user.np
-    ns = strStatuses(status)
+    ns = mapStatuses.from_str(status)
 
     if _type == 'map':
         bmap.status = ns
@@ -386,7 +386,7 @@ async def req(user: Player, args: list) -> str:
     if _map.status == mapStatuses.Ranked:
         return 'This map is already ranked!'
     
-    ns = strStatuses(args[0])
+    ns = mapStatuses.from_str(args[0])
     
     await glob.db.execute('INSERT IGNORE INTO requests (requester, map, status, mode) VALUES (%s, %s, %s, %s)', [user.name, user.np.id, int(ns), user.mode_vn])
 
@@ -598,7 +598,7 @@ async def a_req(user: Player, args: list) -> str:
 
     request = await glob.db.fetchrow('SELECT * FROM requests WHERE id = %s', [int(args[0])])
     _map = await Beatmap.bid_fetch(request['map'])
-    ns = strStatuses(args[1])
+    ns = mapStatuses.from_str(args[1])
 
     # TODO: better management for ranking only certain difficulties
     _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $s', [_map.sid])

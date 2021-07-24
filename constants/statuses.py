@@ -10,24 +10,26 @@ class mapStatuses(IntEnum):
     Loved = 5
     
     GIVE_PP = Ranked | Approved
+    
+    @classmethod
+    def from_str(self, status: str):
+        return {
+            'rank': self.Ranked,
+            'love': self.Loved,
+            'ranked': self.Ranked, # because people are stupid
+            'loved': self.Loved # because people are stupid
+        }.get(status, self.Pending)
 
-def strStatuses(status: str) -> mapStatuses:
-    return {
-        'rank': mapStatuses.Ranked,
-        'love': mapStatuses.Loved,
-        'ranked': mapStatuses.Ranked, # because people are stupid
-        'loved': mapStatuses.Loved # because people are stupid
-    }.get(status, mapStatuses.Pending)
-
-def directStatuses(status: int) -> mapStatuses:
-    return {
-        0: mapStatuses.Ranked,
-        2: mapStatuses.Pending,
-        3: mapStatuses.Qualified,
-        5: mapStatuses.Pending,
-        7: mapStatuses.Ranked,
-        8: mapStatuses.Loved
-    }.get(status)
+    @classmethod
+    def from_direct(self, status: int):
+        return {
+            0: self.Ranked,
+            2: self.Pending,
+            3: self.Qualified,
+            5: self.Pending,
+            7: self.Ranked,
+            8: self.Loved
+        }.get(status)
 
 def apiStatuses(status: int) -> int:
     if status in (-2, -1, 0):
@@ -37,7 +39,7 @@ def apiStatuses(status: int) -> int:
         return status + 1
 
 def apiFromDirect(d_status: int) -> int:
-    status = directStatuses(d_status)
+    status = mapStatuses.from_direct(d_status)
 
     return {
         mapStatuses.Pending: 0,

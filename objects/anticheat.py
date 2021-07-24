@@ -4,14 +4,14 @@ from .player import Player
 
 class Anticheat:
     def __init__(self, **info):
-        self.ver: int = info.get('osuver', None)
+        self.ver: int = osu_ver.match(info.get('osuver', None))
         self.adapters: dict = info.get('adapters', None)
         self.player: Player = info.get('player', None)
         self.headers: dict = info.get('headers', None)
         
-        self.stream: str = ''
+        self.stream: str = 'stable40' # will be default stream if not ce etc.
         
-    async def multi_check(self):
+    async def multi_check(self) -> None:
         if not self.adapters:
             return # no adapters??
         
@@ -54,55 +54,50 @@ class Anticheat:
             [self.player.id, mac, uninstall, disk, ip]
         )
 
-    async def client_check(self):
-        if any(v in self.ver for v in ('ainu', 'skooter')) or 'ainu' in self.headers or not osu_ver.match(self.ver):
+    async def client_check(self) -> bool:
+        if not self.ver or any(v in self.ver for v in ('ainu', 'skooter')) or 'ainu' in self.headers:
             return await self.player.restrict(reason='Modified client', fr=glob.bot)
 
-        int_ver = self.ver.replace('b', '') # not int if cuttingedge, but we want stream anyways
-        try:
-            extra_ver = int_ver.split('.')[1] # jfc
-            release_ver = extra_ver[1:]
-        except IndexError: # no extra ver
-            extra_ver = 0
-            release_ver = int_ver[8:] # version has to be 8 in length
+        self.stream = self.ver['stream']
 
-        if not release_ver:
-            release_ver = 'stable40'
+        if not (real_md5 := glob.cache['vers'].get(self.ver)):
+            year = self.ver['ver'][0:4]
+            month = self.ver['ver'][4:6]
+            day = self.ver['ver'][6:8]
+            formatted_date = f'{year}-{month}-{day}' # we need this to match date against the api
 
-        self.stream = release_ver
-
-        if not (true_md5 := glob.cache['vers'].get(self.ver)):
-            year = int_ver[:4]
-            month = int_ver[4:6]
-            day = int_ver[6:8]
-
-            formatted_date = f'{year}-{month}-{day}'
-
-            async with glob.web.get(f'https://osu.ppy.sh/web/check-updates.php?stream={release_ver}&action=check') as update_req:
+            async with glob.web.get(f'https://osu.ppy.sh/web/check-updates.php?stream={self.stream}&action=check') as update_req:
                 data = await update_req.json()
 
-                for finfo in data:
-                    if finfo['filename'] == 'osu!.exe':
-                        latest_md5 = finfo['file_hash']
-                        date = finfo['timestamp'].split(' ')[0]
+                for file_info in data:
+                    if file_info['filename'] == 'osu!.exe': # found osu client's info, let's check it
+                        latest_md5 = file_info['file_hash'] # we know this will be the latest version for this stream
+                        date = file_info['timestamp'].split(' ')[0] # we don't want the time, only the date
+                        latest_ver = date.strip('-') # we know this will be the latest version for this stream
+
                         if date == formatted_date:
-                            true_md5 = finfo['file_hash']
+                            real_md5 = file_info['file_hash']
 
                         break
-                else:
-                    true_md5 = self.adapters['osu_md5'] # gonna have to trust the client i guess, this shouldn't happen as asahi will force the latest version anyways
 
-            glob.cache['vers'][self.ver] = true_md5
-            glob.cache['latest_ver'][self.stream] = latest_md5
+            glob.cache['latest_ver'][self.stream] = {'md5': latest_md5, 'ver': latest_ver}
+            if not real_md5: # not latest version, we'll just return False so it can enforce an update
+                return False
 
-        if self.adapters['osu_md5'] != true_md5:
+            glob.cache['vers'][self.ver] = real_md5 # even if they aren't on latest, let's store the md5 for the version they're running
+
+        if self.adapters['osu_md5'] != real_md5:
             await self.player.restrict(reason='Modified client', fr=glob.bot)
             return True # we'll skip version check if they are restricted from this, else they won't be notified and end up in infinite loop
         
         return False # nothing found
             
-    async def version_check(self): # only for update check, modified client check above
-        if self.adapters['osu_md5'] != glob.cache['latest_ver'][self.stream]:
+    async def version_check(self) -> bool: # only for update check, modified client check above
+        # oooooooooooo this is ugly!
+        latest_md5 = self.adapters['osu_md5'] == glob.cache['latest_ver'][self.stream]['md5']
+        latest_ver = self.ver['ver'] == glob.cache['latest_ver'][self.stream]['ver']
+
+        if not latest_md5 or not latest_ver:
             return True
         
         return False
