@@ -21,7 +21,7 @@ import orjson
 from objects import glob
 from objects.beatmap import Beatmap
 from objects.score import Score
-from constants.modes import lbModes
+from constants.modes import lbModes, osuModes
 from constants.statuses import mapStatuses, scoreStatuses
 from constants.mods import Mods
 from constants.privs import Privileges
