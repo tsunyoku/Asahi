@@ -32,7 +32,7 @@ class asahiBot(commands.Cog):
         self.set_status.cancel()
 
     @commands.Cog.listener()
-    async def on_command_error(self, ctx, error) -> None:
+    async def on_command_error(self, _, error) -> None:
         if isinstance(error, commands.errors.CommandNotFound):
             pass
 

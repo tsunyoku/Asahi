@@ -335,9 +335,9 @@ async def stop_spec(user: Player, _) -> None:
 async def spec_frames(user: Player, p: bytes) -> None:
     frames = (reader.handle_packet(p, (('frames', osuTypes.raw),)))['frames']
     
-    spec_frames = writer.spectateFrames(frames)
+    frames_packet = writer.spectateFrames(frames)
     for u in user.spectators: # playerlist instances for spectators?
-        u.enqueue(spec_frames)
+        u.enqueue(frames_packet)
 
 @packet(Packets.OSU_JOIN_LOBBY)
 async def join_lobby(user: Player, _) -> None:
