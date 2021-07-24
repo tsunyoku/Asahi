@@ -356,7 +356,7 @@ async def create_match(user: Player, p: bytes) -> None:
     if not glob.matches.get(match.id):
         return user.enqueue(writer.matchJoinFail())
     
-    mp_chan = Channel(name=f'#multiplayer', desc=f'Multiplayer channel for match ID {match.id}', auto=False, perm=False)
+    mp_chan = Channel(name='#multiplayer', desc=f'Multiplayer channel for match ID {match.id}', auto=False, perm=False)
     glob.channels[f'#multi_{match.id}'] = mp_chan
     match.chat = mp_chan
     
@@ -761,7 +761,7 @@ async def root_client(request: Request) -> bytes:
             else: # correct password, we allow the user to continue but lets convert the password to our new format first
                 k = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b'', backend=backend())
                 new_pw = k.derive(pw).decode('unicode-escape')
-                await glob.db.execute(f'UPDATE users SET pw = %s WHERE id = %s', [new_pw, user['id']])
+                await glob.db.execute('UPDATE users SET pw = %s WHERE id = %s', [new_pw, user['id']])
                 
                 # add to cache for the future
                 glob.cache['pw'][new_pw] = pw
@@ -930,7 +930,7 @@ async def root_client(request: Request) -> bytes:
 
                 data += writer.sendMessage(
                     fromname=glob.bot.name, 
-                    msg=f'Your freeze timer has expired and you have not submitted any liveplay, you have been restricted as a result!', 
+                    msg='Your freeze timer has expired and you have not submitted any liveplay, you have been restricted as a result!', 
                     tarname=p.name, 
                     fromid=glob.bot.id
                 )
@@ -955,7 +955,7 @@ async def root_client(request: Request) -> bytes:
 
             data += writer.sendMessage(
                 fromname=glob.bot.name, 
-                msg=f'Your supporter has expired! Your support perks have been removed.', 
+                msg='Your supporter has expired! Your support perks have been removed.', 
                 tarname=p.name, 
                 fromid=glob.bot.id
             )

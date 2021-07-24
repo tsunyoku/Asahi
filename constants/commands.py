@@ -141,7 +141,7 @@ async def _clan_response(user: Player, args: list) -> Optional[str]:
     user.enqueue(
         writer.sendMessage(
             fromname=glob.bot.name, 
-            msg=f'Request accepted! Creating match...', 
+            msg='Request accepted! Creating match...', 
             tarname=user.name, 
             fromid=glob.bot.id
         )
@@ -169,7 +169,7 @@ async def _clan_response(user: Player, args: list) -> Optional[str]:
 
     glob.matches[match.id] = match
 
-    mp_chan = Channel(name=f'#multiplayer', desc=f'Multiplayer channel for match ID {match.id}', auto=False, perm=False)
+    mp_chan = Channel(name='#multiplayer', desc=f'Multiplayer channel for match ID {match.id}', auto=False, perm=False)
     glob.channels[f'#multi_{match.id}'] = mp_chan
     match.chat = mp_chan
 
@@ -321,7 +321,7 @@ async def _map(user: Player, args: list) -> str:
 @command(priv=Privileges.Nominator, name=['requests', 'reqs'], elapsed=False)
 async def reqs(user: Player, args: list) -> str:
     """View all map status requests on the server"""
-    if (requests := await glob.db.fetch(f'SELECT * FROM requests')):
+    if (requests := await glob.db.fetch('SELECT * FROM requests')):
         ret = []
         for idx, req in enumerate(requests):
             _map = await Beatmap.bid_fetch(req['map'])
@@ -403,7 +403,7 @@ async def req(user: Player, args: list) -> str:
         embed.set_image(url=f'https://assets.ppy.sh/beatmaps/{_map.sid}/covers/card.jpg')
 
         embed.add_field(
-            name=f'New request', 
+            name='New request', 
             value=f'{user.name} requested [{_map.name}]({_map.url}) to be {ns.name.lower()}', 
             inline=True
         )

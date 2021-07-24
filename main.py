@@ -96,13 +96,13 @@ async def connect() -> None: # ran before server startup, used to do things like
     announce = Channel(name='#announce', desc='#1 scores and public announcements will be posted here', auto=True, perm=True)
     glob.channels[announce.name] = announce
     if glob.config.debug:
-        log(f'==== Added channel #announce to channel list ====', Ansi.GREEN)
+        log('==== Added channel #announce to channel list ====', Ansi.GREEN)
 
     # add lobby channel to cache
     lobby = Channel(name='#lobby', desc='Multiplayer lobby', auto=False, perm=True)
     glob.channels[lobby.name] = lobby
     if glob.config.debug:
-        log(f'==== Added channel #lobby to channel list ====', Ansi.GREEN)
+        log('==== Added channel #lobby to channel list ====', Ansi.GREEN)
 
     # add all clans to cache
     async for c in glob.db.iter('SELECT * FROM clans'):

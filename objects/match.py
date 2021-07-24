@@ -182,7 +182,7 @@ class Match:
                 slot.status = slotStatus.locked
 
         if len(self.clan_1_users) != len(self.clan_2_users):
-            self.chat.send(glob.bot, f'There is an uneven amount of users on each team! Please make the teams equal before we start the battle.', False)
+            self.chat.send(glob.bot, 'There is an uneven amount of users on each team! Please make the teams equal before we start the battle.', False)
             return
 
         self.battle_ready = True

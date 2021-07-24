@@ -30,7 +30,7 @@ async def expired_donor() -> None:
                 # user isn't online, we'll remove it ourselves
                 user_priv = Privileges(user['priv'])
                 user_priv &= ~Privileges.Supporter
-                await glob.db.execute(f'UPDATE users SET priv = %s WHERE id = %s', [int(user_priv), user['id']])
+                await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(user_priv), user['id']])
                 
         await asyncio.sleep(600) # run every 10 mins
         
