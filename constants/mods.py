@@ -54,7 +54,7 @@ class Mods(IntFlag):
         return ''.join_str
     
     @classmethod
-    def convert_str(self, mods: str) -> Mods:
+    def convert_str(self, mods: str):
         _mods = self.NOMOD # in case theres none to match
         
         if not mods or mods == 'NM':
