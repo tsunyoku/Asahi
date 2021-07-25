@@ -20,40 +20,41 @@ import asyncio
 import orjson
 import copy
 import threading
+from typing import Optional
 
 class Score:
     def __init__(self):
-        self.id: int = None
-        self.map: Beatmap = None
-        self.user: Player = None
+        self.id: Optional[int] = None
+        self.map: Optional[Beatmap] = None
+        self.user: Optional[Player] = None
 
-        self.score: int = None
-        self.acc: float = None
-        self.n300: int = None
-        self.n100: int = None
-        self.n50: int = None
-        self.miss: int = None
-        self.geki: int = None
-        self.katu: int = None
-        self.grade: Grade = None
-        self.mods: Mods = None
-        self.readable_mods: str = None
-        self.combo: int = None
-        self.mode: osuModes = None
+        self.score: Optional[int] = None
+        self.acc: Optional[float] = None
+        self.n300: Optional[int] = None
+        self.n100: Optional[int] = None
+        self.n50: Optional[int] = None
+        self.miss: Optional[int] = None
+        self.geki: Optional[int] = None
+        self.katu: Optional[int] = None
+        self.grade: Optional[Grade] = None
+        self.mods: Optional[Mods] = None
+        self.readable_mods: Optional[str] = None
+        self.combo: Optional[int] = None
+        self.mode: Optional[osuModes] = None
 
-        self.rank: int = None
-        self.pp: float = None
-        self.sr: float = None
+        self.rank: Optional[int] = None
+        self.pp: Optional[float] = None
+        self.sr: Optional[float] = None
 
-        self.fc: bool = None
-        self.passed: bool = None
-        self.status: scoreStatuses = None
-        self.time: int = None
+        self.fc: Optional[bool] = None
+        self.passed: Optional[bool] = None
+        self.status: Optional[scoreStatuses] = None
+        self.time: Optional[int] = None
 
-        self.old_best: Score = None
+        self.old_best: Optional[Score] = None
 
-        self.osuver: int = None
-        self.ur: float = None
+        self.osuver: Optional[int] = None
+        self.ur: Optional[float] = None
 
     async def format(self) -> str:
         msg = f'{self.user.name} | {self.map.name} +{self.readable_mods} {self.acc:.2f}% {"FC" if not self.miss else f"{self.miss}xMiss"} {round(self.pp):,}pp'
