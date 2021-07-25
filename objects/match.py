@@ -85,8 +85,16 @@ class Slot:
 
 class Match:
     # I AM IN IMMENSE PAIN SOMEONE DIAL 999
-
-    def __init__(self):
+    __slots__ = (
+        'id', 'name', 'pw', 'first_host', 'host',
+        'mods', 'mode', 'fm', 'chat', 'slots',
+        'type', 'win_cond', 'in_prog', 'seed',
+        'bid', 'bname', 'bmd5', 'clan_battle',
+        'clan_1', 'clan_2', 'clan_1_wins', 'clan_2_wins',
+        'battle_ready', 'clan_1_users', 'clan_2_users',
+        'start_task', 'alert_tasks'
+    )
+    def __init__(self) -> None:
         self.id: int = 0
         self.name: str = ''
         self.pw: str = ''
@@ -132,7 +140,7 @@ class Match:
         return f'osump://{self.id}/{self.pw}'
 
     @property
-    def embed(self):
+    def embed(self) -> str:
         return f'[{self.invite} {self.name}]'
 
     def next_free(self) -> int:
@@ -182,7 +190,7 @@ class Match:
                 slot.status = slotStatus.locked
 
         if len(self.clan_1_users) != len(self.clan_2_users):
-            self.chat.send(glob.bot, 'There is an uneven amount of users on each team! Please make the teams equal before we start the battle.', False)
+            self.chat.send(glob.bot, 'There is an uneven amount of users on each team! Please make the teams equal before we start the battle.', send_self=False)
             return
 
         self.battle_ready = True
@@ -190,7 +198,7 @@ class Match:
         self.chat.send(
             glob.bot,
             CLAN_BATTLE_EXPLAIN,
-            False
+            send_self=False
         )
 
         self.chat.send(
@@ -199,10 +207,10 @@ class Match:
             f'\n{self.clan_1.name}: {", ".join(u.name for u in self.clan_1_users)}'
             f'\n{self.clan_2.name}: {", ".join(u.name for u in self.clan_2_users)}'
             '\n\nAny clan members who come online at this point will be unable to participate!',
-            False
+            send_self=False
         )
 
-    async def clan_scores(self, ignore: list = []) -> None:
+    async def clan_scores(self, ignore: list[int] = []) -> None:
         time_waited = 0
 
         table = self.mode.table
@@ -324,7 +332,7 @@ class Match:
                 f'{winner.name} wins!\n\n'
                 f'Final Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})\n\n'
                 f'Congratulations! {winner.name} will receive their extra clan points soon.',
-                False
+                send_self=False
             )
 
             self.clan_battle = False
@@ -349,7 +357,7 @@ class Match:
             glob.bot,
             f'Next Clan to Pick: {next_pick.name}\n\n'
             f'Current Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})',
-            False
+            send_self=False
         )
 
         self.enqueue_state()
@@ -360,7 +368,7 @@ class Match:
         if lobby:
             glob.channels['#lobby'].enqueue(writer.updateMatch(self, send_pw=False))
 
-    def enqueue(self, packet, lobby: bool = True, ignore = []) -> None:
+    def enqueue(self, packet, lobby: bool = True, ignore: list[Player] = []) -> None:
         self.chat.enqueue(packet, ignore_list=ignore)
 
         if lobby:

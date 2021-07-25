@@ -1,5 +1,5 @@
 from xevel import Router, Request
-from cmyui import log, Ansi
+from cmyui.logging import log, Ansi
 from collections import defaultdict
 from urllib.parse import unquote
 from pathlib import Path

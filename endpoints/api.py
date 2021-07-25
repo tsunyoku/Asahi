@@ -1,5 +1,5 @@
 from xevel import Router, Request
-from cmyui import log, Ansi
+from cmyui.logging import log, Ansi
 from cmyui.osu.oppai_ng import OppaiWrapper
 from pathlib import Path
 from datetime import datetime

@@ -1,13 +1,13 @@
 ﻿from objects.player import Player
 from constants.privs import Privileges
 
-from typing import Optional
+from typing import Iterator, Optional
 
 class PlayerList(list[Player]):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Player]:
         return super().__iter__()
 
     def __contains__(self, user: Player) -> bool:
@@ -33,10 +33,10 @@ class PlayerList(list[Player]):
     def unrestricted_users(self) -> list[Player]:
         return [u for u in self if not u.priv & Privileges.Restricted]
 
-    def enqueue(self, packets: bytes, ignored: list = []) -> None:
+    def enqueue(self, data: bytes, ignored: list[Player] = []) -> None:
         for u in self:
             if u not in ignored:
-                u.enqueue(packets)
+                u.enqueue(data)
 
     async def get(self, **kwargs) -> Optional[Player]: # lord this is spaghetti
         for _type in ('id', 'name', 'token', 'discord'):
@@ -54,20 +54,15 @@ class PlayerList(list[Player]):
                 return await Player.from_sql(user, True)
 
     async def find_login(self, name: str, pw: str) -> Optional[Player]:
-        if not (user := await self.get(name=name)):
-            return
+        user = await self.get(name=name)
 
-        if user.pw == pw:
+        if user and user.pw == pw:
             return user
 
     def append(self, user: Player) -> None:
-        if user in self:
-            return
-
-        super().append(user)
+        if user not in self:
+            super().append(user)
 
     def remove(self, user: Player) -> None:
-        if user not in self:
-            return
-
-        super().remove(user)
+        if user in self:
+            super().remove(user)

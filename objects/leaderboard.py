@@ -11,6 +11,9 @@ from functools import cached_property
 from typing import Optional
 
 class Leaderboard:
+    __slots__ = ('map', 'mode',
+                 'user_cache', 'score_cache',
+                 'mods_cache', 'country_cache')
     def __init__(self, bmap: Beatmap, mode: osuModes):
         self.map = bmap
         self.mode = mode

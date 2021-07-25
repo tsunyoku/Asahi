@@ -7,11 +7,14 @@ if TYPE_CHECKING:
     from .player import Player
 
 class Channel:
-    def __init__(self, **cinfo):
-        self.name: str = cinfo.get('name')
-        self.desc: str = cinfo.get('desc')
-        self.auto: bool = cinfo.get('auto', False)
-        self.perm: bool = cinfo.get('perm', False)
+    __slots__ = ('name', 'desc', 'auto', 'perm')
+    def __init__(self, **kwargs):
+        self.name: str = kwargs.get('name')
+        self.desc: str = kwargs.get('desc')
+        self.auto: bool = kwargs.get('auto', False)
+        self.perm: bool = kwargs.get('perm', False) # whether the channel should stay
+                                                   # in the global channels list even
+                                                   # when all players have left
         self.players: list = []
 
     def send(self, f: 'Player', msg: str, send_self: bool) -> None:
@@ -34,7 +37,7 @@ class Channel:
         return len(self.players)
 
     @staticmethod
-    def enqueue(b: bytes, ignore: int = 0, ignore_list: list = []) -> None:
+    def enqueue(b: bytes, ignore: int = 0, ignore_list: list[Player] = []) -> None:
         ignore_list.append(ignore)
 
         glob.players.enqueue(b, ignored=ignore_list)

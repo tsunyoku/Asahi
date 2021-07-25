@@ -3,11 +3,12 @@ from constants.regexes import osu_ver
 from .player import Player
 
 class Anticheat:
-    def __init__(self, **info):
-        self.ver: int = info.get('osuver')
-        self.adapters: dict = info.get('adapters')
-        self.player: Player = info.get('player')
-        self.headers: dict = info.get('headers')
+    __slots__ = ('ver', 'adapters', 'player', 'headers')
+    def __init__(self, **kwargs) -> None:
+        self.ver: int = kwargs.get('osuver')
+        self.adapters: dict = kwargs.get('adapters')
+        self.player: Player = kwargs.get('player')
+        self.headers: dict = kwargs.get('headers')
 
         self.stream: str = 'stable40' # will be default stream if not ce etc.
 
@@ -101,11 +102,6 @@ class Anticheat:
         return False # nothing found
 
     async def version_check(self) -> bool: # only for update check, modified client check above
-        # oooooooooooo this is ugly!
         latest_md5 = self.adapters['osu_md5'] == glob.cache['latest_ver'][self.stream]['md5']
         latest_ver = self.ver['ver'] == glob.cache['latest_ver'][self.stream]['ver']
-
-        if not latest_md5 or not latest_ver:
-            return True
-
-        return False
+        return not (latest_md5 and latest_ver)

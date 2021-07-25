@@ -337,7 +337,7 @@ async def reqs(user: Player, _) -> str:
                 id=_map.id + 1,
                 name='Rank',
                 callback=a_req,
-                args=(user, (req['id'], 'rank')),
+                kwargs=(user, (req['id'], 'rank')),
                 destroy=True
             )
 
@@ -347,7 +347,7 @@ async def reqs(user: Player, _) -> str:
                 id=_map.id + 2,
                 name='Love',
                 callback=a_req,
-                args=(user, (req['id'], 'love')),
+                kwargs=(user, (req['id'], 'love')),
                 destroy=True
             )
 
@@ -357,7 +357,7 @@ async def reqs(user: Player, _) -> str:
                 id=_map.id + 3,
                 name='Deny',
                 callback=d_req,
-                args=(user, (req['id'],)),
+                kwargs=(user, (req['id'],)),
                 destroy=True
             )
 
@@ -737,15 +737,15 @@ async def mp_start(_, args: list, match: Match) -> str:
 
     elif args[0] == 'force':
         match.start()
-        match.chat.send(glob.bot, 'Starting match. Have fun!', False)
+        match.chat.send(glob.bot, 'Starting match. Have fun!', send_self=False)
 
     elif args[0].isdecimal():
         def start_timer():
             match.start()
-            match.chat.send(glob.bot, 'Starting match. Have fun!', False)
+            match.chat.send(glob.bot, 'Starting match. Have fun!', send_self=False)
 
         def alert_timer(remaining):
-            match.chat.send(glob.bot, f'Starting match in {remaining} seconds!', False)
+            match.chat.send(glob.bot, f'Starting match in {remaining} seconds!', send_self=False)
 
         loop = asyncio.get_event_loop()
         timer = int(args[0])

@@ -1,12 +1,12 @@
 from discord.ext import commands, tasks
 from discord import Status, ActivityType, Activity
-from cmyui import log, Ansi
+from cmyui.logging import log, Ansi
 from random import choice
 
 from objects import glob
 
 class asahiBot(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         self.bot = bot
 
     @tasks.loop(minutes=1)

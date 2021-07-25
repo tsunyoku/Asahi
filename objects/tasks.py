@@ -5,14 +5,13 @@ from constants.privs import Privileges
 from objects.player import Player
 from packets import writer
 from . import glob
-from cmyui import log
+from cmyui.logging import log
 
 donors = None
 frozen = None
 
 async def prepare_tasks() -> None:
-    global donors
-    global frozen
+    global donors, frozen
     donors = await glob.db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Supporter}')
     frozen = await glob.db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Frozen}')
 
@@ -30,7 +29,10 @@ async def expired_donor() -> None:
                 # user isn't online, we'll remove it ourselves
                 user_priv = Privileges(user['priv'])
                 user_priv &= ~Privileges.Supporter
-                await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(user_priv), user['id']])
+                await glob.db.execute(
+                    'UPDATE users SET priv = %s WHERE id = %s',
+                    [int(user_priv), user['id']]
+                )
 
         await asyncio.sleep(600) # run every 10 mins
 

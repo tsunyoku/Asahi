@@ -1,9 +1,8 @@
 # external imports (some may require to be installed, install using ext/requirements.txt)
-from xevel import Router, Request # web server :blobcowboi:
-from cmyui import Ansi, log # import console logger (cleaner than print | ansi is for log colours), version handler and database handler
-from geoip2 import database # for geoloc
+from xevel import Router, Request
+from cmyui.logging import Ansi, log
+from geoip2 import database
 
-# pw stuff xd
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
 from cryptography.hazmat.backends import default_backend as backend
@@ -12,10 +11,9 @@ import pyfiglet
 import uuid
 import time
 
-# internal imports
-from objects import glob # glob = global, server-wide objects will be stored here e.g database handler
-from objects.player import Player # Player - player object to store stats, info etc.
-from objects.beatmap import Beatmap # Beatmap - object to score map info etc.
+from objects import glob # global objects
+from objects.player import Player
+from objects.beatmap import Beatmap
 from objects.channel import Channel
 from objects.anticheat import Anticheat
 from objects.match import slotStatus, Teams
@@ -32,7 +30,12 @@ from packets.writer import Packets
 if glob.config.server_migration:
     import bcrypt
 
-bancho = Router({f'c.{glob.config.domain}', f'c4.{glob.config.domain}', f'ce.{glob.config.domain}'}) # handler for webserver :D
+bancho = Router({ # handler for webserver :D
+    f'c.{glob.config.domain}',
+    f'c4.{glob.config.domain}',
+    f'ce.{glob.config.domain}'
+})
+
 rdr = database.Reader('ext/geoloc.mmdb')
 
 def packet(pck: Packets, allow_res: bool = False):
@@ -193,7 +196,7 @@ async def send_msg(user: Player, p: bytes) -> None:
         msg = cmd
         user = glob.bot # bot returns the message
 
-    c.send(user, msg, False)
+    c.send(user, msg, send_self=False)
 
 @packet(Packets.OSU_CHANNEL_JOIN, allow_res=True)
 async def join_chan(user: Player, p: bytes) -> None:
@@ -813,7 +816,11 @@ async def root_client(request: Request) -> bytes:
         else:
             geoloc = glob.geoloc[ip]
 
-        user['country_iso'], user['lat'], user['lon'] = (geoloc.country.iso_code, geoloc.location.latitude, geoloc.location.longitude)
+        user['country_iso'], user['lat'], user['lon'] = (
+            geoloc.country.iso_code,
+            geoloc.location.latitude,
+            geoloc.location.longitude
+        )
         user['country'] = country_codes[user['country_iso']]
 
         # set player object

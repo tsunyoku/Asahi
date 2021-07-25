@@ -29,7 +29,7 @@ class Score:
         'combo', 'mode', 'rank', 'pp', 'sr', 'fc', 'passed',
         'status', 'time', 'old_best', 'osuver', 'ur'
     )
-    def __init__(self):
+    def __init__(self) -> None:
         self.id: Optional[int] = None
         self.map: Optional[Beatmap] = None
         self.user: Optional[Player] = None
@@ -206,9 +206,9 @@ class Score:
 
         threading.Thread(target=self.replay_check, args=(rp,), daemon=True).start()
 
-    def replay_check(self, rp: str) -> None:
+    def replay_check(self, replay_data_str: str) -> None:
         cg = Circleguard(glob.config.api_key)
-        replay = ReplayString(rp)
+        replay = ReplayString(replay_data_str)
 
         if glob.config.similarity_checks:
             # get bancho leaderboards and compare replay
@@ -237,13 +237,20 @@ class Score:
         if self.map.status != mapStatuses.Loved:
             msg += f' worth {self.pp:,.0f}pp'
 
-        prev1 = await glob.db.fetchval(f'SELECT users.name FROM users LEFT OUTER JOIN {self.mode.table} t ON t.uid = users.id WHERE t.md5 = %s AND t.mode = %s AND t.status = 2 AND NOT users.priv & {Privileges.Disallowed} AND t.uid != %s AND t.id != %s ORDER BY t.{self.mode.sort} DESC LIMIT 1', [self.map.md5, self.mode.as_vn, self.user.id, self.id])
+        prev1 = await glob.db.fetchval(
+            f'SELECT users.name FROM users '
+            f'LEFT OUTER JOIN {self.mode.table} t ON t.uid = users.id '
+            f'WHERE t.md5 = %s AND t.mode = %s AND t.status = 2 '
+            f'AND NOT users.priv & {Privileges.Disallowed} AND t.uid != %s '
+            f'AND t.id != %s ORDER BY t.{self.mode.sort} DESC LIMIT 1',
+            [self.map.md5, self.mode.as_vn, self.user.id, self.id]
+        )
 
         if prev1:
             msg += f' (Previous #1: [https://{glob.config.domain}/u/{prev1} {prev1}])'
 
         chan = glob.channels['#announce']
-        chan.send(glob.bot, msg, True)
+        chan.send(glob.bot, msg, send_self=True)
 
     def calc_lb_format(self, user: Player) -> str:
         if self.mode.value > 3:

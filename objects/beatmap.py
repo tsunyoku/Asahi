@@ -4,7 +4,7 @@ from constants.privs import Privileges
 from . import glob
 from .menu import Menu
 
-from cmyui import log, Ansi
+from cmyui.logging import log, Ansi
 from cmyui.osu.oppai_ng import OppaiWrapper
 from pathlib import Path
 from maniera.calculator import Maniera
@@ -21,36 +21,37 @@ if TYPE_CHECKING:
     from .leaderboard import Leaderboard
 
 class Beatmap:
-    def __init__(self, **minfo):
-        self.md5: str = minfo.get('md5', '')
-        self.id: int = minfo.get('id', 0)
-        self.sid: int = minfo.get('sid', 0)
-
-        self.bpm: float = minfo.get('bpm', 0.0)
-        self.cs: float = minfo.get('cs', 0.0)
-        self.ar: float = minfo.get('ar', 0.0)
-        self.od: float = minfo.get('od', 0.0)
-        self.hp: float = minfo.get('hp', 0.0)
-        self.sr: float = minfo.get('sr', 0.00)
-        self.mode: int = osuModes(minfo.get('mode', 0))
-
-        self.artist: str = minfo.get('artist', '')
-        self.title: str = minfo.get('title', '')
-        self.diff: str = minfo.get('diff', '')
-        self.mapper: str = minfo.get('mapper', '')
-
-        self.status: 'mapStatuses' = mapStatuses(minfo.get('status', 0))
-        self.frozen: bool = minfo.get('frozen', 0) == 1
-        self.update: int = minfo.get('update', 0)
-
-        self.nc: int = minfo.get('nc', 0) # nc = next check (for status update)
-
-        self.lb: 'Leaderboard' = minfo.get('lb')
-        self.lb_rx: 'Leaderboard' = minfo.get('lb_rx')
-        self.lb_ap: 'Leaderboard' = minfo.get('lb_ap')
-
-        self.plays: int = minfo.get('plays', 0)
-        self.passes: int = minfo.get('passes', 0)
+    __slots__ = (
+        'md5', 'id', 'sid', 'bpm',
+        'cs', 'ar', 'od', 'hp', 'sr',
+        'mode', 'artist', 'title', 'diff', 'mapper',
+        'status', 'frozen', 'update', 'nc',
+        'lb', 'lb_rx', 'lb_ap', 'plays', 'passes'
+    )
+    def __init__(self, **kwargs) -> None:
+        self.md5: str = kwargs.get('md5', '')
+        self.id: int = kwargs.get('id', 0)
+        self.sid: int = kwargs.get('sid', 0)
+        self.bpm: float = kwargs.get('bpm', 0.0)
+        self.cs: float = kwargs.get('cs', 0.0)
+        self.ar: float = kwargs.get('ar', 0.0)
+        self.od: float = kwargs.get('od', 0.0)
+        self.hp: float = kwargs.get('hp', 0.0)
+        self.sr: float = kwargs.get('sr', 0.00)
+        self.mode: int = osuModes(kwargs.get('mode', 0))
+        self.artist: str = kwargs.get('artist', '')
+        self.title: str = kwargs.get('title', '')
+        self.diff: str = kwargs.get('diff', '')
+        self.mapper: str = kwargs.get('mapper', '')
+        self.status: 'mapStatuses' = mapStatuses(kwargs.get('status', 0))
+        self.frozen: bool = kwargs.get('frozen', 0) == 1
+        self.update: int = kwargs.get('update', 0)
+        self.nc: int = kwargs.get('nc', 0) # nc = next check (for status update)
+        self.lb: 'Leaderboard' = kwargs.get('lb')
+        self.lb_rx: 'Leaderboard' = kwargs.get('lb_rx')
+        self.lb_ap: 'Leaderboard' = kwargs.get('lb_ap')
+        self.plays: int = kwargs.get('plays', 0)
+        self.passes: int = kwargs.get('passes', 0)
 
     @property
     def name(self) -> str:
@@ -105,7 +106,7 @@ class Beatmap:
                     id=_id_reqr,
                     name='Request to get Ranked',
                     callback=req,
-                    args=(user, ('rank',)),
+                    kwargs=(user, ('rank',)),
                     destroy=True
                 )
 
@@ -115,7 +116,7 @@ class Beatmap:
                     id=self.sid + 2,
                     name='Request to get Loved',
                     callback=req,
-                    args=(user, ('love',)),
+                    kwargs=(user, ('love',)),
                     destroy=True
                 )
 
@@ -133,7 +134,7 @@ class Beatmap:
                     id=_id_rank,
                     name='Rank',
                     callback=_map,
-                    args=(user, ('rank', 'set',)),
+                    kwargs=(user, ('rank', 'set',)),
                     destroy=True
                 )
 
@@ -143,7 +144,7 @@ class Beatmap:
                     id=_id_love,
                     name='Love',
                     callback=_map,
-                    args=(user, ('love', 'set',)),
+                    kwargs=(user, ('love', 'set',)),
                     destroy=True
                 )
 
@@ -157,7 +158,7 @@ class Beatmap:
                     id=_id_unrank,
                     name='Unrank',
                     callback=_map,
-                    args=(user, ('unrank', 'set',)),
+                    kwargs=(user, ('unrank', 'set',)),
                     destroy=True
                 )
 

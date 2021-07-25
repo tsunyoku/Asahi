@@ -10,7 +10,7 @@ from constants.types import teamTypes
 
 from typing import Optional, TYPE_CHECKING, Union
 from dataclasses import dataclass
-from cmyui import log, Ansi
+from cmyui.logging import log, Ansi
 from cmyui.discord import Webhook, Embed
 from datetime import datetime, timedelta
 
@@ -18,6 +18,7 @@ import queue
 import time
 
 if TYPE_CHECKING:
+    from objects.achievement import Achievement
     from objects.score import Score
 
 @dataclass
@@ -33,17 +34,27 @@ class Stats:
     playtime: int
 
 class Player:
-    def __init__(self, **uinfo):
-        self.id: int = uinfo.get('id')
-        self.name: str = uinfo.get('name')
-        self.token: str = uinfo.get('token', '') # we will set default token in case of bot which won't have a token provided
-        self.pw: str = uinfo.get('pw') # used for /web/ auth
-        self.offset: int = uinfo.get('offset')
-        self.login_time: int = uinfo.get('login_time')
-        self.priv = uinfo.get('priv', Privileges(0))
-        self.country_iso: str = uinfo.get('country_iso')
-        self.country: int = uinfo.get('country')
-        self.loc: list[float, float] = uinfo.get('loc', [0.0, 0.0]) # store as list cus y not (long, lat)
+    __slots__ = (
+        'id', 'name', 'token', 'pw', 'offset',
+        'login_time', 'priv', 'country_iso', 'country', 'loc',
+        'friends', 'queue', 'action', 'info', 'map_md5',
+        'mods', 'mode', 'mode_vn', 'map_id', 'stats',
+        'achievements', 'spectators', 'spectating', 'channels',
+        'match', 'np', 'last_score', 'clan', 'last_ping',
+        'restricted', 'frozen', 'freeze_timer', 'registered_at',
+        'silence_end', 'donor_end', 'discord'
+    )
+    def __init__(self, **kwargs) -> None:
+        self.id: int = kwargs.get('id')
+        self.name: str = kwargs.get('name')
+        self.token: str = kwargs.get('token', '') # we will set default token in case of bot which won't have a token provided
+        self.pw: str = kwargs.get('pw') # used for /web/ auth
+        self.offset: int = kwargs.get('offset')
+        self.login_time: int = kwargs.get('login_time')
+        self.priv = kwargs.get('priv', Privileges(0))
+        self.country_iso: str = kwargs.get('country_iso')
+        self.country: int = kwargs.get('country')
+        self.loc: list[float, float] = kwargs.get('loc', [0.0, 0.0]) # store as list cus y not (long, lat)
         self.friends: list[int] = []
         self.queue = queue.SimpleQueue()
         self.action: int = 0
@@ -54,10 +65,10 @@ class Player:
         self.mode_vn: int = 0
         self.map_id: int = 0
         self.stats: dict[osuModes, Stats] = {}
-        self.achievements: list = []
+        self.achievements: list['Achievement'] = []
 
-        self.spectators: list[Player] = []
-        self.spectating: Optional[Player] = None
+        self.spectators: list['Player'] = []
+        self.spectating: Optional['Player'] = None
         self.channels: list[Channel] = []
 
         self.match: Optional[Match] = None
@@ -72,16 +83,16 @@ class Player:
         self.restricted: bool = False
         self.frozen: bool = False
 
-        self.freeze_timer: int = uinfo.get('freeze_timer', 0)
+        self.freeze_timer: int = kwargs.get('freeze_timer', 0)
 
-        self.registered_at: int = uinfo.get('registered_at', 0)
-        self.silence_end: int = uinfo.get('silence_end', 0)
-        self.donor_end: int = uinfo.get('donor_end', 0)
+        self.registered_at: int = kwargs.get('registered_at', 0)
+        self.silence_end: int = kwargs.get('silence_end', 0)
+        self.donor_end: int = kwargs.get('donor_end', 0)
 
-        self.discord: int = uinfo.get('discord', 0)
+        self.discord: int = kwargs.get('discord', 0)
 
     @property
-    def full_name(self):
+    def full_name(self) -> str:
         if self.clan:
             return f'[{self.clan.tag}] {self.name}'
         else:
@@ -105,7 +116,7 @@ class Player:
         )
 
         self.friends = []
-        async for user in glob.db.iter("SELECT user2 FROM friends WHERE user1 = %s", [self.id]):
+        async for user in glob.db.iter('SELECT user2 FROM friends WHERE user1 = %s', [self.id]):
             self.friends.append(user['user2'])
 
         clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = %s', [self.id])
@@ -260,7 +271,7 @@ class Player:
             glob.players.enqueue(writer.userStats(self))
 
     @property
-    def current_stats(self):
+    def current_stats(self) -> Stats:
         return self.stats[self.mode]
 
     @property
@@ -330,7 +341,7 @@ class Player:
         self.enqueue(writer.hostSpectatorJoined(user.id))
         log(f'{user.name} started spectating {self.name}.', Ansi.LBLUE)
 
-    def remove_spectator(self, user):
+    def remove_spectator(self, user: 'Player') -> None:
         self.spectators.remove(user)
         user.spectating = None
 
@@ -458,7 +469,7 @@ class Player:
         for chan in self.channels:
             self.leave_chan(chan)
 
-    async def ban(self, reason: str, fr) -> None:
+    async def ban(self, reason: str, fr: 'Player') -> None:
         if self.priv & Privileges.Banned:
             return # ?
 
@@ -503,7 +514,7 @@ class Player:
 
         log(f'{self.name} has been banned for {reason}.', Ansi.LBLUE)
 
-    async def freeze(self, reason: str, fr) -> None:
+    async def freeze(self, reason: str, fr: 'Player') -> None:
         expire = datetime.now() + timedelta(days=7)
 
         if self.frozen:
@@ -545,7 +556,7 @@ class Player:
 
         log(f'{self.name} has been frozen for {reason}.', Ansi.LBLUE)
 
-    async def flag(self, reason: str, fr) -> None:
+    async def flag(self, reason: str, fr: 'Player') -> None:
         await glob.db.execute(
             'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) '
             'VALUES (%s, %s, %s, %s, %s)',
@@ -573,7 +584,7 @@ class Player:
 
         log(f'{self.name} has been flagged for {reason}.', Ansi.LBLUE)
 
-    async def unfreeze(self, reason: str, fr) -> None:
+    async def unfreeze(self, reason: str, fr: 'Player') -> None:
         if not self.frozen:
             return # ?
 
@@ -613,7 +624,7 @@ class Player:
 
         log(f'{self.name} has been unfrozen for {reason}.', Ansi.LBLUE)
 
-    async def unban(self, reason: str, fr) -> None:
+    async def unban(self, reason: str, fr: 'Player') -> None:
         await self.remove_priv(Privileges.Banned)
 
         await glob.db.execute(
@@ -643,7 +654,7 @@ class Player:
 
         log(f'{self.name} has been unbanned for {reason}.', Ansi.LBLUE)
 
-    async def restrict(self, reason: str, fr) -> None:
+    async def restrict(self, reason: str, fr: 'Player') -> None:
         if self.restricted:
             return # ?
 
@@ -690,7 +701,7 @@ class Player:
 
         log(f'{self.name} has been restricted for {reason}.', Ansi.LBLUE)
 
-    async def unrestrict(self, reason: str, fr) -> None:
+    async def unrestrict(self, reason: str, fr: 'Player') -> None:
         await self.remove_priv(Privileges.Restricted)
 
         self.restricted = False
@@ -725,14 +736,14 @@ class Player:
 
         log(f'{self.name} has been unrestricted for {reason}.', Ansi.LBLUE)
 
-    async def unlock_ach(self, ach) -> None:
+    async def unlock_ach(self, ach: 'Achievement') -> None:
         await glob.db.execute('INSERT INTO user_achievements (uid, ach) VALUES (%s, %s)', [self.id, ach.id])
         self.achievements.append(ach)
 
     def enqueue(self, b: bytes) -> None:
         self.queue.put_nowait(b)
 
-    def dequeue(self):
+    def dequeue(self) -> Optional[bytes]:
         try:
             return self.queue.get_nowait()
         except queue.Empty:
