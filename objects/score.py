@@ -23,6 +23,12 @@ import threading
 from typing import Optional
 
 class Score:
+    __slots__ = (
+        'id', 'map', 'user', 'score', 'acc', 'n300', 'n100', 'n50',
+        'miss', 'geki', 'katu', 'grade', 'mods', 'readable_mods',
+        'combo', 'mode', 'rank', 'pp', 'sr', 'fc', 'passed',
+        'status', 'time', 'old_best', 'osuver', 'ur'
+    )
     def __init__(self):
         self.id: Optional[int] = None
         self.map: Optional[Beatmap] = None
