@@ -91,15 +91,15 @@ class Match:
         self.name: str = ''
         self.pw: str = ''
 
-        self.first_host: 'Player' = None
-        self.host: 'Player' = None
+        self.first_host: Optional['Player'] = None
+        self.host: Optional['Player'] = None
 
         self.mods: Mods = Mods.NOMOD
         self.mode: osuModes = osuModes.std
 
         self.fm: bool = False
 
-        self.chat: Channel = None
+        self.chat: Optional[Channel] = None
 
         self.slots: list[Slot] = [Slot() for _ in range(16)] # init match with 16 empty slots
         self.type: teamTypes = teamTypes.head
@@ -114,8 +114,8 @@ class Match:
         self.bmd5: str = ''
 
         self.clan_battle: bool = False
-        self.clan_1: Clan = None
-        self.clan_2: Clan = None
+        self.clan_1: Optional[Clan] = None
+        self.clan_2: Optional[Clan] = None
 
         self.clan_1_wins: int = 0
         self.clan_2_wins: int = 0

@@ -173,7 +173,12 @@ class Player:
 
     async def set_stats(self) -> None:
         for mode in osuModes:
-            stat = await glob.db.fetchrow('SELECT rscore_{0} rscore, acc_{0} acc, pc_{0} pc, tscore_{0} tscore, pp_{0} pp, mc_{0} max_combo, pt_{0} playtime FROM stats WHERE id = %s'.format(mode.name), [self.id])
+            stat = await glob.db.fetchrow(
+                'SELECT rscore_{0} rscore, acc_{0} acc, pc_{0} pc, '
+                'tscore_{0} tscore, pp_{0} pp, mc_{0} max_combo, '
+                'pt_{0} playtime FROM stats WHERE id = %s'.format(mode.name),
+                [self.id]
+            )
 
             stat['rank'] = 0
             stat['country_rank'] = 0
@@ -202,10 +207,11 @@ class Player:
         mode_name = mode.name
 
         s = await glob.db.fetch(
-            f'SELECT {table}.acc, {table}.pp FROM {table} '
-            f'LEFT OUTER JOIN maps ON maps.md5 = {table}.md5 '
-            f'WHERE {table}.uid = %s AND {table}.mode = %s AND {table}.status = 2 AND maps.status IN (2, 3) '
-            f'ORDER BY {table}.pp DESC',
+            'SELECT {0}.acc, {0}.pp FROM {0} '
+            'LEFT OUTER JOIN maps ON maps.md5 = {0}.md5 '
+            'WHERE {0}.uid = %s AND {0}.mode = %s '
+            'AND {0}.status = 2 AND maps.status IN (2, 3) '
+            'ORDER BY {0}.pp DESC'.format(table),
             [self.id, mode_vn]
         )
 
@@ -259,7 +265,7 @@ class Player:
 
     @property
     def safe_name(self) -> str:
-        return self.name.lower().replace(' ', '_').rstrip()
+        return self.name.lower().replace(' ', '_')
 
     @property
     def url(self) -> str:
@@ -286,24 +292,30 @@ class Player:
 
         return priv
 
-    async def add_priv(self, priv: Privileges) -> None:
-        self.priv |= priv
-        await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
-
-    async def remove_priv(self, priv: Privileges) -> None:
-        self.priv &= ~priv
-        await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
-
     async def set_priv(self, priv: Privileges) -> None:
         self.priv = priv
-        await glob.db.execute('UPDATE users SET priv = %s WHERE id = %s', [int(self.priv), self.id])
+        await glob.db.execute(
+            'UPDATE users SET priv = %s WHERE id = %s',
+            [int(self.priv), self.id]
+        )
+
+    async def add_priv(self, priv: Privileges) -> None:
+        await self.set_priv(self.priv | priv)
+
+    async def remove_priv(self, priv: Privileges) -> None:
+        await self.set_priv(self.priv & ~priv)
 
     def add_spectator(self, user) -> None:
         joiner = writer.spectatorJoined(user.id)
         sname = f'#spec_{self.id}'
 
         if not (spec := glob.channels.get(sname)):
-            spec = Channel(name='#spectator', desc=f'Spectator chat for {self.name}', auto=False, perm=False)
+            spec = Channel(
+                name='#spectator',
+                desc=f'Spectator chat for {self.name}',
+                auto=False,
+                perm=False
+            )
             self.join_chan(spec)
             glob.channels[sname] = spec
 
@@ -456,8 +468,8 @@ class Player:
             self.enqueue(writer.userID(-3))
 
         await glob.db.execute(
-            'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES '
-            '(%s, %s, %s, %s, %s)',
+            'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) '
+            'VALUES (%s, %s, %s, %s, %s)',
             ['ban', reason, self.id, fr.id, time.time()]
         )
 
@@ -474,8 +486,17 @@ class Player:
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
 
-            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
-            embed.add_field(name='New banned user', value=f'{self.name} has been banned by {fr.name} for {reason}.', inline=True)
+            embed.set_author(
+                url=f'https://{glob.config.domain}/u/{self.id}',
+                icon_url=f'https://a.{glob.config.domain}/{self.id}',
+                name=self.name
+            )
+
+            embed.add_field(
+                name='New banned user',
+                value=f'{self.name} has been banned by {fr.name} for {reason}.',
+                inline=True
+            )
 
             wh.add_embed(embed)
             await wh.post()
@@ -495,8 +516,8 @@ class Player:
         await glob.db.execute('UPDATE users SET freeze_timer = %s WHERE id = %s', [self.freeze_timer.timestamp(), self.id])
 
         await glob.db.execute(
-            'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES '
-            '(%s, %s, %s, %s, %s)',
+            'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) '
+            'VALUES (%s, %s, %s, %s, %s)',
             ['freeze', reason, self.id, fr.id, time.time()]
         )
 
@@ -505,10 +526,19 @@ class Player:
 
         if (wh_url := glob.config.webhooks['anticheat']):
             wh = Webhook(url=wh_url)
-            embed = Embed(title=f'')
+            embed = Embed(title='')
 
-            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
-            embed.add_field(name='New frozen user', value=f'{self.name} has been frozen by {fr.name} for {reason}.', inline=True)
+            embed.set_author(
+                url=f'https://{glob.config.domain}/u/{self.id}',
+                icon_url=f'https://a.{glob.config.domain}/{self.id}',
+                name=self.name
+            )
+
+            embed.add_field(
+                name='New frozen user',
+                value=f'{self.name} has been frozen by {fr.name} for {reason}.',
+                inline=True
+            )
 
             wh.add_embed(embed)
             await wh.post()
@@ -517,8 +547,8 @@ class Player:
 
     async def flag(self, reason: str, fr) -> None:
         await glob.db.execute(
-            'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES '
-            '(%s, %s, %s, %s, %s)',
+            'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) '
+            'VALUES (%s, %s, %s, %s, %s)',
             ['flag', reason, self.id, fr.id, time.time()]
         )
 
@@ -526,8 +556,17 @@ class Player:
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
 
-            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
-            embed.add_field(name='New flagged user', value=f'{self.name} has been flagged by {fr.name} for {reason}.', inline=True)
+            embed.set_author(
+                url=f'https://{glob.config.domain}/u/{self.id}',
+                icon_url=f'https://a.{glob.config.domain}/{self.id}',
+                name=self.name
+            )
+
+            embed.add_field(
+                name='New flagged user',
+                value=f'{self.name} has been flagged by {fr.name} for {reason}.',
+                inline=True
+            )
 
             wh.add_embed(embed)
             await wh.post()
@@ -545,8 +584,8 @@ class Player:
         await glob.db.execute('UPDATE users SET freeze_timer = 0 WHERE id = %s', [self.id])
 
         await glob.db.execute(
-            'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES '
-            '(%s, %s, %s, %s, %s)',
+            'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) '
+            'VALUES (%s, %s, %s, %s, %s)',
             ['unfreeze', reason, self.id, fr.id, time.time()]
         )
 
@@ -557,8 +596,17 @@ class Player:
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
 
-            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
-            embed.add_field(name='New unfrozen user', value=f'{self.name} has been unfrozen by {fr.name} for {reason}.', inline=True)
+            embed.set_author(
+                url=f'https://{glob.config.domain}/u/{self.id}',
+                icon_url=f'https://a.{glob.config.domain}/{self.id}',
+                name=self.name
+            )
+
+            embed.add_field(
+                name='New unfrozen user',
+                value=f'{self.name} has been unfrozen by {fr.name} for {reason}.',
+                inline=True
+            )
 
             wh.add_embed(embed)
             await wh.post()
@@ -569,8 +617,8 @@ class Player:
         await self.remove_priv(Privileges.Banned)
 
         await glob.db.execute(
-            'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES '
-            '(%s, %s, %s, %s, %s)',
+            'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) '
+            'VALUES (%s, %s, %s, %s, %s)',
             ['unban', reason, self.id, fr.id, time.time()]
         )
 
@@ -578,8 +626,17 @@ class Player:
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
 
-            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
-            embed.add_field(name='New unbanned user', value=f'{self.name} has been unbanned by {fr.name} for {reason}.', inline=True)
+            embed.set_author(
+                url=f'https://{glob.config.domain}/u/{self.id}',
+                icon_url=f'https://a.{glob.config.domain}/{self.id}',
+                name=self.name
+            )
+
+            embed.add_field(
+                name='New unbanned user',
+                value=f'{self.name} has been unbanned by {fr.name} for {reason}.',
+                inline=True
+            )
 
             wh.add_embed(embed)
             await wh.post()
@@ -598,8 +655,8 @@ class Player:
             self.enqueue(writer.restartServer(0)) # force relog if they're online
 
         await glob.db.execute(
-            'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) VALUES '
-            '(%s, %s, %s, %s, %s)',
+            'INSERT INTO punishments (`type`, `reason`, `target`, `from`, `time`) '
+            'VALUES (%s, %s, %s, %s, %s)',
             ['restrict', reason, self.id, fr.id, time.time()]
         )
 
@@ -616,8 +673,17 @@ class Player:
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
 
-            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
-            embed.add_field(name='New restricted user', value=f'{self.name} has been restricted by {fr.name} for {reason}.', inline=True)
+            embed.set_author(
+                url=f'https://{glob.config.domain}/u/{self.id}',
+                icon_url=f'https://a.{glob.config.domain}/{self.id}',
+                name=self.name
+            )
+
+            embed.add_field(
+                name='New restricted user',
+                value=f'{self.name} has been restricted by {fr.name} for {reason}.',
+                inline=True
+            )
 
             wh.add_embed(embed)
             await wh.post()
@@ -642,8 +708,17 @@ class Player:
             wh = Webhook(url=wh_url)
             embed = Embed(title=f'')
 
-            embed.set_author(url=f'https://{glob.config.domain}/u/{self.id}', name=self.name, icon_url=f'https://a.{glob.config.domain}/{self.id}')
-            embed.add_field(name='New unrestricted user', value=f'{self.name} has been unrestricted by {fr.name} for {reason}.', inline=True)
+            embed.set_author(
+                url=f'https://{glob.config.domain}/u/{self.id}',
+                icon_url=f'https://a.{glob.config.domain}/{self.id}',
+                name=self.name
+            )
+
+            embed.add_field(
+                name='New unrestricted user',
+                value=f'{self.name} has been unrestricted by {fr.name} for {reason}.',
+                inline=True
+            )
 
             wh.add_embed(embed)
             await wh.post()

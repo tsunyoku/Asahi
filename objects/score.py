@@ -235,7 +235,7 @@ class Score:
         msg = f'[{self.mode!r}] {self.user.embed} achieved #1 on {self.map.embed} +{self.readable_mods}'
 
         if self.map.status != mapStatuses.Loved:
-            msg += f' worth {round(self.pp):,}pp'
+            msg += f' worth {self.pp:,.0f}pp'
 
         prev1 = await glob.db.fetchval(f'SELECT users.name FROM users LEFT OUTER JOIN {self.mode.table} t ON t.uid = users.id WHERE t.md5 = %s AND t.mode = %s AND t.status = 2 AND NOT users.priv & {Privileges.Disallowed} AND t.uid != %s AND t.id != %s ORDER BY t.{self.mode.sort} DESC LIMIT 1', [self.map.md5, self.mode.as_vn, self.user.id, self.id])
 
