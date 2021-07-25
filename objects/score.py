@@ -63,7 +63,8 @@ class Score:
         self.ur: Optional[float] = None
 
     async def format(self) -> str:
-        msg = f'{self.user.name} | {self.map.name} +{self.readable_mods} {self.acc:.2f}% {"FC" if not self.miss else f"{self.miss}xMiss"} {round(self.pp):,}pp'
+        msg = (f'{self.user.name} | {self.map.name} +{self.readable_mods} {self.acc:.2f}% '
+               f'{"FC" if not self.miss else f"{self.miss}xMiss"} {self.pp:,.0f}pp')
 
         if self.miss:
             fc_score = copy.copy(self)
@@ -80,110 +81,112 @@ class Score:
         return msg
 
     @classmethod
-    async def sql(self, sid: int, table: str, sort: str, t: int, ensure: bool = False):
+    async def from_sql(cls, sid: int, table: str, sort: str,
+                       t: int, ensure: bool = False) -> Optional['Score']:
         score = await glob.db.fetchrow(f'SELECT * FROM {table} WHERE id = %s', [sid])
 
         if not score:
             return
 
-        s = self()
+        self = cls()
 
-        s.id = sid
+        self.id = sid
 
-        s.map = await Beatmap.from_md5(score['md5'])
+        self.map = await Beatmap.from_md5(score['md5'])
 
-        if not s.map:
+        if not self.map:
             return # ?
 
-        s.user = await glob.players.get(id=score['uid'], sql=ensure)
+        self.user = await glob.players.get(id=score['uid'], sql=ensure)
 
-        if not s.user:
-            return s
+        if not self.user:
+            return self
 
-        if not s.map:
+        if not self.map:
             return # ??
 
-        s.pp = score['pp']
-        s.score = score['score']
-        s.combo = score['combo']
-        s.mods = Mods(score['mods'])
-        s.acc = score['acc']
-        s.n300 = score['n300']
-        s.n100 = score['n100']
-        s.n50 = score['n50']
-        s.miss = score['miss']
-        s.geki = score['geki']
-        s.katu = score['katu']
-        s.grade = score['grade']
-        s.fc = score['fc']
-        s.status = scoreStatuses(score['status'])
-        s.mode = lbModes(osuModes(score['mode']).as_vn, s.mods)
+        self.pp = score['pp']
+        self.score = score['score']
+        self.combo = score['combo']
+        self.mods = Mods(score['mods'])
+        self.acc = score['acc']
+        self.n300 = score['n300']
+        self.n100 = score['n100']
+        self.n50 = score['n50']
+        self.miss = score['miss']
+        self.geki = score['geki']
+        self.katu = score['katu']
+        self.grade = score['grade']
+        self.fc = score['fc']
+        self.status = scoreStatuses(score['status'])
+        self.mode = lbModes(osuModes(score['mode']).as_vn, self.mods)
 
-        s.time = score['time']
-        s.passed = s.status.value != 0
+        self.time = score['time']
+        self.passed = self.status.value != 0
 
-        if not s.user.restricted:
-            s.rank = await s.calc_lb(table, sort, t)
+        if not self.user.restricted:
+            self.rank = await self.calc_lb(table, sort, t)
         else:
-            s.rank = 0
+            self.rank = 0
 
-        s.osuver = score['osuver']
+        self.osuver = score['osuver']
 
-        return s
+        return self
 
     @classmethod
-    async def submission(self, base: str, iv: str, pw: str, ver: str):
-        a = RijndaelCbc( # much better fuck one liners
+    async def from_submission(cls, base: str, iv: str,
+                              pw: str, ver: str) -> Optional['Score']:
+        rijndael = RijndaelCbc( # much better fuck one liners
             key=f'osu!-scoreburgr---------{ver}',
             iv=b64decode(iv),
             padding=Pkcs7Padding(32),
             block_size=32
         )
 
-        data = a.decrypt(b64decode(base)).decode().split(':')
+        data = rijndael.decrypt(b64decode(base)).decode().split(':')
 
-        s = self()
+        self = cls()
 
-        s.map = await Beatmap.from_md5(data[0])
+        self.map = await Beatmap.from_md5(data[0])
 
         if (u := await glob.players.get(name=data[1].rstrip())) and u.pw == pw:
-            s.user = u
+            self.user = u
 
-        if not s.user:
-            return s # even if user isnt found, may be related to connection and we want to tell the client to retry
+        if not self.user:
+            return self # even if user isnt found, may be related to connection and we want to tell the client to retry
 
-        if not s.map:
+        if not self.map:
             return # ??
 
         # i wanted to make everything be set in the same order as init but some require all score info to exist first so sadly not :c
-        s.score = int(data[9])
-        s.n300 = int(data[3])
-        s.n100 = int(data[4])
-        s.n50 = int(data[5])
-        s.miss = int(data[8])
-        s.geki = int(data[6])
-        s.katu = int(data[7])
-        s.mods = Mods(int(data[13]))
-        s.readable_mods = repr(Mods(int(data[13])))
-        s.combo = int(data[10])
-        s.mode = lbModes(int(data[15]), s.mods)
+        self.score = int(data[9])
+        self.n300 = int(data[3])
+        self.n100 = int(data[4])
+        self.n50 = int(data[5])
+        self.miss = int(data[8])
+        self.geki = int(data[6])
+        self.katu = int(data[7])
+        self.mods = Mods(int(data[13]))
+        self.readable_mods = repr(Mods(int(data[13])))
+        self.combo = int(data[10])
+        self.mode = lbModes(int(data[15]), self.mods)
 
-        s.fc = data[11] == 'True' # WHY IS OSU GIVING STRING FOR BOOL!!!!!!
-        s.passed = data[14] == 'True' # AGAIN OSU WHY!!!!
-        s.time = round(time.time()) # have to add round cast cus it gives float smh
+        self.fc = data[11] == 'True' # WHY IS OSU GIVING STRING FOR BOOL!!!!!!
+        self.passed = data[14] == 'True' # AGAIN OSU WHY!!!!
+        self.time = round(time.time()) # have to add round cast cus it gives float smh
 
-        s.grade = data[12] if s.passed else 'F'
+        self.grade = data[12] if self.passed else 'F'
 
-        await s.calc_info()
-        s.pp, s.sr = await s.calc_pp(s.mode.as_vn)
-        await s.score_order()
+        await self.calc_info()
+        self.pp, self.sr = await self.calc_pp(self.mode.as_vn)
+        await self.score_order()
 
-        if s.user.restricted:
-            s.rank = 0
+        if self.user.restricted:
+            self.rank = 0
 
-        s.osuver = float(re.sub("[^0-9]", "", ver)) # lol
+        self.osuver = float(re.sub("[^0-9]", "", ver)) # lol
 
-        return s
+        return self
 
     async def analyse(self) -> None:
         # BIG NOTE: THIS IS MORE OF A PREVENTATIVE MEASURE TO STOP BLATANT CHEATERS. SOME VERY GOOD LEGIT PLAYERS COULD GET FLAGGED BY THIS SO PLEASE BE AWARE
@@ -362,7 +365,7 @@ class Score:
         )
 
         if score: # they already have a (best) submitted score
-            self.old_best = await Score.sql(score['id'], self.mode.table, self.mode.sort, t)
+            self.old_best = await Score.from_sql(score['id'], self.mode.table, self.mode.sort, t)
 
             if (self.pp == score['pp'] and self.score > score['score']) or self.pp > score['pp']: # allow scores to overwrite if they have higher score but same pp
                 self.status = scoreStatuses.Best

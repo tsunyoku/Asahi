@@ -542,7 +542,7 @@ async def recalc(user: Player, args: list) -> str:
             )
 
            for sc in scores_db:
-               score = await Score.sql(sc['id'], mode.table, mode.sort, sc['sort'])
+               score = await Score.from_sql(sc['id'], mode.table, mode.sort, sc['sort'])
                score.pp, score.sr = await score.calc_pp(mode.as_vn)
 
                await glob.db.execute(f'UPDATE {mode.table} SET pp = %s WHERE id = %s', [score.pp, score.id])
@@ -565,7 +565,7 @@ async def recalc(user: Player, args: list) -> str:
                 )
 
                for sc in scores_db:
-                   score = await Score.sql(sc['id'], mode.table, mode.sort, sc['sort'])
+                   score = await Score.from_sql(sc['id'], mode.table, mode.sort, sc['sort'])
                    score.pp, score.sr = await score.calc_pp(mode.as_vn)
 
                    await glob.db.execute(f'UPDATE {mode.table} SET pp = %s WHERE id = %s', [score.pp, score.id])

@@ -53,7 +53,7 @@ class Player:
         self.mode: int = 0
         self.mode_vn: int = 0
         self.map_id: int = 0
-        self.stats: dict[osuModes.value, Stats] = {}
+        self.stats: dict[osuModes, Stats] = {}
         self.achievements: list = []
 
         self.spectators: list[Player] = []
@@ -88,8 +88,8 @@ class Player:
             return self.name
 
     @classmethod
-    async def login(self, user: dict):
-        p = self(
+    async def login(cls, user: dict) -> 'Player':
+        self = cls(
             id=user['id'],
             name=user['name'],
             token=user['token'],
@@ -104,31 +104,31 @@ class Player:
             discord=user['discord']
         )
 
-        p.friends = []
-        async for user in glob.db.iter("SELECT user2 FROM friends WHERE user1 = %s", [p.id]):
-            p.friends.append(user['user2'])
+        self.friends = []
+        async for user in glob.db.iter("SELECT user2 FROM friends WHERE user1 = %s", [self.id]):
+            self.friends.append(user['user2'])
 
-        clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = %s', [p.id])
+        clan = await glob.db.fetchval('SELECT clan FROM users WHERE id = %s', [self.id])
         if clan:
-            p.clan = glob.clans.get(clan)
+            self.clan = glob.clans.get(clan)
 
-        if p.priv & Privileges.Restricted:
-            p.restricted = True
+        if self.priv & Privileges.Restricted:
+            self.restricted = True
 
-        if p.priv & Privileges.Frozen:
-            p.frozen = True
+        if self.priv & Privileges.Frozen:
+            self.frozen = True
 
-        db_achs = await glob.db.fetch('SELECT ach FROM user_achievements WHERE uid = %s', [p.id])
+        db_achs = await glob.db.fetch('SELECT ach FROM user_achievements WHERE uid = %s', [self.id])
         for db in db_achs:
             for ach in glob.achievements:
                 if db['ach'] == ach.id:
-                    p.achievements.append(ach)
+                    self.achievements.append(ach)
 
-        return p
+        return self
 
     @classmethod
-    async def from_sql(self, spc: Union[str, int], discord = False):
-
+    async def from_sql(cls, spc: Union[str, int],
+                       discord = False) -> Optional['Player']:
         if discord:
             typ = 'discord'
         elif isinstance(spc, str):
@@ -143,7 +143,7 @@ class Player:
         if not user:
             return
 
-        p = self(
+        self = cls(
             id=user['id'],
             name=user['name'],
             token='',
@@ -159,17 +159,17 @@ class Player:
         )
 
         if (clan := user['clan']):
-            p.clan = glob.clans.get(clan)
+            self.clan = glob.clans.get(clan)
 
-        if p.priv & Privileges.Disallowed:
-            p.restricted = True
+        if self.priv & Privileges.Disallowed:
+            self.restricted = True
 
-        if p.priv & Privileges.Frozen:
-            p.frozen = True
+        if self.priv & Privileges.Frozen:
+            self.frozen = True
 
-        await p.set_stats()
+        await self.set_stats()
 
-        return p
+        return self
 
     async def set_stats(self) -> None:
         for mode in osuModes:

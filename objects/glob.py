@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from fatFuckSQL import fatFawkSQL
     import aioredis
 
-db: 'fatFawkSQL.connect' # type hinting
+db: 'fatFawkSQL' # type hinting
 version: 'Version' # once again, type hinting
 web: 'ClientSession'
 redis: 'aioredis.create_redis_pool'

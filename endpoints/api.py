@@ -235,6 +235,8 @@ async def getLb(request: Request) -> list:
 
     return ret
 
+DATETIME_OFFSET = 0x89F7FF5F7B58000
+
 @api.route("/get_replay")
 async def getReplay(request: Request) -> Union[tuple, bytes]:
     args = request.args
@@ -262,7 +264,7 @@ async def getReplay(request: Request) -> Union[tuple, bytes]:
     if not file.exists():
         return (400, {'message': "replay couldn't be found. please check the score id and try again!"})
 
-    raw = file.read_bytes()
+    raw_replay = file.read_bytes()
 
     # get score from sql
     score = await glob.db.fetchrow(
@@ -271,25 +273,26 @@ async def getReplay(request: Request) -> Union[tuple, bytes]:
         [sid]
     )
 
-    _hash = hashlib.md5(
-        (f'{score["n100"] + score["n300"]}p{score["n50"]}o'
+    # when im not lazy ill use Score.sql to get score object so we can implement rank and shit
+    replay_hash = hashlib.md5((
+        f'{score["n100"] + score["n300"]}p{score["n50"]}o'
         f'{score["geki"]}o{score["katu"]}t'
         f'{score["miss"]}a{score["md5"]}r'
         f'{score["combo"]}e{score["fc"] == 1}y'
         f'{score["name"]}o{score["score"]}u'
         f'0{score["mods"]}True'
-        '').encode() # when im not lazy ill use Score.sql to get score object so we can implement rank and shit
-    ).hexdigest()
+    ).encode()).hexdigest()
 
-    rp = bytearray() # headers timeee
+    buffer = bytearray() # headers timeee
 
-    rp += struct.pack('<Bi', score["m"], score["osuver"] or 20210520) # not all scores will have osuver so lets just send latest (as of this code) version
-    rp += writer.write_string(score["md5"])
+    # not all scores will have osuver so lets just send latest (as of this code) version
+    buffer += struct.pack('<Bi', score["m"], score["osuver"] or 2021_05_20)
+    buffer += writer.write_string(score["md5"])
 
-    rp += writer.write_string(score["name"])
-    rp += writer.write_string(_hash)
+    buffer += writer.write_string(score["name"])
+    buffer += writer.write_string(replay_hash)
 
-    rp += struct.pack('<hhhhhhihBi',
+    buffer += struct.pack('<hhhhhhihBi',
         score["n300"], score["n100"],
         score["n50"], score["geki"],
         score["katu"], score["miss"],
@@ -297,23 +300,22 @@ async def getReplay(request: Request) -> Union[tuple, bytes]:
         score["fc"], score["mods"]
     )
 
-    rp += b'\x00' # graph probably NEVER
+    buffer += b'\x00' # graph probably NEVER
 
-    t = int(score["time"] * 1e7)
-    rp += struct.pack('<q', t + 0x89F7FF5F7B58000) # interesting choice osu
+    buffer += struct.pack('<q', score["time"] * 1_000_000 + DATETIME_OFFSET)
 
-    rp += struct.pack('<i', len(raw))
-    rp += raw
-    rp += struct.pack('<q', sid)
+    buffer += struct.pack('<i', len(raw_replay))
+    buffer += raw_replay
+    buffer += struct.pack('<q', sid)
 
     name = (f'{score["name"]} ~ {score["artist"]} - {score["title"]} [{score["diff"]}] '
-           f'+{score["readable_mods"]} ({datetime.fromtimestamp(score["time"]).strftime("%Y/%m/%d")})')
+           f'+{score["readable_mods"]} ({datetime.fromtimestamp(score["time"]):%Y/%m/%d})')
 
     request.resp_headers['Content-Type'] = 'application/octet-stream'
     request.resp_headers['Content-Description'] = 'File Transfer'
     request.resp_headers['Content-Disposition'] = f'attachment; filename={name}.osr'
 
-    return bytes(rp)
+    return bytes(buffer)
 
 @api.route('/player_scores')
 async def playerScores(req: Request) -> Union[tuple, list]:
@@ -395,7 +397,7 @@ async def playerScores(req: Request) -> Union[tuple, list]:
     return {'scores': scores}
 
 @api.route('/player_search')
-async def searchPlayers(req: Request) -> Union[tuple, list]:
+async def searchPlayers(req: Request) -> tuple[dict[str, object]]:
     args = req.args
 
     query = args.get('search')
@@ -404,7 +406,7 @@ async def searchPlayers(req: Request) -> Union[tuple, list]:
         return (400, {'message': 'please provide a search query!'})
 
     users = await glob.db.fetch('SELECT id, name FROM users WHERE name LIKE %s', [f'{query}%'])
-    return users or []
+    return users or ()
 
 @api.route('/player_most_played')
 async def mostPlayed(req: Request) -> Union[tuple, dict]:

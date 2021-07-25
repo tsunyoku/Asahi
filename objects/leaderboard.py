@@ -91,7 +91,7 @@ class Leaderboard:
             scrs.extend(score_cache) # add the cached scores to our list of scores to return if there's any
         else:
             for s in scores:
-                score = await Score.sql(s['id'], self.mode.table, self.mode.sort, s['s'], ensure=True) # get score objects from sql, useful for cache
+                score = await Score.from_sql(s['id'], self.mode.table, self.mode.sort, s['s'], ensure=True) # get score objects from sql, useful for cache
 
                 scrs.append(score) # add to list to return
 
@@ -144,7 +144,7 @@ class Leaderboard:
 
         if pbd:
             # score found xd
-            pb = await Score.sql(pbd['id'], self.mode.table, self.mode.sort, pbd['s'])
+            pb = await Score.from_sql(pbd['id'], self.mode.table, self.mode.sort, pbd['s'])
         else:
             pb = None
 

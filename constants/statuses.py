@@ -12,34 +12,34 @@ class mapStatuses(IntEnum):
     GIVE_PP = Ranked | Approved
 
     @classmethod
-    def from_str(self, status: str):
+    def from_str(cls, status: str) -> 'mapStatuses':
         return {
-            'rank': self.Ranked,
-            'love': self.Loved,
-            'ranked': self.Ranked, # because people are stupid
-            'loved': self.Loved # because people are stupid
-        }.get(status, self.Pending)
+            'rank': cls.Ranked,
+            'love': cls.Loved,
+            'ranked': cls.Ranked, # because people are stupid
+            'loved': cls.Loved # because people are stupid
+        }.get(status, cls.Pending)
 
     @classmethod
-    def from_direct(self, status: int):
+    def from_direct(cls, status: int) -> 'mapStatuses':
         _status = {
-            0: self.Ranked,
-            2: self.Pending,
-            3: self.Qualified,
-            5: self.Pending,
-            7: self.Ranked,
-            8: self.Loved
+            0: cls.Ranked,
+            2: cls.Pending,
+            3: cls.Qualified,
+            5: cls.Pending,
+            7: cls.Ranked,
+            8: cls.Loved
         }.get(status)
 
-        return self.to_api(_status)
+        return cls.to_api(_status)
 
     @classmethod
-    def from_api(self, status: int):
+    def from_api(cls, status: int) -> 'mapStatuses':
         if status in (-2, -1, 0):
-            return self.Pending
+            return cls.Pending
 
         if status in (1, 2, 3, 4):
-            return self(status + 1)
+            return cls(status + 1)
 
     def to_api(self) -> int:
         return {

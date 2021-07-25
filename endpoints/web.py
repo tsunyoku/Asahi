@@ -338,7 +338,7 @@ async def getMapScores(request: Request) -> bytes:
 async def scoreSubmit(request: Request) -> bytes:
     mpargs = request.args
 
-    s = await Score.submission(mpargs['score'], mpargs['iv'], mpargs['pass'], mpargs['osuver'])
+    s = await Score.from_submission(mpargs['score'], mpargs['iv'], mpargs['pass'], mpargs['osuver'])
 
     if not s:
         return b'error: no'

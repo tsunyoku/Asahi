@@ -1,4 +1,5 @@
 from enum import IntFlag
+from typing import Optional
 
 class Privileges(IntFlag):
     Normal = 1 << 0
@@ -24,9 +25,9 @@ class Privileges(IntFlag):
     Disallowed = Restricted | Banned
 
     @classmethod
-    def get(self, name):
-        if name in self.__members__:
-            return self[name]
+    def get(cls, name) -> Optional['Privileges']:
+        if name in cls.__members__:
+            return cls[name]
 
 class ClientPrivileges(IntFlag):
     Player = 1 << 0
