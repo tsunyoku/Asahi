@@ -37,7 +37,7 @@ class PlayerList(list[Player]):
         for u in self:
             if u not in ignored:
                 u.enqueue(packets)
-                
+
     async def get(self, **kwargs) -> Optional[Player]: # lord this is spaghetti
         for _type in ('id', 'name', 'token', 'discord'):
             if (user := kwargs.pop(_type, None)):
@@ -45,14 +45,28 @@ class PlayerList(list[Player]):
                 break
         else:
             return
-                
+
         for u in self:
             if getattr(u, utype) == user:
                 return u
         else:
             if kwargs.get('sql') and utype != 'token':
-                return await Player.from_sql(user, True)
-            
+                return await Player.from_sql(user, utype == 'discord')
+
+    # kind of useless given we have get(), 
+    # however packet reader needs non-async func sooo here we are
+    def get_online(self, **kwargs) -> Optional[Player]:
+        for _type in ('id', 'name', 'token', 'discord'):
+            if (user := kwargs.pop(_type, None)):
+                utype = _type
+                break
+        else:
+            return
+
+        for u in self:
+            if getattr(u, utype) == user:
+                return u
+
     async def find_login(self, name: str, pw: str) -> Optional[Player]:
         if not (user := await self.get(name=name)):
             return

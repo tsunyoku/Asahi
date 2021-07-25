@@ -93,9 +93,6 @@ class Score:
         if not s.user:
             return s
 
-        if not s.map:
-            return # ??
-
         s.pp = score['pp']
         s.score = score['score']
         s.combo = score['combo']
@@ -110,7 +107,7 @@ class Score:
         s.grade = score['grade']
         s.fc = score['fc']
         s.status = scoreStatuses(score['status'])
-        s.mode = lbModes(osuModes(score['mode']).as_vn, s.mods)
+        s.mode = lbModes(score['mode'], s.mods)
 
         s.time = score['time']
         s.passed = s.status.value != 0
