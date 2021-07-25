@@ -337,7 +337,7 @@ async def reqs(user: Player, _) -> str:
                 id=_map.id + 1,
                 name='Rank',
                 callback=a_req,
-                kwargs=(user, (req['id'], 'rank')),
+                args=(user, (req['id'], 'rank')),
                 destroy=True
             )
 
@@ -347,7 +347,7 @@ async def reqs(user: Player, _) -> str:
                 id=_map.id + 2,
                 name='Love',
                 callback=a_req,
-                kwargs=(user, (req['id'], 'love')),
+                args=(user, (req['id'], 'love')),
                 destroy=True
             )
 
@@ -357,7 +357,7 @@ async def reqs(user: Player, _) -> str:
                 id=_map.id + 3,
                 name='Deny',
                 callback=d_req,
-                kwargs=(user, (req['id'],)),
+                args=(user, (req['id'],)),
                 destroy=True
             )
 

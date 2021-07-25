@@ -75,12 +75,12 @@ class Beatmap:
             if bid == c.id:
                 return c
 
-        bmap = await glob.db.fetchrow('SELECT * FROM maps WHERE id = %s', [bid])
-        if not bmap:
+        row = await glob.db.fetchrow('SELECT * FROM maps WHERE id = %s', [bid])
+        if not row:
             await cls.cache_from_map(bid)
-            bmap = await glob.db.fetchrow('SELECT * FROM maps WHERE id = %s', [bid])
+            row = await glob.db.fetchrow('SELECT * FROM maps WHERE id = %s', [bid])
 
-        return cls(**bmap)
+        return cls(**row)
 
     @staticmethod
     def from_cache(md5: str) -> Optional['Beatmap']:
@@ -106,7 +106,7 @@ class Beatmap:
                     id=_id_reqr,
                     name='Request to get Ranked',
                     callback=req,
-                    kwargs=(user, ('rank',)),
+                    args=(user, ('rank',)),
                     destroy=True
                 )
 
@@ -116,7 +116,7 @@ class Beatmap:
                     id=self.sid + 2,
                     name='Request to get Loved',
                     callback=req,
-                    kwargs=(user, ('love',)),
+                    args=(user, ('love',)),
                     destroy=True
                 )
 
@@ -134,7 +134,7 @@ class Beatmap:
                     id=_id_rank,
                     name='Rank',
                     callback=_map,
-                    kwargs=(user, ('rank', 'set',)),
+                    args=(user, ('rank', 'set',)),
                     destroy=True
                 )
 
@@ -144,7 +144,7 @@ class Beatmap:
                     id=_id_love,
                     name='Love',
                     callback=_map,
-                    kwargs=(user, ('love', 'set',)),
+                    args=(user, ('love', 'set',)),
                     destroy=True
                 )
 
@@ -158,7 +158,7 @@ class Beatmap:
                     id=_id_unrank,
                     name='Unrank',
                     callback=_map,
-                    kwargs=(user, ('unrank', 'set',)),
+                    args=(user, ('unrank', 'set',)),
                     destroy=True
                 )
 
@@ -221,14 +221,14 @@ class Beatmap:
 
     @classmethod
     async def from_sql(cls, md5: str) -> Optional['Beatmap']:
-        bmap = await glob.db.fetchrow('SELECT * FROM maps WHERE md5 = %s', [md5])
+        row = await glob.db.fetchrow('SELECT * FROM maps WHERE md5 = %s', [md5])
 
-        if not bmap:
+        if not row:
             return # not in sql so we know to attempt from api next
 
-        self = cls(**bmap)
+        self = cls(**row)
 
-        glob.cache['maps'][bmap['md5']] = self # cache the map now we have it from sql
+        glob.cache['maps'][row['md5']] = self # cache the map now we have it from sql
 
         return self
 

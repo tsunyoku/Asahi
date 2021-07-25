@@ -13,8 +13,8 @@ class Channel:
         self.desc: str = kwargs.get('desc')
         self.auto: bool = kwargs.get('auto', False)
         self.perm: bool = kwargs.get('perm', False) # whether the channel should stay
-                                                   # in the global channels list even
-                                                   # when all players have left
+                                                    # in the global channels list even
+                                                    # when all players have left
         self.players: list = []
 
     def send(self, f: 'Player', msg: str, send_self: bool) -> None:
