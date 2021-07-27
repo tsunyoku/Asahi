@@ -11,7 +11,7 @@ def init_customs():
     for ach in glob.achievements:
         if ach.custom:
             custom.append(ach.image)
-            
+
             # client likes @2x
             custom.append(f'{ach.image}@2x')
 

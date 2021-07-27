@@ -1,4 +1,5 @@
 from enum import IntFlag
+from typing import Optional
 
 class Privileges(IntFlag):
     Normal = 1 << 0
@@ -9,11 +10,11 @@ class Privileges(IntFlag):
     Admin = 1 << 4
     Developer = 1 << 5
     Owner = 1 << 6
-    
+
     # i'm making banned/restricted privileges separately because the system of removing normal really confuses me to this day
     Restricted = 1 << 7
     Banned = 1 << 8
-    
+
     BypassAnticheat = 1 << 9 # can bypass anticheat checks
     Frozen = 1 << 10
     Whitelisted = 1 << 11 # can bypass pp cap
@@ -22,11 +23,11 @@ class Privileges(IntFlag):
     Manager = Admin | Developer | Owner
     Master = Normal | Verified | Supporter | Nominator | Admin | Developer | Owner | BypassAnticheat | Whitelisted
     Disallowed = Restricted | Banned
-    
+
     @classmethod
-    def get(self, name):
-        if name in self.__members__:
-            return self[name]
+    def get(cls, name) -> Optional['Privileges']:
+        if name in cls.__members__:
+            return cls[name]
 
 class ClientPrivileges(IntFlag):
     Player = 1 << 0

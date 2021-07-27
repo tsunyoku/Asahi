@@ -55,7 +55,7 @@ pp_caps = (
     None, # vanilla taiko
     None, # vanilla catch
     None, # mania
-    
+
     1400, # rx std
     None, # rx taiko
     None, # rx catch

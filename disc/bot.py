@@ -1,14 +1,14 @@
 from discord.ext import commands, tasks
 from discord import Status, ActivityType, Activity
-from cmyui import log, Ansi
+from cmyui.logging import log, Ansi
 from random import choice
 
 from objects import glob
 
 class asahiBot(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         self.bot = bot
- 
+
     @tasks.loop(minutes=1)
     async def set_status(self) -> None:
         statuses = [
@@ -27,7 +27,7 @@ class asahiBot(commands.Cog):
             log('==== Asahi Discord bot started ====', Ansi.GREEN)
 
         await self.set_status.start()
-        
+
     async def end_tasks(self) -> None:
         self.set_status.cancel()
 

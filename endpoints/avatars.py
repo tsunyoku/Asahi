@@ -9,7 +9,7 @@ avatars = Router(f'a.{glob.config.domain}')
 @avatars.route("/")
 async def default_avatar(req: Request) -> bytes:
     file = ava_path / 'default.png'
-    
+
     req.resp_headers['Content-Type'] = 'image/png'
     return file.read_bytes()
 

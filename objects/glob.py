@@ -4,17 +4,17 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aiohttp import ClientSession
-    from cmyui import Version
+    from cmyui.version import Version
     from objects.player import Player
     from lists.players import PlayerList
 
     from fatFuckSQL import fatFawkSQL
-    import aioredis
+    from aioredis import Redis
 
-db: 'fatFawkSQL.connect' # type hinting
+db: 'fatFawkSQL' # type hinting
 version: 'Version' # once again, type hinting
 web: 'ClientSession'
-redis: 'aioredis.create_redis_pool'
+redis: 'Redis'
 
 packets = {}
 packets_restricted = {} # packet dict for packets that restricted players *can* use
