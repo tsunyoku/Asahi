@@ -490,13 +490,13 @@ async def match_settings(user: Player, p: bytes) -> None:
         match.unready_players(slotStatus.ready)
 
     if m.bmd5 != match.bmd5:
-        m = await Beatmap.from_md5(m.bmd5)
+        _m = await Beatmap.from_md5(m.bmd5)
 
-        if m:
-            match.bid = m.id
-            match.bmd5 = m.md5
-            match.bname = m.name
-            match.mode = m.mode
+        if _m:
+            match.bid = _m.id
+            match.bmd5 = _m.md5
+            match.bname = _m.name
+            match.mode = _m.mode
         else:
             match.bid = m.bid
             match.bmd5 = m.bmd5
