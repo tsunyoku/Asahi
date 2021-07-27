@@ -621,7 +621,7 @@ async def osuGetSetFavourites(request: Request) -> bytes:
 @web.route("/web/osu-rate.php")
 async def osuAddMapRating(request: Request) -> bytes:
     args = request.args
-    if not await auth(args['u'], args['h'], request):
+    if not await auth(args['u'], args['p'], request):
         return b'auth fail' # request-specific auth error? XD
     
     md5 = args['c']
