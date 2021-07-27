@@ -116,7 +116,7 @@ class Score:
         self.grade = score['grade']
         self.fc = score['fc']
         self.status = scoreStatuses(score['status'])
-        self.mode = lbModes(score['mode'].as_vn, self.mods)
+        self.mode = lbModes(score['mode'], self.mods)
 
         self.time = score['time']
         self.passed = self.status.value != 0
