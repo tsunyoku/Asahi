@@ -1,14 +1,19 @@
 ﻿from functools import cached_property
+from typing import Callable
 
 class Achievement:
-    def __init__(self, **ainfo):
-        self.id: int = ainfo.get('id')
-        self.image: str = ainfo.get('image')
-        self.name: str = ainfo.get('name')
-        self.desc: str = ainfo.get('desc')
-        self.cond: eval = ainfo.get('cond')
-        self.custom: bool = ainfo.get('custom')
-    
+    __slots__ = (
+        'id', 'image', 'name',
+        'desc', 'cond', 'custom'
+    )
+    def __init__(self, **kwargs) -> None:
+        self.id: int = kwargs.get('id')
+        self.image: str = kwargs.get('image')
+        self.name: str = kwargs.get('name')
+        self.desc: str = kwargs.get('desc')
+        self.cond: Callable = kwargs.get('cond')
+        self.custom: bool = kwargs.get('custom')
+
     @cached_property
-    def format(self):
+    def format(self) -> str:
         return f'{self.image}+{self.name}+{self.desc}'

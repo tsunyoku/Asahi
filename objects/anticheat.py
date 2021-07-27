@@ -3,27 +3,28 @@ from constants.regexes import osu_ver
 from .player import Player
 
 class Anticheat:
-    def __init__(self, **info):
-        self.ver: int = info.get('osuver')
-        self.adapters: dict = info.get('adapters')
-        self.player: Player = info.get('player')
-        self.headers: dict = info.get('headers')
-        
+    __slots__ = ('ver', 'adapters', 'player', 'headers')
+    def __init__(self, **kwargs) -> None:
+        self.ver: int = kwargs.get('osuver')
+        self.adapters: dict = kwargs.get('adapters')
+        self.player: Player = kwargs.get('player')
+        self.headers: dict = kwargs.get('headers')
+
         self.stream: str = 'stable40' # will be default stream if not ce etc.
-        
+
     async def multi_check(self) -> None:
         if not self.adapters:
             return # no adapters??
-        
+
         mac = self.adapters['mac_address']
         uninstall = self.adapters['uninstall_id']
         disk = self.adapters['disk_serial']
         ip = self.adapters['ip']
-        
+
         mac_check = await glob.db.fetchval('SELECT uid FROM user_hashes WHERE mac_address = %s AND uid != %s', [mac, self.player.id])
         if mac_check:
             og = await Player.from_sql(mac_check)
-            
+
             await self.player.ban(reason=f'Multiaccount of user {og.name}', fr=glob.bot)
             await og.ban(reason=f'Multiaccounting (user {self.player.name})', fr=glob.bot)
 
@@ -47,7 +48,7 @@ class Anticheat:
 
             await self.player.flag(reason=f'Flagged with same IP as {og.name}', fr=glob.bot)
             await og.flag(reason=f'Flagged with same IP as {self.player.name}', fr=glob.bot)
-            
+
         await glob.db.execute(
             'INSERT INTO user_hashes (uid, mac_address, uninstall_id, disk_serial, ip) '
             'VALUES (%s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE occurrences = occurrences + 1',
@@ -59,12 +60,12 @@ class Anticheat:
             return await self.player.restrict(reason='Modified client', fr=glob.bot)
 
         matched_ver = osu_ver.match(self.ver)
-        
+
         if not matched_ver:
             return await self.player.restrict(reason='Modified client', fr=glob.bot)
-        
+
         self.ver = matched_ver
-        
+
         if (stream := self.ver['stream']):
             self.stream = stream
 
@@ -97,15 +98,10 @@ class Anticheat:
         if self.adapters['osu_md5'] != real_md5:
             await self.player.restrict(reason='Modified client', fr=glob.bot)
             return True # we'll skip version check if they are restricted from this, else they won't be notified and end up in infinite loop
-        
+
         return False # nothing found
-            
+
     async def version_check(self) -> bool: # only for update check, modified client check above
-        # oooooooooooo this is ugly!
         latest_md5 = self.adapters['osu_md5'] == glob.cache['latest_ver'][self.stream]['md5']
         latest_ver = self.ver['ver'] == glob.cache['latest_ver'][self.stream]['ver']
-
-        if not latest_md5 or not latest_ver:
-            return True
-        
-        return False
+        return not (latest_md5 and latest_ver)

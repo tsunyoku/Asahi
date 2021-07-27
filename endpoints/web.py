@@ -1,5 +1,5 @@
 from xevel import Router, Request
-from cmyui import log, Ansi
+from cmyui.logging import log, Ansi
 from collections import defaultdict
 from urllib.parse import unquote
 from pathlib import Path
@@ -41,7 +41,7 @@ async def auth(name: str, md5: str, req: Request) -> bool:
     if not (player := await glob.players.find_login(name, md5)):
         log(f'{name} failed authentication', Ansi.LRED)
         return False
-    
+
     req.extras['player'] = player
     return True
 
@@ -132,10 +132,10 @@ async def osuSearch(request: Request) -> Union[tuple, bytes]:
         return b''
 
     request_args = {'amount': 100, 'offset': 100 * int(args['p'])}
-    
+
     if (query := args['q']) not in ('Newest', 'Top+Rated', 'Most+Played'):
         request_args['query'] = query
-        
+
     if (mode := int(args['m'])) != -1:
         request_args['mode'] = mode
 
@@ -147,13 +147,13 @@ async def osuSearch(request: Request) -> Union[tuple, bytes]:
             return (resp.status, b'0')
 
         result = await resp.json()
-        
+
     map_amount = len(result)
     ret = [f'{"101" if map_amount == 100 else map_amount}']
-    
+
     for _map in result:
         sorted_diffs = sorted(_map['ChildrenBeatmaps'], key=lambda sr: sr['DifficultyRating'])
-        
+
         diffs = ', '.join([directMapFormat(s) for s in sorted_diffs])
         ret.append(directSetFormat(_map, diffs))
 
@@ -164,24 +164,24 @@ async def osuSearchSet(request: Request) -> bytes:
     args = request.args
     if not await auth(args['u'], args['h'], request):
         return b''
-    
+
     if 'b' in args: # wants beatmap
         _type, value = ('id', args['b'])
     elif 's' in args: # wants beatmapset
         _type, value = ('sid', args['s'])
     else:
         return
-        
+
     _set = await glob.db.fetchrow(f'SELECT DISTINCT * FROM maps WHERE {_type} = %s', [value])
-    
+
     if not _set: # get it from api and then grab it again!
         if 's' in args:
             await Beatmap.cache_set(args['s'])
         elif 'b' in args:
             await Beatmap.cache_from_map(args['b'])
-        
+
         _set = await glob.db.fetchrow(f'SELECT DISTINCT * FROM maps WHERE {_type} = %s', [value])
-        
+
     return (
         f'{_set["sid"]}.osz|{_set["artist"]}|{_set["title"]}|'
         f'{_set["mapper"]}|{_set["status"]}|10.0|{_set["update"]}|'
@@ -249,7 +249,7 @@ async def osuMapInfo(request: Request) -> bytes:
 
     data = orjson.loads(request.body)
     player = request.extras.get('player')
-    
+
     ret = []
 
     for idx, file in enumerate(data['Filenames']):
@@ -260,28 +260,28 @@ async def osuMapInfo(request: Request) -> bytes:
             'SELECT id, sid, md5, status FROM maps WHERE artist = %s AND title = %s AND diff = %s AND mapper = %s',
             [info['artist'], info['title'], info['diff'], info['mapper']]
         )
-        
+
         if not _map:
             continue
-        
+
         status = mapStatuses(_map['status'])
         _map['status'] = status.to_api()
-        
+
         grades = ['N', 'N', 'N', 'N'] # 1 per mode, N = no score?
-        
+
         mode_table = osuModes(player.mode).table # use grades for their current mode
 
         async for s in glob.db.iter(f'SELECT grade, mode FROM {mode_table} WHERE md5 = %s AND uid = %s AND status = 2', [_map['md5'], player.id]):
             grades[s['mode']] = s['grade']
-            
+
         ret.append(
             f'{idx}|'
             f'{_map["id"]}|{_map["sid"]}|{_map["md5"]}|'
             f'{_map["status"]}|{"|".join(grades)}'
         )
-        
+
     return '\n'.join(ret).encode()
-        
+
 
 @web.route("/web/osu-osz2-getscores.php")
 async def getMapScores(request: Request) -> bytes:
@@ -302,7 +302,7 @@ async def getMapScores(request: Request) -> bytes:
         player.mode = mode.value
         player.mode_vn = mode.as_vn
         player.mods = mods
-        
+
         if not player.restricted:
             glob.players.enqueue(writer.userStats(player))
 
@@ -316,7 +316,7 @@ async def getMapScores(request: Request) -> bytes:
             return b'-1|false'
 
         exists = await glob.db.fetchval(
-            'SELECT 1 FROM maps WHERE artist = %s AND title = %s AND diff = %s AND mapper = %s', 
+            'SELECT 1 FROM maps WHERE artist = %s AND title = %s AND diff = %s AND mapper = %s',
             [info['artist'], info['title'], info['diff'], info['mapper']]
         )
 
@@ -331,14 +331,14 @@ async def getMapScores(request: Request) -> bytes:
 
     if not (lb := getattr(bmap, mode.leaderboard)):
         setattr(bmap, mode.leaderboard, lb := Leaderboard(bmap, mode)) # cursed 1 line lol
-        
+
     return await lb.return_leaderboard(player, lbm, mods)
 
 @web.route("/web/osu-submit-modular-selector.php", ['POST'])
 async def scoreSubmit(request: Request) -> bytes:
     mpargs = request.args
 
-    s = await Score.submission(mpargs['score'], mpargs['iv'], mpargs['pass'], mpargs['osuver'])
+    s = await Score.from_submission(mpargs['score'], mpargs['iv'], mpargs['pass'], mpargs['osuver'])
 
     if not s:
         return b'error: no'
@@ -358,15 +358,15 @@ async def scoreSubmit(request: Request) -> bytes:
     s.id = await glob.db.execute(
         f'INSERT INTO {s.mode.table} (md5, score, acc, pp, combo, mods, n300, '
         f'geki, n100, katu, n50, miss, grade, status, mode, time, uid, readable_mods, fc) VALUES '
-        f'(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', 
-        [s.map.md5, s.score, s.acc, s.pp, s.combo, int(s.mods), s.n300, 
+        f'(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
+        [s.map.md5, s.score, s.acc, s.pp, s.combo, int(s.mods), s.n300,
          s.geki, s.n100, s.katu, s.n50, s.miss, s.grade, s.status.value, s.mode.as_vn, s.time, s.user.id, s.readable_mods, s.fc]
     )
-    
+
     if s.status == scoreStatuses.Best:
         # set any other best scores to submitted ones as they've been overwritten
         await glob.db.execute(
-            f'UPDATE {s.mode.table} SET status = 1 WHERE status = 2 AND uid = %s AND md5 = %s AND mode = %s AND id != %s', 
+            f'UPDATE {s.mode.table} SET status = 1 WHERE status = 2 AND uid = %s AND md5 = %s AND mode = %s AND id != %s',
             [s.user.id, s.map.md5, s.mode.as_vn, s.id]
         )
 
@@ -384,11 +384,11 @@ async def scoreSubmit(request: Request) -> bytes:
             f = vn_path / f'{s.id}.osr'
 
         f.write_bytes(replay)
-        
+
         if glob.config.anticheat and s.user.priv & Privileges.BypassAnticheat:
             loop = asyncio.get_event_loop()
             loop.create_task(s.analyse())
-    
+
     cap = glob.config.pp_caps[s.mode.value]
 
     if cap is not None and s.pp >= cap \
@@ -402,7 +402,7 @@ async def scoreSubmit(request: Request) -> bytes:
     old = copy.copy(stats) # we need a copy of the old stats for submission chart
 
     elapsed = mpargs.get('st' if s.passed else 'ft') # timewarp check with this soon?
-    
+
     if not elapsed and s.user.priv & Privileges.BypassAnticheat:
         await s.user.restrict('Modified client', fr=glob.bot) # its really only old version, but its supposed to be blocked on login. if it isnt present it must be modified to seem like a new version
 
@@ -418,19 +418,19 @@ async def scoreSubmit(request: Request) -> bytes:
 
         if s.combo > old.max_combo:
             stats.max_combo = s.combo
-        
+
         if s.map.status & mapStatuses.GIVE_PP:
             stats.rscore += add
 
     await s.user.update_stats(s.mode, s.mode.table, s.mode.as_vn)
-    
+
     if not s.user.restricted:
         s.map.plays += 1
         if s.passed:
             s.map.passes += 1
-            
+
         await glob.db.execute(
-            'UPDATE maps SET plays = %s, passes = %s WHERE md5 = %s', 
+            'UPDATE maps SET plays = %s, passes = %s WHERE md5 = %s',
             [s.map.plays, s.map.passes, s.map.md5]
         )
 
@@ -438,18 +438,18 @@ async def scoreSubmit(request: Request) -> bytes:
     if s.mods & Mods.GAME_CHANGING or s.status == scoreStatuses.Failed:
         log(f'[{s.mode!r}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
         return b'error: no' # not actually erroring, score is already submitted we just want client to stop request as we cannot provide chart
-    
+
     achievements = ''
     if s.map.status & mapStatuses.GIVE_PP and not s.user.restricted: # TODO: hush-hush etc. achievements
         achs = []
         for ach in glob.achievements:
             if ach in s.user.achievements:
                 continue
-                
+
             if ach.cond(s):
                 await s.user.unlock_ach(ach)
                 achs.append(ach)
-                
+
         achievements = '/'.join([a.format for a in achs])
 
     charts = []
@@ -514,7 +514,7 @@ async def scoreSubmit(request: Request) -> bytes:
             chart_format('accuracy', None, round(stats.acc, 2)),
             chart_format('pp', None, stats.pp)
         )),
-        
+
         f'achievements-new:{achievements}'
     )))
 
@@ -522,13 +522,13 @@ async def scoreSubmit(request: Request) -> bytes:
         if s.rank == 1: # announce #1 to announce channel cus they achieved #1
             loop = asyncio.get_event_loop()
             loop.create_task(s.announce_n1())
-        
+
         # update lb cache
         lb = getattr(s.map, s.mode.leaderboard)
-        
+
         if lb:
             threading.Thread(target=lb.set_user_pb, args=(s.user, s,)).start()
-        
+
     s.user.last_score = s
 
     log(f'[{s.mode!r}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
@@ -593,14 +593,14 @@ async def osuAddSetFavourite(request: Request) -> bytes:
     args = request.args
     if not await auth(args['u'], args['h'], request):
         return b'Please login to add favourites!' # request-specific auth error? XD
-    
+
     player = request.extras.get('player')
-    
+
     sid = int(args['a'])
-    
+
     if await glob.db.fetchval('SELECT 1 FROM favourites WHERE uid = %s AND sid = %s', [player.id, sid]):
         return b'You\'ve already favourited this beatmap!' # request-specific return? XD
-    
+
     await glob.db.execute(
         'INSERT INTO favourites '
         'VALUES (%s, %s)',
@@ -612,10 +612,10 @@ async def osuGetSetFavourites(request: Request) -> bytes:
     args = request.args
     if not await auth(args['u'], args['h'], request):
         return b''
-    
+
     player = request.extras.get('player')
     favourites = await glob.db.fetchall('SELECT sid FROM favourites WHERE uid = %s', [player.id])
-    
+
     return '\n'.join(favourites).encode()
 
 @web.route("/web/osu-rate.php")
@@ -623,30 +623,30 @@ async def osuAddMapRating(request: Request) -> bytes:
     args = request.args
     if not await auth(args['u'], args['h'], request):
         return b'auth fail' # request-specific auth error? XD
-    
+
     md5 = args['c']
     player = request.extras.get('player')
-    
+
     if 'v' not in args: # verifying we can rate the map?
         if md5 in glob.cache['unsub']:
             return b'no exist'
-        
+
         _map = await Beatmap.from_md5(md5)
-        
+
         if _map.status < mapStatuses.Ranked:
             return b'not ranked'
-        
+
         if not await glob.db.fetchval('SELECT 1 FROM ratings WHERE md5 = %s AND uid = %s', [md5, player.id]):
             return b'ok'
     else: # already verified, we just need to add the rating
         rating = int(args['v'])
-        
+
         await glob.db.execute(
             'INSERT INTO ratings '
             'VALUES (%s, %s, %s)',
             [player.id, md5, rating]
         )
-        
+
     # already voted/just voted, we'll return the average rating
     avg = await glob.db.fetchval('SELECT AVG(rating) AS average FROM ratings WHERE md5 = %s', [md5])
     return f'alreadyvoted\n{avg}'.encode()

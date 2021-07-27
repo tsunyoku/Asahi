@@ -26,7 +26,7 @@ class osuFlags(IntFlag):
     SQL2Library = 1 << 20
     libeay32Library = 1 << 21
     aqnMenuSample = 1 << 22
-    
+
     HQ_RELATED = RunWithLdFlag | ConsoleOpen | ExtraThreads | HQAssembly | HQFile | RegistryEdits
     AQN_RELATED = SQL2Library | libeay32Library | aqnMenuSample
     AUTO_BOT = RawMouseDiscrepancy | RawKeyboardDiscrepancy

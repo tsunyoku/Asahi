@@ -49,7 +49,7 @@ class osuModes(Enum):
             return 2
         else:
             return self.value
-    
+
     @property
     @cache
     def sort(self) -> str:
@@ -57,7 +57,7 @@ class osuModes(Enum):
             return 'pp'
         else:
             return 'score'
-        
+
     @property
     @cache
     def leaderboard(self) -> str:
@@ -79,6 +79,5 @@ def lbModes(mode: int, mods: int) -> osuModes:
             return osuModes(mode)
 
         return osuModes(7)
-   
-    return osuModes(mode)
 
+    return osuModes(mode)

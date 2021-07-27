@@ -11,6 +11,9 @@ from functools import cached_property
 from typing import Optional
 
 class Leaderboard:
+    __slots__ = ('map', 'mode',
+                 'user_cache', 'score_cache',
+                 'mods_cache', 'country_cache')
     def __init__(self, bmap: Beatmap, mode: osuModes):
         self.map = bmap
         self.mode = mode
@@ -43,7 +46,7 @@ class Leaderboard:
         ]
 
         p = [self.map.md5, mode_vn]
-        
+
         score_cache = None # init value, some lb types won't provide a cache anyways
 
         if lb == 2:
@@ -71,7 +74,7 @@ class Leaderboard:
         base = [] # base info to return (map info + score count)
 
         base.append(map_body)
-        
+
         rating = await glob.db.fetchval('SELECT AVG(rating) AS rating FROM ratings WHERE md5 = %s', [self.map.md5])
         if not rating:
             rating = 10.0
@@ -91,7 +94,7 @@ class Leaderboard:
             scrs.extend(score_cache) # add the cached scores to our list of scores to return if there's any
         else:
             for s in scores:
-                score = await Score.sql(s['id'], self.mode.table, self.mode.sort, s['s'], ensure=True) # get score objects from sql, useful for cache
+                score = await Score.from_sql(s['id'], self.mode.table, self.mode.sort, s['s'], ensure=True) # get score objects from sql, useful for cache
 
                 scrs.append(score) # add to list to return
 
@@ -106,7 +109,7 @@ class Leaderboard:
         self.user_cache[user.name] = score # set personal cached score
 
         if (score_cache := self.score_cache):
-            for s in score_cache: 
+            for s in score_cache:
                 if s.user.name == user.name:
                     score_cache.remove(s)
                     break
@@ -116,7 +119,7 @@ class Leaderboard:
                 if s.user.name == user.name:
                     self.mods_cache[score.mods].remove(s)
                     break
-        
+
         if (country_cache := self.country_cache.get(user.country_iso)):
             for s in country_cache:
                 if s.user.name == user.name:
@@ -127,7 +130,7 @@ class Leaderboard:
 
         if mods_cache:
             mods_cache.append(score)
-        
+
         if country_cache:
             country_cache.append(score)
 
@@ -138,13 +141,13 @@ class Leaderboard:
         pbd = await glob.db.fetchrow(
             f'SELECT {self.mode.table}.id, {self.mode.sort} as s FROM {self.mode.table} '
             f'WHERE md5 = %s AND mode = %s AND status = 2 AND uid = %s '
-            f'ORDER BY s DESC LIMIT 1', 
+            f'ORDER BY s DESC LIMIT 1',
             [self.map.md5, self.mode.as_vn, user.id]
         )
 
         if pbd:
             # score found xd
-            pb = await Score.sql(pbd['id'], self.mode.table, self.mode.sort, pbd['s'])
+            pb = await Score.from_sql(pbd['id'], self.mode.table, self.mode.sort, pbd['s'])
         else:
             pb = None
 
