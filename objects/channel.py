@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from .player import Player
 
 class Channel:
-    __slots__ = ('name', 'desc', 'auto', 'perm')
+    __slots__ = ('name', 'desc', 'auto', 'perm', 'players')
     def __init__(self, **kwargs):
         self.name: str = kwargs.get('name')
         self.desc: str = kwargs.get('desc')

@@ -3,7 +3,7 @@ from constants.regexes import osu_ver
 from .player import Player
 
 class Anticheat:
-    __slots__ = ('ver', 'adapters', 'player', 'headers')
+    __slots__ = ('ver', 'adapters', 'player', 'headers', 'stream')
     def __init__(self, **kwargs) -> None:
         self.ver: int = kwargs.get('osuver')
         self.adapters: dict = kwargs.get('adapters')
