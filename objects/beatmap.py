@@ -113,14 +113,14 @@ class Beatmap:
                 glob.menus[_id_reqr] = request_rank
 
                 request_love = Menu(
-                    id=self.sid + 2,
+                    id=_id_reql,
                     name='Request to get Loved',
                     callback=req,
                     args=(user, ('love',)),
                     destroy=True
                 )
 
-                glob.menus[self.sid + 2] = request_love
+                glob.menus[_id_reql] = request_love
 
                 msg += f' // {request_rank.embed}  {request_love.embed}'
         else:

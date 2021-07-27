@@ -111,9 +111,11 @@ class Player:
             loc=[user['lon'], user['lat']],
             pw=user['md5'].decode(),
             priv=Privileges(user['priv']),
-            freeze_timer=datetime.fromtimestamp(user['freeze_timer']),
-            discord=user['discord']
+            freeze_timer=datetime.fromtimestamp(user['freeze_timer'])
         )
+
+        if (discord := user.get('discord')):
+            self.discord = discord
 
         self.friends = []
         async for user in glob.db.iter('SELECT user2 FROM friends WHERE user1 = %s', [self.id]):
