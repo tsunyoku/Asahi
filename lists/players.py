@@ -51,7 +51,21 @@ class PlayerList(list[Player]):
                 return u
         else:
             if kwargs.get('sql') and utype != 'token':
-                return await Player.from_sql(user, True)
+                return await Player.from_sql(user, utype == 'discord')
+
+    # kind of useless given we have get(), 
+    # however packet reader needs non-async func sooo here we are
+    def get_online(self, **kwargs) -> Optional[Player]:
+        for _type in ('id', 'name', 'token', 'discord'):
+            if (user := kwargs.pop(_type, None)):
+                utype = _type
+                break
+        else:
+            return
+
+        for u in self:
+            if getattr(u, utype) == user:
+                return u
 
     async def find_login(self, name: str, pw: str) -> Optional[Player]:
         user = await self.get(name=name)

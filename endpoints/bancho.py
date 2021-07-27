@@ -306,7 +306,7 @@ async def update_action(user: Player, p: bytes) -> None:
     user.map_id = d['mid']
 
     if d['actionid'] == 2:
-        user.info += f' +{d["mods"]!r}' # TODO when im home: fix this
+        user.info += f' +{(Mods(user.mods))!r}' # ugly and i dont care!
 
     if not user.restricted:
         glob.players.enqueue(writer.userStats(user))

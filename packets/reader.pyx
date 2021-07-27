@@ -179,8 +179,8 @@ cdef class Reader:
                 self.data = self.data[4:]
     
         uid = self.read_i32()
-        match.host = glob.players_id[uid]
-        match.first_host = glob.players_id[uid]
+        match.host = glob.players.get_online(id=uid)
+        match.first_host = glob.players.get_online(id=uid)
     
         match.mode = osuModes(self.read_i8())
         match.win_cond = winConditions(self.read_i8())
