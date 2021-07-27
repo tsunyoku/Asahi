@@ -37,7 +37,7 @@ class Channel:
         return len(self.players)
 
     @staticmethod
-    def enqueue(b: bytes, ignore: int = 0, ignore_list: list[Player] = []) -> None:
+    def enqueue(b: bytes, ignore: int = 0, ignore_list: list['Player'] = []) -> None:
         ignore_list.append(ignore)
 
         glob.players.enqueue(b, ignored=ignore_list)

@@ -16,6 +16,7 @@ from objects import glob # global objects
 from objects.player import Player
 from objects.channel import Channel
 from objects.clan import Clan
+from objects.achievement import Achievement
 from constants.countries import country_codes
 from lists.players import PlayerList
 
@@ -90,7 +91,7 @@ async def connect() -> None: # ran before server startup, used to do things like
     async for clan_row in glob.db.iter('SELECT * FROM achievements'):
         clan_row['cond'] = eval(f'lambda s: {clan_row["cond"]}')
         clan_row['desc'] = clan_row.pop('descr') # TODO: fix in sql
-        glob.achievements.append(**clan_row)
+        glob.achievements.append(Achievement(**clan_row))
 
     init_customs() # set custom achievements list for assets proxy
 

@@ -368,7 +368,7 @@ class Match:
         if lobby:
             glob.channels['#lobby'].enqueue(writer.updateMatch(self, send_pw=False))
 
-    def enqueue(self, packet, lobby: bool = True, ignore: list[Player] = []) -> None:
+    def enqueue(self, packet, lobby: bool = True, ignore: list['Player'] = []) -> None:
         self.chat.enqueue(packet, ignore_list=ignore)
 
         if lobby:

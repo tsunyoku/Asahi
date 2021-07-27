@@ -6,8 +6,6 @@ from constants.statuses import mapStatuses
 from constants.privs import Privileges
 
 from objects import glob
-
-from functools import cached_property
 from typing import Optional
 
 class Leaderboard:
@@ -24,11 +22,11 @@ class Leaderboard:
         self.mods_cache = {}
         self.country_cache = {}
 
-    @cached_property
+    @property
     def base_body(self) -> str:
         return f'{self.map.status}|false|{self.map.id}|{self.map.sid}'
 
-    @cached_property
+    @property
     def map_body(self) -> str:
         return f'0\n{self.map.name}\n'
 
