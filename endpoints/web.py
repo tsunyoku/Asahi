@@ -38,6 +38,8 @@ ap_path = Path.cwd() / 'resources/replays_ap'
 web = Router(f'osu.{glob.config.domain}')
 
 async def auth(name: str, md5: str, req: Request) -> bool:
+    name = name.replace('%20', ' ')
+
     if not (player := await glob.players.find_login(name, md5)):
         log(f'{name} failed authentication', Ansi.LRED)
         return False

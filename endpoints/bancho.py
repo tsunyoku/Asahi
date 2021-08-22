@@ -850,7 +850,7 @@ async def root_client(request: Request) -> bytes:
             # client_check will restrict if a client is custom and if that's the case we want to ignore any update checks.
             # if an update check is made, this will send update required packet if thats what the function returns.
             # i should probably rename these funcs in the future
-            if not await checks.client_check() and await checks.version_check():
+            if not await checks.client_check() and not await checks.version_check():
                 request.resp_headers['cho-token'] = 'no'
                 return writer.versionUpdateForced() + writer.userID(-2)
 

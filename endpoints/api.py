@@ -351,7 +351,7 @@ async def playerScores(req: Request) -> Union[tuple, list]:
 
     mode = lbModes(mode, rx)
 
-    query = ('SELECT t.id, t.md5, score, pp, acc, combo, mods, '
+    query = ('SELECT t.id, t.md5, score, pp, acc, combo, mods, readable_mods, '
             'n300, n100, n50, miss, geki, katu, '
             'grade, t.status, t.mode, time, fc '
             f'FROM {mode.table} t INNER JOIN maps ON t.md5 = maps.md5 WHERE uid = %s AND t.mode = %s')
