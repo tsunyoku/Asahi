@@ -97,7 +97,9 @@ class Leaderboard:
                 scrs.append(score) # add to list to return
 
         if not score_cache:
-            score_cache = scrs # add scores to cache if they weren't cached previously
+            if lb == 2: self.mods_cache[mods] = scrs
+            elif lb == 4: self.country_cache[user.country_iso] = scrs
+            elif lb == 1: self.score_cache = scrs
 
         s = [s.calc_lb_format(user) for s in scrs]
 
@@ -124,7 +126,9 @@ class Leaderboard:
                     country_cache.remove(s)
                     break
 
-        self.score_cache.append(score) # always add to full cache, even if it is empty
+        print(score_cache)
+        if score_cache:
+            score_cache.append(score)
 
         if mods_cache:
             mods_cache.append(score)

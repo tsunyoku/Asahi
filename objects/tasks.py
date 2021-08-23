@@ -49,7 +49,7 @@ async def freeze_timers() -> None:
 
                 # restrict is a bit more complicated, we'll use player object from sql
                 p = await Player.from_sql(user['id'])
-                p.remove_priv(Privileges.Frozen)
-                await p.restrict(reason='Expired freeze timer')
+                await p.remove_priv(Privileges.Frozen)
+                await p.restrict(reason='Expired freeze timer', fr=glob.bot)
 
         await asyncio.sleep(600) # run every 10 mins

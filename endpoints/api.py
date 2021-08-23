@@ -188,11 +188,12 @@ async def getLb(request: Request) -> list:
             )
 
             db_grades = await glob.db.fetchrow(
-                'SELECT SUM(grade IN ("SS", "SSH")) AS ss, '
+                'SELECT SUM(grade IN ("X", "XH")) AS ss, '
                 'SUM(grade IN ("S", "SH")) AS s, '
                 'SUM(grade = "A") AS a FROM {0} WHERE uid = %s AND mode = %s'.format(lb_mode.table),
                 [uid, mode]
             )
+
 
             ret.append({
                 'rank': rank + 1,
@@ -202,7 +203,7 @@ async def getLb(request: Request) -> list:
                 'pp': info['pp'],
                 'acc': info['acc'],
                 'playcount': info['pc'],
-                'grades': {key: int(val) for key, val in db_grades.items()}
+                'grades': {key: int(val or 0) for key, val in db_grades.items()}
             })
 
         return ret
@@ -419,7 +420,7 @@ async def mostPlayed(req: Request) -> Union[tuple, dict]:
     m = int(args.get('mode', 0))
     r = int(args.get('rx', 0))
 
-    limit = int(args.get('limit', 5))
+    limit = int(args.get('limit', 6))
 
     if r == 0: rx = Mods.NOMOD
     elif r == 1: rx = Mods.RELAX
