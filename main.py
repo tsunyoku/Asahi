@@ -139,9 +139,25 @@ async def connect() -> None: # ran before server startup, used to do things like
         )
         clan.chan = clan_chan # uwu
         glob.clans[clan.id] = clan
+        clan.country = await glob.db.fetchval('SELECT country FROM users WHERE id = %s', [clan.owner])
 
         async for member_row in glob.db.iter('SELECT id FROM users WHERE clan = %s', [clan.id]):
             clan.members.append(member_row['id'])
+
+        await glob.redis.zadd(f'asahi:clan_leaderboard', clan.score, clan.id)
+        await glob.redis.zadd(f'asahi:clan_leaderboard:{clan.country}', clan.score, clan.id)
+
+        r = await glob.redis.zrevrank(f'asahi:clan_leaderboard', clan.id)
+        cr = await glob.redis.zrevrank(f'asahi:clan_leaderboard:{clan.country}', clan.id)
+
+        if r is None:
+            if clan.score > 0: clan.rank = 1
+        else: clan.rank = r + 1
+    
+        if cr is None:
+            if clan.score > 0: clan.country_rank = 1
+        else:
+            clan.country_rank = cr + 1
 
         if glob.config.debug:
             log(f'==== Added clan {clan.name} to clan list ====', Ansi.GREEN)

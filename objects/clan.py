@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from .match import Match
 
 class Clan:
-    __slots__ = ('id', 'name', 'tag', 'owner', 'chan', 'members', 'battle')
+    __slots__ = ('id', 'name', 'tag', 'owner', 'chan', 'members', 'battle', 'score', 'country', 'rank', 'country_rank')
     def __init__(self, **kwargs) -> None:
         self.id: int = kwargs.get('id', 0)
         self.name: str = kwargs.get('name', 0)
@@ -16,3 +16,8 @@ class Clan:
         self.members: list = []
 
         self.battle: Match = None
+        self.score: int = kwargs.get('score', 0)
+        self.country: str = None
+
+        self.rank: int = 0
+        self.country_rank: int = 0

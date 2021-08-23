@@ -15,6 +15,7 @@ from packets import writer
 
 import hashlib
 import struct
+import orjson
 
 api = Router(f'api.{glob.config.domain}')
 
@@ -458,3 +459,48 @@ async def mostPlayed(req: Request) -> Union[tuple, dict]:
         } if bmap else None
 
     return {'maps': maps}
+
+@api.route('/get_clan')
+async def getClan(req: Request) -> Union[tuple, dict]:
+    args = req.args
+
+    clan_id = int(args.get('id', 0))
+    m = int(args.get('mode', 0))
+    rx = int(args.get('rx', 0))
+
+    if not (clan := glob.clans.get(clan_id)):
+        return (400, {'message': "clan couldn't be found!"})
+
+    mode = lbModes(m, rx)
+    members = [await glob.players.get(id=uid, sql=True) for uid in clan.members]
+    o = await glob.players.get(id=clan.owner, sql=True)
+
+    resp = {
+        'info': {
+            'id': clan.id,
+            'name': clan.name,
+            'tag': clan.tag
+        },
+        'owner': {
+            'id': o.id,
+            'name': o.name,
+            'country': o.country_iso,
+            'priv': o.priv
+        },
+        'members': [{
+            'id': m.id,
+            'name': m.name,
+            'country': m.country_iso,
+            'priv': m.priv
+        } for m in members if m.id != clan.owner],
+        'stats': {
+            'score': await glob.db.fetchval('SELECT score FROM clans WHERE id = %s', [clan.id]),
+            'rank': clan.rank,
+            'country_rank': clan.country_rank,
+            'rscore': sum([u.stats[mode.value].rscore for u in members]),
+            'tscore': sum([u.stats[mode.value].tscore for u in members]),
+            'pc': sum([u.stats[mode.value].pc for u in members])
+        }
+    }
+
+    return {'clan': resp}
