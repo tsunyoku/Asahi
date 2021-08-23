@@ -24,7 +24,7 @@ from endpoints.assets import assets, init_customs
 
 from objects.tasks import expired_donor, freeze_timers, prepare_tasks
 
-glob.version = Version(0, 4, 0) # TODO: autoupdater using this
+glob.version = Version(0, 4, 1) # TODO: autoupdater using this
 
 app = Xevel(glob.config.socket, loop=asyncio.get_event_loop(), gzip=4) # webserver
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
