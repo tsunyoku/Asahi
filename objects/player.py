@@ -203,7 +203,7 @@ class Player:
                     if stat['pp'] > 0:
                         stat['rank'] = 1
                 else:
-                    stat['rank'] += 1
+                    stat['rank'] = r + 1
 
                 cr = await glob.redis.zrevrank(f'asahi:leaderboard:{mode.name}:{self.country_iso}', self.id)
 
@@ -211,7 +211,7 @@ class Player:
                     if stat['pp'] > 0:
                         stat['country_rank'] = 1
                 else:
-                    stat['country_rank'] =  cr + 1
+                    stat['country_rank'] = cr + 1
 
             self.stats[mode.value] = Stats(**stat)
 

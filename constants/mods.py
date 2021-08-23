@@ -51,7 +51,7 @@ class Mods(IntFlag):
             if self.value & mod and (m := str_mods.get(mod)):
                 _str += m
 
-        if self.value & Mods.NIGHTCORE: _str = _str.replace('NC', '')
+        if self.value & Mods.NIGHTCORE: _str = _str.replace('DT', '')
         if self.value & Mods.PERFECT: _str = _str.replace('SD', '')
 
         return _str
