@@ -466,12 +466,16 @@ async def getClan(req: Request) -> Union[tuple, dict]:
 
     clan_id = int(args.get('id', 0))
     m = int(args.get('mode', 0))
-    rx = int(args.get('rx', 0))
+    r = int(args.get('rx', 0))
 
     if not (clan := glob.clans.get(clan_id)):
         return (400, {'message': "clan couldn't be found!"})
 
+    if r == 0: rx = Mods.NOMOD
+    elif r == 1: rx = Mods.RELAX
+    elif r == 2: rx = Mods.AUTOPILOT
     mode = lbModes(m, rx)
+
     members = [await glob.players.get(id=uid, sql=True) for uid in clan.members]
     o = await glob.players.get(id=clan.owner, sql=True)
 
@@ -485,13 +489,15 @@ async def getClan(req: Request) -> Union[tuple, dict]:
             'id': o.id,
             'name': o.name,
             'country': o.country_iso,
-            'priv': o.priv
+            'priv': o.priv,
+            'rank': o.stats[mode.value].rank
         },
         'members': [{
             'id': m.id,
             'name': m.name,
             'country': m.country_iso,
-            'priv': m.priv
+            'priv': m.priv,
+            'rank': m.stats[mode.value].rank
         } for m in members if m.id != clan.owner],
         'stats': {
             'score': await glob.db.fetchval('SELECT score FROM clans WHERE id = %s', [clan.id]),
