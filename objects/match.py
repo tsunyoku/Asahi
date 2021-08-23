@@ -342,7 +342,12 @@ class Match:
                 del glob.clan_battles[clan]
                 clan.battle = None
 
-            return await glob.db.execute('UPDATE clans SET score = score + 50 WHERE id = %s', [winner.id])
+            winner.score += 50
+            await glob.db.execute('UPDATE clans SET score = %s WHERE id = %s', [winner.score, winner.id])
+
+            await glob.redis.zadd(f'asahi:clan_leaderboard', winner.score, winner.id)
+            await glob.redis.zadd(f'asahi:clan_leaderboard:{winner.country}', winner.score, winner.id)
+            return
 
         if self.host in self.clan_1_users:
             new_host = await glob.players.get(id=self.clan_2.owner)
