@@ -599,7 +599,7 @@ async def a_req(user: Player, args: list) -> str:
     ns = mapStatuses.from_str(args[1])
 
     # TODO: better management for ranking only certain difficulties
-    _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = $s', [_map.sid])
+    _set = await glob.db.fetch('SELECT md5 FROM maps WHERE sid = %s', [_map.sid])
 
     for m in _set:
         bm = await Beatmap.from_md5(m['md5'])

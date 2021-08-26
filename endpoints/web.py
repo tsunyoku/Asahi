@@ -328,7 +328,7 @@ async def getMapScores(request: Request) -> bytes:
             glob.cache['unsub'].append(md5)
             return b'-1|false' # bmap or other version of bmap cannot be found, must be unsubmitted
 
-    if not bmap.frozen and bmap.nc < time.time():
+    if bmap.nc < time.time():
         await bmap.check_status()
 
     if not (lb := getattr(bmap, mode.leaderboard)):
@@ -387,7 +387,7 @@ async def scoreSubmit(request: Request) -> bytes:
 
         f.write_bytes(replay)
 
-        if glob.config.anticheat and s.user.priv & Privileges.BypassAnticheat:
+        if glob.config.anticheat and not s.user.priv & Privileges.BypassAnticheat:
             loop = asyncio.get_event_loop()
             loop.create_task(s.analyse())
 
@@ -437,7 +437,7 @@ async def scoreSubmit(request: Request) -> bytes:
         )
 
     # sub charts bruh
-    if s.mods & Mods.GAME_CHANGING or s.status == scoreStatuses.Failed:
+    if s.status == scoreStatuses.Failed:
         log(f'[{s.mode!r}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})', Ansi.LBLUE)
         return b'error: no' # not actually erroring, score is already submitted we just want client to stop request as we cannot provide chart
 

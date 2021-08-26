@@ -12,8 +12,8 @@ frozen = None
 
 async def prepare_tasks() -> None:
     global donors, frozen
-    donors = await glob.db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Supporter}')
-    frozen = await glob.db.fetch(f'SELECT * FROM users WHERE priv & {Privileges.Frozen}')
+    donors = await glob.db.fetch(f'SELECT * FROM users WHERE priv & {int(Privileges.Supporter)}')
+    frozen = await glob.db.fetch(f'SELECT * FROM users WHERE priv & {int(Privileges.Frozen)}')
 
 async def expired_donor() -> None:
     while True: # this sux

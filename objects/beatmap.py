@@ -380,13 +380,31 @@ class Beatmap:
 
         async with glob.web.get(api, params=params) as resp:
             if resp.status != 200 or not resp:
-                glob.cache['unsub'] = self.md5
+                for _type in ('lb', 'lb_rx', 'lb_ap'):
+                    setattr(self, _type, None)
+
+                glob.cache['unsub'].append(self.md5)
+                await glob.db.execute('DELETE FROM maps WHERE md5 = %s', [self.md5])
+
+                for table in ('scores', 'scores_rx', 'scores_ap'):
+                    await glob.db.execute(f'DELETE FROM {table} WHERE md5 = %s', [self.md5])
+
                 return # request failed, map prob doesnt exist anymore
 
             data = await resp.json()
             if not data:
-                glob.cache['unsub'] = self.md5
+                for _type in ('lb', 'lb_rx', 'lb_ap'):
+                    setattr(self, _type, None)
+
+                glob.cache['unsub'].append(self.md5)
+                await glob.db.execute('DELETE FROM maps WHERE md5 = %s', [self.md5])
+
+                for table in ('scores', 'scores_rx', 'scores_ap'):
+                    await glob.db.execute(f'DELETE FROM {table} WHERE md5 = %s', [self.md5])
+
                 return # request failed, map prob doesnt exist anymore
+
+        if self.frozen: return
 
         bmap = await glob.db.fetchrow('SELECT id, status, frozen, `update` FROM maps WHERE id = %s', [self.id])
 

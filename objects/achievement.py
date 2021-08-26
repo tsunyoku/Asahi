@@ -3,6 +3,7 @@ from typing import Callable
 
 class Achievement:
     __slots__ = (
+        '__dict__',
         'id', 'image', 'name',
         'desc', 'cond', 'custom'
     )

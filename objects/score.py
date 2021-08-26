@@ -20,6 +20,7 @@ import asyncio
 import orjson
 import copy
 import threading
+import math
 from typing import Optional
 
 class Score:
@@ -238,7 +239,7 @@ class Score:
             f'SELECT users.name FROM users '
             f'LEFT OUTER JOIN {self.mode.table} t ON t.uid = users.id '
             f'WHERE t.md5 = %s AND t.mode = %s AND t.status = 2 '
-            f'AND NOT users.priv & {Privileges.Disallowed} AND t.uid != %s '
+            f'AND NOT users.priv & {int(Privileges.Disallowed)} AND t.uid != %s '
             f'AND t.id != %s ORDER BY t.{self.mode.sort} DESC LIMIT 1',
             [self.map.md5, self.mode.as_vn, self.user.id, self.id]
         )
@@ -262,14 +263,14 @@ class Score:
 
         return (f'{self.id}|{nm}|{val}|{self.combo}|{self.n50}|{self.n100}|{self.n300}|'
                 f'{self.miss}|{self.katu}|{self.geki}|{int(self.fc)}|'
-                f'{self.mods}|{self.user.id}|{self.rank}|{self.time}|1')
+                f'{int(self.mods)}|{self.user.id}|{self.rank}|{self.time}|1')
 
     async def calc_lb(self, table: str, sort: str, value: int) -> int:
         lb = await glob.db.fetchval(
             f'SELECT COUNT(*) AS r FROM {table} '
             f'LEFT OUTER JOIN users ON users.id = {table}.uid '
             f'WHERE {table}.md5 = %s AND {table}.mode = %s AND {table}.status = 2 '
-            f'AND NOT users.priv & {Privileges.Disallowed} AND {table}.{sort} > %s',
+            f'AND NOT users.priv & {int(Privileges.Disallowed)} AND {table}.{sort} > %s',
             [self.map.md5, self.mode.value, value]
         )
 
@@ -282,7 +283,7 @@ class Score:
 
             async with glob.web.get(url) as resp:
                 if not resp or resp.status != 200:
-                    return 0.0
+                    return (0.0, 0.0)
 
                 m = await resp.read()
                 path.write_bytes(m)
@@ -303,7 +304,12 @@ class Score:
                 ezpp.set_accuracy_percent(float(self.acc))
 
                 ezpp.calculate(path)
-                return (ezpp.get_pp(), ezpp.get_sr())
+                pp = ezpp.get_pp()
+
+                if pp in (math.inf, math.nan):
+                    return (0.0, 0.0)
+
+                return (pp, ezpp.get_sr())
         elif self.mode.value == 3: # mania: use maniera
             if self.map.mode != 3:
                 return 0.0 # no convert support
@@ -356,7 +362,7 @@ class Score:
             f'SELECT COUNT(*) AS r FROM {self.mode.table} t '
             f'LEFT OUTER JOIN users ON users.id = t.uid '
             f'WHERE t.md5 = %s AND t.mode = %s AND t.status = 2 '
-            f'AND NOT users.priv & {Privileges.Disallowed} AND t.{self.mode.sort} > %s',
+            f'AND NOT users.priv & {int(Privileges.Disallowed)} AND t.{self.mode.sort} > %s',
             [self.map.md5, mode, t]
         )
 

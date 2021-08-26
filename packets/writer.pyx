@@ -307,6 +307,14 @@ cpdef bytes userStats(player):
     if player is glob.bot:
         return botStats()
 
+    stats = player.current_stats
+    if stats.pp > 0x7fff:
+        rscore = stats.pp
+        pp = 0
+    else:
+        rscore = stats.rscore
+        pp = stats.pp
+
     return write(
         Packets.CHO_USER_STATS,
         (player.id, osuTypes.i32),
@@ -316,12 +324,12 @@ cpdef bytes userStats(player):
         (player.mods, osuTypes.i32), # mods
         (player.mode_vn, osuTypes.u8), # game mode
         (player.map_id, osuTypes.i32), # map id
-        (player.current_stats.rscore, osuTypes.i64), # ranked score
-        (player.current_stats.acc / 100.0, osuTypes.f32), # accuracy
-        (player.current_stats.pc, osuTypes.i32), # playcount
-        (player.current_stats.tscore, osuTypes.i64), # total score
-        (player.current_stats.rank, osuTypes.i32), # rank
-        (player.current_stats.pp, osuTypes.i16) # pp
+        (rscore, osuTypes.i64), # ranked score
+        (stats.acc / 100.0, osuTypes.f32), # accuracy
+        (stats.pc, osuTypes.i32), # playcount
+        (stats.tscore, osuTypes.i64), # total score
+        (stats.rank, osuTypes.i32), # rank
+        (pp, osuTypes.i16) # pp
     )
 
 cpdef bytes notification(str msg):

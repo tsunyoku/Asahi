@@ -15,7 +15,6 @@ from packets import writer
 
 import hashlib
 import struct
-import orjson
 
 api = Router(f'api.{glob.config.domain}')
 
@@ -48,6 +47,12 @@ async def get_country_rank(mode: str, uid: int, pp: int, country: str) -> int:
 
     return 1
 
+def make_safe(username: str) -> str:
+    if not username: return
+
+    escaped = username.replace('+', '_')
+    return escaped.lower().replace(' ', '_')
+
 @api.route('/player_count')
 async def onlinePlayers(request: Request) -> dict:
     return {'online': len(glob.players) - 1}
@@ -57,7 +62,7 @@ async def user(request: Request) -> Union[tuple, dict]:
     args = request.args
 
     id = int(args.get('id', 0))
-    username = args.get('username', None)
+    username = make_safe(args.get('username', None))
 
     m = int(args.get('mode', 0))
     rx = int(args.get('rx', 0))
@@ -66,7 +71,7 @@ async def user(request: Request) -> Union[tuple, dict]:
         return (400, {'message': 'you must specify either a username or id!'})
 
     if not id:
-        id = await glob.db.fetchval('SELECT id FROM users WHERE name = %s', [username])
+        id = await glob.db.fetchval('SELECT id FROM users WHERE safe_name = %s', [username])
 
     if not (user := await glob.players.get(id=id, sql=True)):
         return (400, {'message': "user couldn't be found!"})
@@ -99,13 +104,13 @@ async def playerStatus(request: Request) -> Union[tuple, dict]:
     args = request.args
 
     id = int(args.get('id', 0))
-    username = args.get('username', None)
+    username = make_safe(args.get('username', None))
 
     if not id and not username:
         return (400, {'message': 'you must specify either a username or id!'})
 
     if username:
-        id = await glob.db.fetchval('SELECT id FROM users WHERE name = %s', [username])
+        id = await glob.db.fetchval('SELECT id FROM users WHERE safe_name = %s', [username])
 
     if not id:
         return (400, {'message': 'user could not be found! please check the username/id you specified and try again'})
@@ -148,7 +153,7 @@ async def getLb(request: Request) -> list:
     mode = int(args.get('mode', 0))
     rx = int(args.get('rx', 0))
 
-    search = args.get('u', None)
+    search = make_safe(args.get('u', None))
 
     limit = int(args.get('limit', 50))
     page = int(args.get('p', 0))
@@ -210,7 +215,7 @@ async def getLb(request: Request) -> list:
 
     users = await glob.db.fetch(
         f'SELECT users.name, users.id, users.country, stats.pp_{lb_mode.name} pp, stats.acc_{lb_mode.name} acc, stats.pc_{lb_mode.name} pc '
-        f'FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.name LIKE %s', [f'{search}%']
+        f'FROM users LEFT OUTER JOIN stats ON stats.id = users.id WHERE users.safe_name LIKE %s', [f'{search}%']
     )
 
     for info in users:
@@ -328,7 +333,7 @@ async def playerScores(req: Request) -> Union[tuple, list]:
     rx = int(args.get('rx', 0))
 
     uid = int(args.get('id', 0))
-    username = args.get('username')
+    username = make_safe(args.get('username'))
 
     limit = int(args.get('limit', 5))
 
@@ -336,7 +341,7 @@ async def playerScores(req: Request) -> Union[tuple, list]:
         return (400, {'message': 'you must specify either a username or id!'})
 
     if not uid:
-        uid = await glob.db.fetchval('SELECT id FROM users WHERE name = %s', [username])
+        uid = await glob.db.fetchval('SELECT id FROM users WHERE safe_name = %s', [username])
 
     if not (user := await glob.players.get(id=uid, sql=True)):
         return (400, {'message': "user couldn't be found!"})
@@ -402,12 +407,12 @@ async def playerScores(req: Request) -> Union[tuple, list]:
 async def searchPlayers(req: Request) -> tuple[dict[str, object]]:
     args = req.args
 
-    query = args.get('search')
+    query = make_safe(args.get('search'))
 
     if not query:
         return (400, {'message': 'please provide a search query!'})
 
-    users = await glob.db.fetch('SELECT id, name FROM users WHERE name LIKE %s', [f'{query}%'])
+    users = await glob.db.fetch('SELECT id, name FROM users WHERE safe_name LIKE %s', [f'{query}%'])
     return users or ()
 
 @api.route('/player_most_played')
@@ -415,7 +420,7 @@ async def mostPlayed(req: Request) -> Union[tuple, dict]:
     args = req.args
 
     uid = int(args.get('id', 0))
-    username = args.get('username', None)
+    username = make_safe(args.get('username', None))
 
     m = int(args.get('mode', 0))
     r = int(args.get('rx', 0))
@@ -432,7 +437,7 @@ async def mostPlayed(req: Request) -> Union[tuple, dict]:
         return (400, {'message': 'please provide either a username or user id!'})
 
     if not uid:
-        uid = await glob.db.fetchval('SELECT id FROM users WHERE name = %s', [username])
+        uid = await glob.db.fetchval('SELECT id FROM users WHERE safe_name = %s', [username])
 
     if not (user := await glob.players.get(id=uid, sql=True)):
         return (400, {'message': "user couldn't be found!"})

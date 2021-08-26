@@ -24,7 +24,7 @@ from endpoints.assets import assets, init_customs
 
 from objects.tasks import expired_donor, freeze_timers, prepare_tasks
 
-glob.version = Version(0, 4, 1) # TODO: autoupdater using this
+glob.version = Version(0, 4, 2) # TODO: autoupdater using this
 
 app = Xevel(glob.config.socket, loop=asyncio.get_event_loop(), gzip=4) # webserver
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
@@ -83,6 +83,7 @@ async def connect() -> None: # ran before server startup, used to do things like
         country_iso=botinfo['country'],
         country=country_codes[botinfo['country'].upper()]
     )
+    await glob.bot.set_stats()
     glob.players.append(glob.bot)
 
     if glob.config.debug:

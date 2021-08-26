@@ -14,18 +14,15 @@ if "$install"; then
     sudo apt-get install -y apt-transport-https && \
     sudo apt-get update && \
     sudo apt-get install -y dotnet-sdk-5.0
+  rm -rf packages-microsoft-prod.deb
 fi
 
-if [ ! -d "./osu-tools" ]
-then
-  git submodule init && git submodule update
-fi
+git submodule init && git submodule update
 
 cd osu-tools
 dotnet restore
 dotnet publish -r linux-x64 PerformanceCalculator -c Release -o compiled/ /p:PublishSingleFile=true
 cd ..
-rm -rf packages-microsoft-prod.deb
 
 chmod +x oppai-ng/libbuild
 ./oppai-ng/libbuild

@@ -38,6 +38,6 @@ class Channel:
 
     @staticmethod
     def enqueue(b: bytes, ignore: int = 0, ignore_list: list['Player'] = []) -> None:
-        ignore_list.append(ignore)
+        ignore_list.append(glob.players.get_online(id=ignore))
 
         glob.players.enqueue(b, ignored=ignore_list)
