@@ -522,8 +522,7 @@ async def scoreSubmit(request: Request) -> bytes:
 
     if s.status == scoreStatuses.Best and s.map.status >= mapStatuses.Ranked:
         if s.rank == 1: # announce #1 to announce channel cus they achieved #1
-            loop = asyncio.get_event_loop()
-            loop.create_task(s.announce_n1())
+            await s.announce_n1()
 
         # update lb cache
         lb = getattr(s.map, s.mode.leaderboard)
