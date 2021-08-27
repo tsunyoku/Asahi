@@ -168,7 +168,7 @@ class Player:
             pw='',
             priv=Privileges(user['priv']),
             freeze_timer=datetime.fromtimestamp(user['freeze_timer']),
-            discord=user['discord']
+            discord=user.get('discord')
         )
 
         if (clan := user['clan']):
