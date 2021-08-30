@@ -449,7 +449,7 @@ async def mostPlayed(req: Request) -> Union[tuple, dict]:
              f'FROM {mode.table} WHERE uid = %s AND mode = %s '
              f'GROUP BY md5 ORDER BY plays DESC LIMIT %s')
 
-    maps = await glob.db.fetch(query, [user.id, mode.value, limit])
+    maps = await glob.db.fetch(query, [user.id, mode.as_vn, limit])
 
     for _map in maps:
         bmap = await Beatmap.from_md5(_map.pop('md5'))
