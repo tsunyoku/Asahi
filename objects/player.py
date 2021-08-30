@@ -14,7 +14,6 @@ from cmyui.logging import log, Ansi
 from cmyui.discord import Webhook, Embed
 from datetime import datetime, timedelta
 
-import queue
 import time
 
 if TYPE_CHECKING:
@@ -56,7 +55,7 @@ class Player:
         self.country: int = kwargs.get('country')
         self.loc: list[float, float] = kwargs.get('loc', [0.0, 0.0]) # store as list cus y not (long, lat)
         self.friends: list[int] = []
-        self.queue = queue.SimpleQueue()
+        self.queue = bytearray()
         self.action: int = 0
         self.info: str = ''
         self.map_md5: str = ''
@@ -743,10 +742,10 @@ class Player:
         self.achievements.append(ach)
 
     def enqueue(self, b: bytes) -> None:
-        self.queue.put_nowait(b)
+        self.queue += b
 
     def dequeue(self) -> Optional[bytes]:
-        try:
-            return self.queue.get_nowait()
-        except queue.Empty:
-            pass
+        if self.queue:
+            p = bytes(self.queue)
+            self.queue.clear()
+            return p
