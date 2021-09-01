@@ -11,7 +11,7 @@ from base64 import b64decode
 from py3rijndael import RijndaelCbc, Pkcs7Padding
 from pathlib import Path
 from cmyui.osu.oppai_ng import OppaiWrapper
-from maniera.calculator import Maniera
+from peace_performance_python.objects import Beatmap as CalcBeatmap, Calculator
 from circleguard import Circleguard, ReplayString
 
 import time
@@ -310,43 +310,10 @@ class Score:
                     return (0.0, 0.0)
 
                 return (pp, ezpp.get_sr())
-        elif self.mode.value == 3: # mania: use maniera
-            if self.map.mode != 3:
-                return 0.0 # no convert support
-
-            if self.mods != Mods.NOMOD:
-                mods = int(self.mods)
-            else:
-                mods = 0
-
-            c = Maniera(str(path), mods, int(self.score))
-            c.calculate()
-
-            return (c.pp, c.sr)
-        else: # ctb: use shitty osu-tools
-
-            cmd = [f'./osu-tools/compiled/PerformanceCalculator simulate catch {str(path)}']
-
-            if self.combo:
-                cmd.append(f'-c {self.combo}') # max combo
-
-            cmd.append(f'-X {self.miss}') # miss count
-
-            cmd.append(f'-D {self.n50}') # 50s equivalent for catch?
-            # hey note from len4ee here 50s for ctb is droplets xd
-
-            for mod in re.findall('.{1,2}', self.readable_mods):
-                if mod != 'NM': # will confuse osu-tools xd
-                    cmd.append(f'-m {mod}') # osu tool expects 1 arg per mod so we have to do this gay regex
-
-            cmd.append('-j') # json formatting is godsend thank u peppy
-
-            p = asyncio.subprocess.PIPE
-            comp = ' '.join(cmd)
-            pr = await asyncio.create_subprocess_shell(comp, stdout=p, stderr=p)
-            ot, _ = await pr.communicate()
-            o = orjson.loads(ot.decode('utf-8'))
-            return o['pp'], 0.0
+        else:
+            _map = CalcBeatmap(path)
+            calc = Calculator(acc=self.acc, miss=self.miss, katu=self.katu, score=self.score, combo=self.combo, mode=mode_vn, mods=int(self.mods)).calculate(_map)
+            return calc.pp, calc.stars
 
     async def score_order(self) -> None:
         mode = self.mode.as_vn

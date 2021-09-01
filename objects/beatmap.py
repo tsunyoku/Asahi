@@ -13,6 +13,7 @@ import time
 from datetime import datetime as dt
 import asyncio
 import orjson
+import math
 from typing import Optional
 
 from typing import TYPE_CHECKING
@@ -187,24 +188,22 @@ class Beatmap:
 
                 ezpp.calculate(path)
                 return round(ezpp.get_pp()) # returning sr soontm
-        elif self.mode.as_vn == 3: # mania: use maniera
-            c = Maniera(str(path), 0, self.score)
-            c.calculate()
+        else:
+            if self.mode.as_vn == 3:
+                if acc == 100: score = 1000000
+                elif acc == 99: score = 990000
+                elif acc == 97: score = 970000
+                elif acc == 95: score = 950000
+            else: score = 0
 
-            return round(c.pp)
-        else: # ctb: use shitty osu-tools
+            _map = CalcBeatmap(path)
+            calc = Calculator(acc=acc, miss=0, mode=self.mode.as_vn, score=score).calculate(_map)
 
-            cmd = [f'./osu-tools/compiled/PerformanceCalculator simulate catch {str(path)}']
-            cmd.append(f'-a {acc}')
+            pp = calc.pp
+            if pp in (math.inf, math.nan): pp = 0
+            else: pp = round(pp)
 
-            cmd.append('-j') # json formatting is godsend thank u peppy
-
-            p = asyncio.subprocess.PIPE
-            comp = ' '.join(cmd)
-            pr = await asyncio.create_subprocess_shell(comp, stdout=p, stderr=p)
-            ot, _ = await pr.communicate()
-            o = orjson.loads(ot.decode('utf-8'))
-            return round(o['pp'])
+            return (pp, calc.stars)
 
     @classmethod
     async def from_md5(cls, md5: str) -> Optional['Beatmap']:
