@@ -7,7 +7,7 @@ from .menu import Menu
 from cmyui.logging import log, Ansi
 from cmyui.osu.oppai_ng import OppaiWrapper
 from pathlib import Path
-from maniera.calculator import Maniera
+from peace_performance_python.objects import Beatmap as CalcBeatmap, Calculator
 
 import time
 from datetime import datetime as dt
