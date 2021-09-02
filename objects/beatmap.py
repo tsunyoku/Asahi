@@ -90,9 +90,9 @@ class Beatmap:
 
     async def np_msg(self, user) -> str:
         pp = {acc: await self.calc_acc(acc)
-              for acc in (95, 98, 99, 100)}
+              for acc in (95, 97, 99, 100)}
 
-        msg = (f'{self.embed}  // 95%: {pp[95]}pp | 98%: {pp[98]}pp | 99%: {pp[99]}pp | 100%: {pp[100]}pp'
+        msg = (f'{self.embed}  // 95%: {pp[95]}pp | 97%: {pp[97]}pp | 99%: {pp[99]}pp | 100%: {pp[100]}pp'
               f' // {self.sr:.2f}★ | {self.bpm:.0f}BPM | CS {self.cs}, AR {self.ar}, OD {self.od}')
 
         # TODO: CLEAN!!!!!
