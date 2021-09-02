@@ -203,7 +203,7 @@ class Beatmap:
             if pp in (math.inf, math.nan): pp = 0
             else: pp = round(pp)
 
-            return (pp, calc.stars)
+            return pp
 
     @classmethod
     async def from_md5(cls, md5: str) -> Optional['Beatmap']:
