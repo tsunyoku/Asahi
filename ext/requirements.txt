@@ -11,3 +11,5 @@ circleguard
 peace_performance_python
 cython
 plazy
+discord
+cffi

@@ -182,8 +182,9 @@ async def disconnect() -> None:
     if glob.config.debug:
         log('==== Closed Redis connection ====', Ansi.GREEN)
 
-    bot = dc.cogs['asahiBot']
-    await bot.end_tasks()
+    if glob.config.token:
+        bot = dc.cogs['asahiBot']
+        await bot.end_tasks()
 
     await dc.close()
     if glob.config.debug:
@@ -217,7 +218,7 @@ if __name__ == '__main__':
     app.add_router(assets)
 
     # add tasks to run @ startup
-    app.add_task((dc.start, glob.config.token))
+    if glob.config.token: app.add_task((dc.start, glob.config.token))
     app.add_task(expired_donor)
     app.add_task(freeze_timers)
 
