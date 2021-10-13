@@ -75,7 +75,7 @@ class Anticheat:
             async with glob.web.get(f'https://osu.ppy.sh/api/v2/changelog') as update_req:
                 data = await update_req.json()
 
-                for file_info in data:
+                for file_info in data['streams']:
                     if file_info['name'] == self.stream: # found osu client's info, let's check it
                         latest_ver = ver['latest_build']['version']
                         break
