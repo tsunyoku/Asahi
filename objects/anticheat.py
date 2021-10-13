@@ -81,8 +81,8 @@ class Anticheat:
                         break
 
             glob.cache['latest_ver'][self.stream] = latest_ver
-            if (self.ver['ver'] + self.ver['subver'] or '') != latest_ver: return False
+            if (self.ver['ver'] + (self.ver['subver'] or '')) != latest_ver: return False
             return True
 
     async def version_check(self) -> bool: # only for update check
-        return self.ver['ver'] + self.ver.get('subver', '') != glob.cache['latest_ver'][self.stream]
+        return self.ver['ver'] + (self.ver['subver'] or '') != glob.cache['latest_ver'][self.stream]
