@@ -70,38 +70,19 @@ class Anticheat:
             self.stream = stream
 
         if not (real_md5 := glob.cache['vers'].get(self.ver)):
-            year = self.ver['ver'][0:4]
-            month = self.ver['ver'][4:6]
-            day = self.ver['ver'][6:8]
-            formatted_date = f'{year}-{month}-{day}' # we need this to match date against the api
+            subver = self.ver.get('subver')
 
-            async with glob.web.get(f'https://osu.ppy.sh/web/check-updates.php?stream={self.stream}&action=check') as update_req:
+            async with glob.web.get(f'https://osu.ppy.sh/api/v2/changelog') as update_req:
                 data = await update_req.json()
 
                 for file_info in data:
-                    if file_info['filename'] == 'osu!.exe': # found osu client's info, let's check it
-                        latest_md5 = file_info['file_hash'] # we know this will be the latest version for this stream
-                        date = file_info['timestamp'].split(' ')[0] # we don't want the time, only the date
-                        latest_ver = date.replace('-', '') # we know this will be the latest version for this stream
-
-                        if date == formatted_date:
-                            real_md5 = file_info['file_hash']
-
+                    if file_info['name'] == self.stream: # found osu client's info, let's check it
+                        latest_ver = ver['latest_build']['version']
                         break
 
-            glob.cache['latest_ver'][self.stream] = {'md5': latest_md5, 'ver': latest_ver}
-            if not real_md5: # not latest version, we'll just return False so it can enforce an update
-                return False
+            glob.cache['latest_ver'][self.stream] = latest_ver
+            if (self.ver['ver'] + self.ver.get('subver', '')) != latest_ver: return False
+            return True
 
-            glob.cache['vers'][self.ver] = real_md5 # even if they aren't on latest, let's store the md5 for the version they're running
-
-        if self.adapters['osu_md5'] != real_md5:
-            await self.player.restrict(reason='Modified client', fr=glob.bot)
-            return True # we'll skip version check if they are restricted from this, else they won't be notified and end up in infinite loop
-
-        return False # nothing found
-
-    async def version_check(self) -> bool: # only for update check, modified client check above
-        latest_md5 = self.adapters['osu_md5'] == glob.cache['latest_ver'][self.stream]['md5']
-        latest_ver = self.ver['ver'] == glob.cache['latest_ver'][self.stream]['ver']
-        return not (latest_md5 and latest_ver)
+    async def version_check(self) -> bool: # only for update check
+        return self.ver['ver'] + self.ver.get('subver', '') != glob.cache['latest_ver'][self.stream]
