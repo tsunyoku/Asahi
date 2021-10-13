@@ -77,7 +77,7 @@ class Anticheat:
 
                 for file_info in data['streams']:
                     if file_info['name'] == self.stream: # found osu client's info, let's check it
-                        latest_ver = ver['latest_build']['version']
+                        latest_ver = file_info['latest_build']['version']
                         break
 
             glob.cache['latest_ver'][self.stream] = latest_ver
