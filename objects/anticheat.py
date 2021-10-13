@@ -70,7 +70,7 @@ class Anticheat:
             self.stream = stream
 
         if not (real_md5 := glob.cache['vers'].get(self.ver)):
-            subver = self.ver.get('subver')
+            subver = self.ver['subver'] or ''
 
             async with glob.web.get(f'https://osu.ppy.sh/api/v2/changelog') as update_req:
                 data = await update_req.json()
@@ -81,7 +81,7 @@ class Anticheat:
                         break
 
             glob.cache['latest_ver'][self.stream] = latest_ver
-            if (self.ver['ver'] + self.ver.get('subver', '')) != latest_ver: return False
+            if (self.ver['ver'] + self.ver['subver'] or '') != latest_ver: return False
             return True
 
     async def version_check(self) -> bool: # only for update check
