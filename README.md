@@ -63,4 +63,4 @@ Finally, start up Asahi:
 
 ## Need your own project made?
 
-I'm not trying to be a sellout, however I have recently started freelancing! If you are looking for work to be made for you, at a cheap price, please consider checking out my [Fiver](https://www.fiverr.com/tsunyoku)!
+I'm not trying to be a sellout, however I have recently started freelancing! If you are looking for work to be made for you, at a cheap price, please consider checking out my [Fiverr](https://www.fiverr.com/tsunyoku)!
