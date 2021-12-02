@@ -1,5 +1,6 @@
 from enum import IntEnum
 
+
 class Grade(IntEnum):
     SSH = 0
     SH = 1

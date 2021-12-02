@@ -1,10 +1,12 @@
-from enum import IntEnum, unique
+from enum import IntEnum
+from enum import unique
+
 
 @unique
 class osuTypes(IntEnum):
     # integral
-    i8  = 0
-    u8  = 1
+    i8 = 0
+    u8 = 1
     i16 = 2
     u16 = 3
     i32 = 4
@@ -20,10 +22,11 @@ class osuTypes(IntEnum):
     match = 13
 
     # misc
-    i32_list   = 17 # 2 bytes len
-    i32_list4l = 18 # 4 bytes len
-    string     = 19
-    raw        = 20
+    i32_list = 17  # 2 bytes len
+    i32_list4l = 18  # 4 bytes len
+    string = 19
+    raw = 20
+
 
 @unique
 class teamTypes(IntEnum):
@@ -31,6 +34,7 @@ class teamTypes(IntEnum):
     tag = 1
     team = 2
     tag_team = 3
+
 
 @unique
 class winConditions(IntEnum):

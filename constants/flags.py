@@ -1,4 +1,5 @@
-﻿from enum import IntFlag
+from enum import IntFlag
+
 
 class osuFlags(IntFlag):
     SpeedHackDetected = 1 << 1
@@ -27,7 +28,9 @@ class osuFlags(IntFlag):
     libeay32Library = 1 << 21
     aqnMenuSample = 1 << 22
 
-    HQ_RELATED = RunWithLdFlag | ConsoleOpen | ExtraThreads | HQAssembly | HQFile | RegistryEdits
+    HQ_RELATED = (
+        RunWithLdFlag | ConsoleOpen | ExtraThreads | HQAssembly | HQFile | RegistryEdits
+    )
     AQN_RELATED = SQL2Library | libeay32Library | aqnMenuSample
     AUTO_BOT = RawMouseDiscrepancy | RawKeyboardDiscrepancy
     FL_CHEAT = FlashlightChecksumIncorrect | FlashLightImageHack

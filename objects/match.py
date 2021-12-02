@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .player import Player
@@ -16,6 +17,7 @@ from enum import IntEnum, unique
 
 import asyncio
 
+
 @unique
 class slotStatus(IntEnum):
     open = 1
@@ -29,11 +31,13 @@ class slotStatus(IntEnum):
 
     has_player = not_ready | ready | no_map | playing | complete
 
+
 @unique
 class Teams(IntEnum):
     teamless = 0
     blue = 1
     red = 2
+
 
 CLAN_BATTLE_EXPLAIN = (
     "All online clan members have joined! If you're unsure of how clan battles work, here is a rundown. "
@@ -42,11 +46,12 @@ CLAN_BATTLE_EXPLAIN = (
     "Once you reach 5 wins, that clan wins and the match is over. When you win a match, your clan gains 'clan score' which is the metric used for clan leaderboards. Have fun!"
 )
 
+
 class Slot:
     # i actually kind of like this setup
 
     def __init__(self):
-        self.player: 'Player' = None
+        self.player: "Player" = None
 
         self.status: slotStatus = slotStatus.open
         self.team: Teams = Teams.teamless
@@ -83,24 +88,46 @@ class Slot:
 
         self.mods = s.mods
 
+
 class Match:
     # I AM IN IMMENSE PAIN SOMEONE DIAL 999
     __slots__ = (
-        'id', 'name', 'pw', 'first_host', 'host',
-        'mods', 'mode', 'fm', 'chat', 'slots',
-        'type', 'win_cond', 'in_prog', 'seed',
-        'bid', 'bname', 'bmd5', 'clan_battle',
-        'clan_1', 'clan_2', 'clan_1_wins', 'clan_2_wins',
-        'battle_ready', 'clan_1_users', 'clan_2_users',
-        'start_task', 'alert_tasks'
+        "id",
+        "name",
+        "pw",
+        "first_host",
+        "host",
+        "mods",
+        "mode",
+        "fm",
+        "chat",
+        "slots",
+        "type",
+        "win_cond",
+        "in_prog",
+        "seed",
+        "bid",
+        "bname",
+        "bmd5",
+        "clan_battle",
+        "clan_1",
+        "clan_2",
+        "clan_1_wins",
+        "clan_2_wins",
+        "battle_ready",
+        "clan_1_users",
+        "clan_2_users",
+        "start_task",
+        "alert_tasks",
     )
+
     def __init__(self) -> None:
         self.id: int = 0
-        self.name: str = ''
-        self.pw: str = ''
+        self.name: str = ""
+        self.pw: str = ""
 
-        self.first_host: Optional['Player'] = None
-        self.host: Optional['Player'] = None
+        self.first_host: Optional["Player"] = None
+        self.host: Optional["Player"] = None
 
         self.mods: Mods = Mods.NOMOD
         self.mode: osuModes = osuModes.std
@@ -109,17 +136,19 @@ class Match:
 
         self.chat: Optional[Channel] = None
 
-        self.slots: list[Slot] = [Slot() for _ in range(16)] # init match with 16 empty slots
+        self.slots: list[Slot] = [
+            Slot() for _ in range(16)
+        ]  # init match with 16 empty slots
         self.type: teamTypes = teamTypes.head
         self.win_cond: winConditions = winConditions.score
 
         self.in_prog: bool = False
-        self.seed: int = 0 # osu mania players crying rn
+        self.seed: int = 0  # osu mania players crying rn
 
         # i fucking HATE this
         self.bid: int = 0
-        self.bname: str = ''
-        self.bmd5: str = ''
+        self.bname: str = ""
+        self.bmd5: str = ""
 
         self.clan_battle: bool = False
         self.clan_1: Optional[Clan] = None
@@ -137,23 +166,23 @@ class Match:
 
     @property
     def invite(self) -> str:
-        return f'osump://{self.id}/{self.pw}'
+        return f"osump://{self.id}/{self.pw}"
 
     @property
     def embed(self) -> str:
-        return f'[{self.invite} {self.name}]'
+        return f"[{self.invite} {self.name}]"
 
     def next_free(self) -> int:
         for sn, s in enumerate(self.slots):
             if s.status == slotStatus.open:
                 return sn
 
-    def get_slot(self, user: 'Player') -> Optional[Slot]:
+    def get_slot(self, user: "Player") -> Optional[Slot]:
         for slot in self.slots:
             if user is slot.player:
                 return slot
 
-    def get_slot_id(self, user: 'Player') -> int:
+    def get_slot_id(self, user: "Player") -> int:
         for sn, slot in enumerate(self.slots):
             if user is slot.player:
                 return sn
@@ -190,24 +219,24 @@ class Match:
                 slot.status = slotStatus.locked
 
         if len(self.clan_1_users) != len(self.clan_2_users):
-            self.chat.send(glob.bot, 'There is an uneven amount of users on each team! Please make the teams equal before we start the battle.', send_self=False)
+            self.chat.send(
+                glob.bot,
+                "There is an uneven amount of users on each team! Please make the teams equal before we start the battle.",
+                send_self=False,
+            )
             return
 
         self.battle_ready = True
 
-        self.chat.send(
-            glob.bot,
-            CLAN_BATTLE_EXPLAIN,
-            send_self=False
-        )
+        self.chat.send(glob.bot, CLAN_BATTLE_EXPLAIN, send_self=False)
 
         self.chat.send(
             glob.bot,
-            f'Players fighting:'
+            f"Players fighting:"
             f'\n{self.clan_1.name}: {", ".join(u.name for u in self.clan_1_users)}'
             f'\n{self.clan_2.name}: {", ".join(u.name for u in self.clan_2_users)}'
-            '\n\nAny clan members who come online at this point will be unable to participate!',
-            send_self=False
+            "\n\nAny clan members who come online at this point will be unable to participate!",
+            send_self=False,
         )
 
     async def clan_scores(self, ignore: list[int] = []) -> None:
@@ -222,8 +251,8 @@ class Match:
         for m in self.clan_1_users:
             if m.id not in ignore:
                 score = await glob.db.fetchval(
-                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1',
-                    [m.id, self.bmd5]
+                    f"SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1",
+                    [m.id, self.bmd5],
                 )
 
                 if not score:
@@ -236,8 +265,8 @@ class Match:
         for m in self.clan_2_users:
             if m.id not in ignore:
                 score = await glob.db.fetchval(
-                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1',
-                    [m.id, self.bmd5]
+                    f"SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1",
+                    [m.id, self.bmd5],
                 )
 
                 if not score:
@@ -249,8 +278,8 @@ class Match:
         for uid in clan1_retry:
             if uid not in ignore:
                 score = await glob.db.fetchval(
-                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1',
-                    [m.id, self.bmd5]
+                    f"SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1",
+                    [m.id, self.bmd5],
                 )
 
                 if score:
@@ -260,8 +289,8 @@ class Match:
         for uid in clan2_retry:
             if uid not in ignore:
                 score = await glob.db.fetchval(
-                    f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1',
-                    [m.id, self.bmd5]
+                    f"SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1",
+                    [m.id, self.bmd5],
                 )
 
                 if score:
@@ -279,8 +308,8 @@ class Match:
             for uid in clan1_retry:
                 if uid not in ignore:
                     score = await glob.db.fetchval(
-                        f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1',
-                        [m.id, self.bmd5]
+                        f"SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1",
+                        [m.id, self.bmd5],
                     )
 
                     if score:
@@ -290,8 +319,8 @@ class Match:
             for uid in clan2_retry:
                 if uid not in ignore:
                     score = await glob.db.fetchval(
-                        f'SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1',
-                        [m.id, self.bmd5]
+                        f"SELECT {sort} FROM {table} WHERE uid = %s AND md5 = %s ORDER BY time DESC LIMIT 1",
+                        [m.id, self.bmd5],
                     )
 
                     if score:
@@ -309,7 +338,7 @@ class Match:
         clan1_avg = sum(clan1_scores) / len(clan1_scores)
         clan2_avg = sum(clan2_scores) / len(clan2_scores)
 
-        if clan1_avg == clan2_avg: # they drew, increment both
+        if clan1_avg == clan2_avg:  # they drew, increment both
             self.clan_2_wins += 1
             self.clan_2_wins += 1
         elif clan1_avg > clan2_avg:
@@ -319,7 +348,9 @@ class Match:
 
         winner = None
 
-        if (self.clan_1_wins >= 5 and self.clan_2_wins >= 5) and (self.clan_1_wins == self.clan_2_wins): # they are drawing, lets continue the match
+        if (self.clan_1_wins >= 5 and self.clan_2_wins >= 5) and (
+            self.clan_1_wins == self.clan_2_wins
+        ):  # they are drawing, lets continue the match
             pass
         elif self.clan_1_wins >= 5:
             winner = self.clan_1
@@ -329,10 +360,10 @@ class Match:
         if winner:
             self.chat.send(
                 glob.bot,
-                f'{winner.name} wins!\n\n'
-                f'Final Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})\n\n'
-                f'Congratulations! {winner.name} will receive their extra clan points soon.',
-                send_self=False
+                f"{winner.name} wins!\n\n"
+                f"Final Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})\n\n"
+                f"Congratulations! {winner.name} will receive their extra clan points soon.",
+                send_self=False,
             )
 
             self.clan_battle = False
@@ -343,10 +374,17 @@ class Match:
                 clan.battle = None
 
             winner.score += 50
-            await glob.db.execute('UPDATE clans SET score = %s WHERE id = %s', [winner.score, winner.id])
+            await glob.db.execute(
+                "UPDATE clans SET score = %s WHERE id = %s",
+                [winner.score, winner.id],
+            )
 
-            await glob.redis.zadd(f'asahi:clan_leaderboard', winner.score, winner.id)
-            await glob.redis.zadd(f'asahi:clan_leaderboard:{winner.country}', winner.score, winner.id)
+            await glob.redis.zadd(f"asahi:clan_leaderboard", winner.score, winner.id)
+            await glob.redis.zadd(
+                f"asahi:clan_leaderboard:{winner.country}",
+                winner.score,
+                winner.id,
+            )
             return
 
         if self.host in self.clan_1_users:
@@ -356,13 +394,13 @@ class Match:
             new_host = await glob.players.get(id=self.clan_1.owner)
             next_pick = self.clan_1
 
-        self.host = new_host # alternate turns for map picks
+        self.host = new_host  # alternate turns for map picks
 
         self.chat.send(
             glob.bot,
-            f'Next Clan to Pick: {next_pick.name}\n\n'
-            f'Current Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})',
-            send_self=False
+            f"Next Clan to Pick: {next_pick.name}\n\n"
+            f"Current Score: {self.clan_1_wins} - {self.clan_2_wins} ({self.clan_1.name} - {self.clan_2.name})",
+            send_self=False,
         )
 
         self.enqueue_state()
@@ -371,10 +409,10 @@ class Match:
         self.chat.enqueue(writer.updateMatch(self, send_pw=True))
 
         if lobby:
-            glob.channels['#lobby'].enqueue(writer.updateMatch(self, send_pw=False))
+            glob.channels["#lobby"].enqueue(writer.updateMatch(self, send_pw=False))
 
-    def enqueue(self, packet, lobby: bool = True, ignore: list['Player'] = []) -> None:
+    def enqueue(self, packet, lobby: bool = True, ignore: list["Player"] = []) -> None:
         self.chat.enqueue(packet, ignore_list=ignore)
 
         if lobby:
-            glob.channels['#lobby'].enqueue(packet)
+            glob.channels["#lobby"].enqueue(packet)

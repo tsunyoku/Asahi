@@ -425,6 +425,6 @@ cpdef bytes matchInvite(f, to):
 
 cpdef bytes newMatch(m):
     return write(Packets.CHO_NEW_MATCH, ((m, True), osuTypes.match))
-    
+
 cpdef bytes matchAbort():
     return write(Packets.CHO_MATCH_ABORT)

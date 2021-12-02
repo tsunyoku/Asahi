@@ -1,18 +1,19 @@
 from enum import Enum
-from .mods import Mods
 from functools import cache
 
-m_str = (
-    'osu!std',
-    'osu!taiko',
-    'osu!catch',
-    'osu!mania',
+from .mods import Mods
 
-    'std!rx',
-    'taiko!rx',
-    'catch!rx',
-    'std!ap'
+m_str = (
+    "osu!std",
+    "osu!taiko",
+    "osu!catch",
+    "osu!mania",
+    "std!rx",
+    "taiko!rx",
+    "catch!rx",
+    "std!ap",
 )
+
 
 class osuModes(Enum):
     std = 0
@@ -32,11 +33,11 @@ class osuModes(Enum):
     @cache
     def table(self) -> str:
         if self.value in (4, 5, 6):
-            return 'scores_rx'
+            return "scores_rx"
         elif self.value in (0, 1, 2, 3):
-            return 'scores'
+            return "scores"
         else:
-            return 'scores_ap'
+            return "scores_ap"
 
     @property
     @cache
@@ -54,19 +55,20 @@ class osuModes(Enum):
     @cache
     def sort(self) -> str:
         if self.value > 3:
-            return 'pp'
+            return "pp"
         else:
-            return 'score'
+            return "score"
 
     @property
     @cache
     def leaderboard(self) -> str:
         if self.value in (4, 5, 6):
-            return 'lb_rx'
+            return "lb_rx"
         elif self.value in (0, 1, 2, 3):
-            return 'lb'
+            return "lb"
         else:
-            return 'lb_ap'
+            return "lb_ap"
+
 
 def lbModes(mode: int, mods: int) -> osuModes:
     if mods & Mods.RELAX:

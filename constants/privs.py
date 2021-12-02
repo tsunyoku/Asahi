@@ -1,6 +1,7 @@
 from enum import IntFlag
 from typing import Optional
 
+
 class Privileges(IntFlag):
     Normal = 1 << 0
     Verified = 1 << 1
@@ -15,19 +16,30 @@ class Privileges(IntFlag):
     Restricted = 1 << 7
     Banned = 1 << 8
 
-    BypassAnticheat = 1 << 9 # can bypass anticheat checks
+    BypassAnticheat = 1 << 9  # can bypass anticheat checks
     Frozen = 1 << 10
-    Whitelisted = 1 << 11 # can bypass pp cap
+    Whitelisted = 1 << 11  # can bypass pp cap
 
     Staff = Nominator | Admin | Developer | Owner
     Manager = Admin | Developer | Owner
-    Master = Normal | Verified | Supporter | Nominator | Admin | Developer | Owner | BypassAnticheat | Whitelisted
+    Master = (
+        Normal
+        | Verified
+        | Supporter
+        | Nominator
+        | Admin
+        | Developer
+        | Owner
+        | BypassAnticheat
+        | Whitelisted
+    )
     Disallowed = Restricted | Banned
 
     @classmethod
-    def get(cls, name) -> Optional['Privileges']:
+    def get(cls, name) -> Optional["Privileges"]:
         if name in cls.__members__:
             return cls[name]
+
 
 class ClientPrivileges(IntFlag):
     Player = 1 << 0

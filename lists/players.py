@@ -1,7 +1,9 @@
-﻿from objects.player import Player
-from constants.privs import Privileges
+from typing import Iterator
+from typing import Optional
 
-from typing import Iterator, Optional
+from constants.privs import Privileges
+from objects.player import Player
+
 
 class PlayerList(list[Player]):
     def __init__(self, *args, **kwargs) -> None:
@@ -38,9 +40,9 @@ class PlayerList(list[Player]):
             if u not in ignored:
                 u.enqueue(data)
 
-    async def get(self, **kwargs) -> Optional[Player]: # lord this is spaghetti
-        for _type in ('id', 'name', 'token', 'discord'):
-            if (user := kwargs.pop(_type, None)):
+    async def get(self, **kwargs) -> Optional[Player]:  # lord this is spaghetti
+        for _type in ("id", "name", "token", "discord"):
+            if user := kwargs.pop(_type, None):
                 utype = _type
                 break
         else:
@@ -50,14 +52,14 @@ class PlayerList(list[Player]):
             if getattr(u, utype) == user:
                 return u
         else:
-            if kwargs.get('sql') and utype != 'token':
-                return await Player.from_sql(user, utype == 'discord')
+            if kwargs.get("sql") and utype != "token":
+                return await Player.from_sql(user, utype == "discord")
 
-    # kind of useless given we have get(), 
+    # kind of useless given we have get(),
     # however packet reader needs non-async func sooo here we are
     def get_online(self, **kwargs) -> Optional[Player]:
-        for _type in ('id', 'name', 'token', 'discord'):
-            if (user := kwargs.pop(_type, None)):
+        for _type in ("id", "name", "token", "discord"):
+            if user := kwargs.pop(_type, None):
                 utype = _type
                 break
         else:
