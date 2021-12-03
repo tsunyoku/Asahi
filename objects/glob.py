@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from fatFuckSQL import fatFawkSQL
     from aioredis import Redis
 
+    from xevel import Xevel
+
 db: "fatFawkSQL"  # type hinting
 version: "Version"  # once again, type hinting
 web: "ClientSession"

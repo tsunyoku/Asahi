@@ -244,9 +244,9 @@ class Score:
         async with glob.web.get(url) as resp:
             rp = await resp.read()
 
-        threading.Thread(target=self.replay_check, args=(rp,), daemon=True).start()
+        glob.app.add_task(self.replay_check(rp))
 
-    def replay_check(self, replay_data_str: str) -> None:
+    async def replay_check(self, replay_data_str: str) -> None:
         cg = Circleguard(glob.config.api_key)
         replay = ReplayString(replay_data_str)
 
@@ -262,33 +262,27 @@ class Score:
                 for mreplay in _map:
                     sim = cg.similarity(replay, mreplay)
                     if (
-                        sim < 17.0
+                        sim < 17
                     ):  # suggested circlecore value, idk if this should change
                         # THIS CAN FLAG LEGIT HENCE WHY IT FLAGS, PLEASE CHECK A REPLAY MANUALLY IF FLAGGED!
-                        return asyncio.run(
-                            self.user.flag(
-                                reason=f"potential replay botting using {mreplay.username}'s bancho replay (similarity: {sim:.2f}) on {self.map.name}",
-                                fr=glob.bot,
-                            ),
+                        return await self.user.flag(
+                            reason=f"potential replay botting using {mreplay.username}'s bancho replay (similarity: {sim:.2f}) on {self.map.name}",
+                            fr=glob.bot,
                         )
 
         self.ur = cg.ur(replay)  # cant do := because class :(
         if self.ur < 70:
-            asyncio.run(
-                self.user.flag(
-                    reason=f"potential relax (ur: {self.ur:.2f}) on {self.map.name}",
-                    fr=glob.bot,
-                ),
+            await self.user.flag(
+                reason=f"potential relax (ur: {self.ur:.2f}) on {self.map.name}",
+                fr=glob.bot,
             )
 
         # this can sometimes be a false positive but its detectable thru a visualized graph (i may send it alongside the embed at some point)
         # there is a fix in the works for detecting false positives
         if (ft := cg.frametime(replay)) < 14:
-            asyncio.run(
-                self.user.restrict(
-                    reason=f"timewarp cheating (frametime: {ft:.2f}) on {self.map.name}",
-                    fr=glob.bot,
-                ),
+            await self.user.restrict(
+                reason=f"timewarp cheating (frametime: {ft:.2f}) on {self.map.name}",
+                fr=glob.bot,
             )
 
     async def announce_n1(self) -> None:

@@ -26,13 +26,13 @@ from utils.logging import info
 
 glob.version = Version(0, 4, 3)  # TODO: autoupdater using this
 
-app = Xevel(glob.config.socket, gzip=4)  # webserver
+glob.app = Xevel(glob.config.socket, gzip=4)  # webserver
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
 
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
 
-@app.before_serving()
+@glob.app.before_serving()
 async def connect() -> None:  # ran before server startup, used to do things like connecting to mysql :D
     info(f"Asahi v{glob.version} starting")
 
@@ -163,13 +163,13 @@ async def connect() -> None:  # ran before server startup, used to do things lik
         debug(f"Added clan {clan.name} to clan list")
 
     await prepare_tasks()  # make new db conn for donor/freeze tasks
-    app.add_task(expired_donor)
-    app.add_task(freeze_timers)
+    glob.app.add_task(expired_donor)
+    glob.app.add_task(freeze_timers)
 
     info(f"Asahi v{glob.version} started")
 
 
-@app.after_serving()
+@glob.app.after_serving()
 async def disconnect() -> None:
     info(f"Asahi v{glob.version} stopping")
 
@@ -228,18 +228,18 @@ if __name__ == "__main__":
     from endpoints.web import web
     from endpoints.api import api
 
-    app.add_router(bancho)
-    app.add_router(avatars)
-    app.add_router(web)
-    app.add_router(api)
-    app.add_router(assets)
+    glob.app.add_router(bancho)
+    glob.app.add_router(avatars)
+    glob.app.add_router(web)
+    glob.app.add_router(api)
+    glob.app.add_router(assets)
 
     # add tasks to run @ startup
     if glob.config.token:
         load_discord_cogs()
-        app.add_task((dc.start, glob.config.token))
+        glob.app.add_task((dc.start, glob.config.token))
 
-    raise SystemExit(app.start())
+    raise SystemExit(glob.app.start())
 elif __name__ == "main":
     if housekeeping.running_via_asgi():
         raise RuntimeError(
