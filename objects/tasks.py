@@ -1,12 +1,10 @@
 import asyncio
 import time
 
-from cmyui.logging import log
+from utils.logging import info
 
 from . import glob
 from constants.privs import Privileges
-from objects.player import Player
-from packets import writer
 
 donors = None
 frozen = None
@@ -23,10 +21,12 @@ async def prepare_tasks() -> None:
 
 
 async def expired_donor() -> None:
+    from packets import writer
+
     while True:  # this sux
         for user in list(donors):
             if user["donor_end"] < time.time():  # donor expired
-                log(f"Removing {user['name']}'s expired donor.")
+                info(f"Removing {user['name']}'s expired donor.")
                 donors.remove(user)
 
                 if p := await glob.players.get(id=user["id"]):
@@ -47,10 +47,12 @@ async def expired_donor() -> None:
 
 
 async def freeze_timers() -> None:
+    from objects.player import Player
+
     while True:  # this sux v2
         for user in list(frozen):
             if user["freeze_timer"] < time.time():  # freeze timer passed
-                log(f'Restricting {user["name"]} as their freeze timer expired.')
+                info(f'Restricting {user["name"]} as their freeze timer expired.')
                 frozen.remove(user)
 
                 if p := await glob.players.get(id=user["id"]):

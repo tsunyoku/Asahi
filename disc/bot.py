@@ -1,13 +1,12 @@
 from random import choice
 
-from cmyui.logging import Ansi
-from cmyui.logging import log
 from discord import Activity
 from discord import ActivityType
 from discord import Status
 from discord.ext import commands
 from discord.ext import tasks
 
+from utils.logging import debug
 from objects import glob
 
 
@@ -32,8 +31,7 @@ class asahiBot(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self) -> None:
-        if glob.config.debug:
-            log("==== Asahi Discord bot started ====", Ansi.GREEN)
+        debug("Asahi Discord bot started")
 
         await self.set_status.start()
 

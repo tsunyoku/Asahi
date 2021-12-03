@@ -4,8 +4,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Union
 
-from cmyui.logging import Ansi
-from cmyui.logging import log
 from cmyui.osu.oppai_ng import OppaiWrapper
 from xevel import Request
 from xevel import Router
@@ -18,20 +16,20 @@ from objects import glob
 from objects.beatmap import Beatmap
 from packets import writer
 
+from utils.logging import error, info
+
 api = Router(f"api.{glob.config.domain}")
 
 if glob.config.debug:
-
     @api.after_request()
     async def logRequest(resp: Request) -> Request:
         if resp.code >= 400:
-            colourret = Ansi.LRED
+            log_func = error
         else:
-            colourret = Ansi.LCYAN
+            log_func = info
 
-        log(
+        log_func(
             f"[{resp.type}] {resp.code} {resp.url} | Time Elapsed: {resp.elapsed}",
-            colourret,
         )
         return resp
 

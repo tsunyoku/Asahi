@@ -12,8 +12,6 @@ from typing import Union
 from urllib.parse import unquote
 
 import orjson
-from cmyui.logging import Ansi
-from cmyui.logging import log
 from cryptography.hazmat.backends import default_backend as backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
@@ -34,6 +32,8 @@ from objects.leaderboard import Leaderboard
 from objects.score import Score
 from packets import writer
 
+from utils.logging import warning, error, debug, info
+
 ss_path = Path.cwd() / "resources/screenshots"
 vn_path = Path.cwd() / "resources/replays"
 rx_path = Path.cwd() / "resources/replays_rx"
@@ -46,7 +46,7 @@ async def auth(name: str, md5: str, req: Request) -> bool:
     name = name.replace("%20", " ")
 
     if not (player := await glob.players.find_login(name, md5)):
-        log(f"{name} failed authentication", Ansi.LRED)
+        warning(f"{name} failed authentication")
         return False
 
     req.extras["player"] = player
@@ -63,13 +63,12 @@ if glob.config.debug:
             ret = ""
 
         if resp.code >= 400:
-            colourret = Ansi.LRED
+            log_func = error
         else:
-            colourret = Ansi.LCYAN
+            log_func = info
 
-        log(
+        log_func(
             f"[{resp.type}] {resp.code} {resp.url}{ret} | Time Elapsed: {resp.elapsed}",
-            colourret,
         )
         return resp
 
@@ -269,9 +268,8 @@ async def ingameRegistration(request: Request) -> Union[dict, bytes]:
             [name, email, bc, name.lower().replace(" ", "_"), time.time()],
         )
         await glob.db.execute("INSERT INTO stats (id) VALUES (%s)", [uid])
-        log(
+        info(
             f"{name} successfully registered. | Time Elapsed: {(time.time() - start) * 1000:.2f}ms",
-            Ansi.LBLUE,
         )
 
     return b"ok"
@@ -533,9 +531,8 @@ async def scoreSubmit(request: Request) -> bytes:
 
     # sub charts bruh
     if s.status == scoreStatuses.Failed:
-        log(
+        info(
             f"[{s.mode!r}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})",
-            Ansi.LBLUE,
         )
         return b"error: no"  # not actually erroring, score is already submitted we just want client to stop request as we cannot provide chart
 
@@ -658,9 +655,8 @@ async def scoreSubmit(request: Request) -> bytes:
 
     s.user.last_score = s
 
-    log(
+    info(
         f"[{s.mode!r}] {s.user.name} submitted a score on {s.map.name} ({s.status.name})",
-        Ansi.LBLUE,
     )
     return "\n".join(charts).encode()  # thank u osu
 

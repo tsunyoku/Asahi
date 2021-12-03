@@ -1,4 +1,3 @@
-import asyncio
 import math
 import time
 from datetime import datetime as dt
@@ -6,9 +5,6 @@ from pathlib import Path
 from typing import Optional
 from typing import TYPE_CHECKING
 
-import orjson
-from cmyui.logging import Ansi
-from cmyui.logging import log
 from cmyui.osu.oppai_ng import OppaiWrapper
 from peace_performance_python.objects import Beatmap as CalcBeatmap
 from peace_performance_python.objects import Calculator
@@ -18,6 +14,8 @@ from .menu import Menu
 from constants.modes import osuModes
 from constants.privs import Privileges
 from constants.statuses import mapStatuses
+
+from utils.logging import info
 
 if TYPE_CHECKING:
     from .leaderboard import Leaderboard
@@ -345,7 +343,7 @@ class Beatmap:
 
         await cls.cache_set(self.sid)
 
-        log(f"Retrieved Set ID {self.sid} from osu!api", Ansi.LCYAN)
+        info(f"Retrieved Set ID {self.sid} from osu!api")
         return self
 
     @classmethod

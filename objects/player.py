@@ -8,8 +8,6 @@ from typing import Union
 
 from cmyui.discord import Embed
 from cmyui.discord import Webhook
-from cmyui.logging import Ansi
-from cmyui.logging import log
 
 from . import glob
 from .beatmap import Beatmap
@@ -23,6 +21,8 @@ from constants.privs import ClientPrivileges
 from constants.privs import Privileges
 from constants.types import teamTypes
 from packets import writer
+
+from utils.logging import warning, info
 
 if TYPE_CHECKING:
     from objects.achievement import Achievement
@@ -410,7 +410,7 @@ class Player:
         self.spectators.append(user)
         user.spectating = self
         self.enqueue(writer.hostSpectatorJoined(user.id))
-        log(f"{user.name} started spectating {self.name}.", Ansi.LBLUE)
+        info(f"{user.name} started spectating {self.name}.")
 
     def remove_spectator(self, user: "Player") -> None:
         self.spectators.remove(user)
@@ -431,7 +431,7 @@ class Player:
             self.enqueue(cinfo)
 
         self.enqueue(writer.hostSpectatorLeft(user.id))
-        log(f"{user.name} stopped spectating {self.name}.", Ansi.LBLUE)
+        info(f"{user.name} stopped spectating {self.name}.")
 
     def join_chan(self, chan: Channel) -> None:
         if self in chan.players:
@@ -444,7 +444,7 @@ class Player:
         for o in chan.players:
             o.enqueue(writer.channelInfo(chan))
 
-        log(f"{self.name} joined channel {chan.name}", Ansi.LBLUE)
+        info(f"{self.name} joined channel {chan.name}")
 
     def leave_chan(self, chan: Channel) -> None:
         if not glob.channels.get(chan.name) or self not in chan.players:
@@ -457,7 +457,7 @@ class Player:
         for o in chan.players:
             o.enqueue(writer.channelInfo(chan))
 
-        log(f"{self.name} left channel {chan.name}", Ansi.LBLUE)
+        info(f"{self.name} left channel {chan.name}")
 
     def join_match(self, match: Match, pw: str) -> None:
         if self.match:
@@ -466,9 +466,8 @@ class Player:
 
         if self is not match.host:
             if pw != match.pw:
-                log(
+                warning(
                     f"{self.name} tried to join multiplayer {match.name} with incorrect password",
-                    Ansi.LRED,
                 )
                 self.enqueue(writer.matchJoinFail())
                 return
@@ -589,7 +588,7 @@ class Player:
             wh.add_embed(embed)
             await wh.post()
 
-        log(f"{self.name} has been banned for {reason}.", Ansi.LBLUE)
+        warning(f"{self.name} has been banned for {reason}.")
 
     async def freeze(self, reason: str, fr: "Player") -> None:
         expire = datetime.now() + timedelta(days=7)
@@ -634,7 +633,7 @@ class Player:
             wh.add_embed(embed)
             await wh.post()
 
-        log(f"{self.name} has been frozen for {reason}.", Ansi.LBLUE)
+        warning(f"{self.name} has been frozen for {reason}.")
 
     async def flag(self, reason: str, fr: "Player") -> None:
         await glob.db.execute(
@@ -662,7 +661,7 @@ class Player:
             wh.add_embed(embed)
             await wh.post()
 
-        log(f"{self.name} has been flagged for {reason}.", Ansi.LBLUE)
+        warning(f"{self.name} has been flagged for {reason}.")
 
     async def unfreeze(self, reason: str, fr: "Player") -> None:
         if not self.frozen:
@@ -705,7 +704,7 @@ class Player:
             wh.add_embed(embed)
             await wh.post()
 
-        log(f"{self.name} has been unfrozen for {reason}.", Ansi.LBLUE)
+        warning(f"{self.name} has been unfrozen for {reason}.")
 
     async def unban(self, reason: str, fr: "Player") -> None:
         await self.remove_priv(Privileges.Banned)
@@ -735,7 +734,7 @@ class Player:
             wh.add_embed(embed)
             await wh.post()
 
-        log(f"{self.name} has been unbanned for {reason}.", Ansi.LBLUE)
+        warning(f"{self.name} has been unbanned for {reason}.")
 
     async def restrict(self, reason: str, fr: "Player") -> None:
         if self.restricted:
@@ -785,7 +784,7 @@ class Player:
             wh.add_embed(embed)
             await wh.post()
 
-        log(f"{self.name} has been restricted for {reason}.", Ansi.LBLUE)
+        warning(f"{self.name} has been restricted for {reason}.")
 
     async def unrestrict(self, reason: str, fr: "Player") -> None:
         await self.remove_priv(Privileges.Restricted)
@@ -820,7 +819,7 @@ class Player:
             wh.add_embed(embed)
             await wh.post()
 
-        log(f"{self.name} has been unrestricted for {reason}.", Ansi.LBLUE)
+        warning(f"{self.name} has been unrestricted for {reason}.")
 
     async def unlock_ach(self, ach: "Achievement") -> None:
         await glob.db.execute(

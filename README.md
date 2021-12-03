@@ -45,12 +45,6 @@ Now, copy the config file and edit the config:
 cp ext/config.sample.py config.py
 ```
 
-We also want to compile the pp systems & packet handlers:
-```bash
-chmod +x ext/compile.sh
-./ext/compile.sh
-```
-
 Finally, start up Asahi:
 ```bash
 ./main.py

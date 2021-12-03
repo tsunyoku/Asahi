@@ -32,6 +32,8 @@ from packets import reader
 from packets import writer
 from packets.writer import Packets
 
+from utils.logging import warning, error, info
+
 if glob.config.server_migration:
     import bcrypt
 
@@ -99,7 +101,7 @@ async def friend_add(user: Player, p: bytes) -> None:
         [user.id, tar],
     )
 
-    log(f"{user.name} added UID {tar} into their friends list.", Ansi.LCYAN)
+    info(f"{user.name} added UID {tar} into their friends list.")
 
 
 @packet(Packets.OSU_FRIEND_REMOVE)
@@ -115,7 +117,7 @@ async def friend_remove(user: Player, p: bytes) -> None:
         [user.id, tar],
     )
 
-    log(f"{user.name} removed UID {tar} from their friends list.", Ansi.LCYAN)
+    info(f"{user.name} removed UID {tar} from their friends list.")
 
 
 @packet(Packets.OSU_LOGOUT, allow_res=True)
@@ -124,7 +126,7 @@ async def logout(user: Player, _) -> None:
         return
 
     user.logout()
-    log(f"{user.name} logged out.", Ansi.LBLUE)
+    info(f"{user.name} logged out.")
 
 
 @packet(Packets.OSU_SEND_PRIVATE_MESSAGE)
@@ -135,7 +137,7 @@ async def send_pm(user: Player, p: bytes) -> None:
     tarname = d["msg"].tarname
 
     if not (target := await glob.players.get(name=tarname)):
-        log(f"{user.name} tried to send message to offline user {tarname}", Ansi.LRED)
+        warning(f"{user.name} tried to send message to offline user {tarname}")
         return
 
     if target is glob.bot:
@@ -174,7 +176,7 @@ async def send_pm(user: Player, p: bytes) -> None:
             ),
         )
 
-        log(f'{user.name} sent message "{msg}" to {tarname}', Ansi.LCYAN)
+        info(f'{user.name} sent message "{msg}" to {tarname}')
 
 
 @packet(Packets.OSU_SEND_PUBLIC_MESSAGE)
@@ -412,7 +414,7 @@ async def create_match(user: Player, p: bytes) -> None:
     match.chat = mp_chan
 
     user.join_match(match, match.pw)
-    log(f"{user.name} created a new multiplayer lobby.", Ansi.LBLUE)
+    info(f"{user.name} created a new multiplayer lobby.")
 
 
 @packet(Packets.OSU_JOIN_MATCH)
@@ -860,8 +862,7 @@ async def root_client(request: Request) -> bytes:
         if (
             not user
         ):  # ensure user actually exists before attempting to do anything else
-            if glob.config.debug:
-                log(f"User {username} does not exist.", Ansi.LRED)
+            warning(f"User {username} does not exist.")
 
             request.resp_headers[
                 "cho-token"
@@ -875,11 +876,9 @@ async def root_client(request: Request) -> bytes:
         ):
             user_pw = user["pw"].encode()
             if not bcrypt.checkpw(pw, user_pw):
-                if glob.config.debug:
-                    log(
-                        f"{username}'s login attempt failed: provided an incorrect password",
-                        Ansi.LRED,
-                    )
+                warning(
+                    f"{username}'s login attempt failed: provided an incorrect password",
+                )
 
                 request.resp_headers[
                     "cho-token"
@@ -914,11 +913,10 @@ async def root_client(request: Request) -> bytes:
                 if (
                     pw != bcache[user_pw]
                 ):  # compare provided md5 with the stored (cached) pw to ensure they have provided the correct password
-                    if glob.config.debug:
-                        log(
-                            f"{username}'s login attempt failed: provided an incorrect password",
-                            Ansi.LRED,
-                        )
+                    warning(
+                        f"{username}'s login attempt failed: provided an incorrect password",
+                        Ansi.LRED,
+                    )
 
                     request.resp_headers[
                         "cho-token"
@@ -935,11 +933,10 @@ async def root_client(request: Request) -> bytes:
                 try:
                     k.verify(pw, user_pw)
                 except Exception:
-                    if glob.config.debug:
-                        log(
-                            f"{username}'s login attempt failed: provided an incorrect password",
-                            Ansi.LRED,
-                        )
+                    warning(
+                        f"{username}'s login attempt failed: provided an incorrect password",
+                        Ansi.LRED,
+                    )
 
                     request.resp_headers[
                         "cho-token"
@@ -999,7 +996,7 @@ async def root_client(request: Request) -> bytes:
                 "UPDATE users SET country = %s WHERE id = %s",
                 [p.country_iso.lower(), p.id],
             )  # set country code in db
-            log(f"{p.name} has been successfully verified.", Ansi.LBLUE)
+            info(f"{p.name} has been successfully verified.")
 
         if glob.config.anticheat and not p.priv & Privileges.BypassAnticheat:
             a = cinfo[3][:-1].split(":")  # client-provided adapters
@@ -1137,7 +1134,7 @@ async def root_client(request: Request) -> bytes:
                 )
 
         if p.priv & Privileges.Supporter and p.donor_end < start:
-            log(f"Removing {p.name}'s expired donor.")
+            info(f"Removing {p.name}'s expired donor.")
             await p.remove_priv(Privileges.Supporter)
 
             data += writer.sendMessage(
@@ -1151,7 +1148,7 @@ async def root_client(request: Request) -> bytes:
         data += writer.notification(
             f"Welcome to Asahi v{glob.version}\n\nTime Elapsed: {elapsed:.2f}ms",
         )  # send notification as indicator they've logged in i guess
-        log(f"{p.name} successfully logged in.", Ansi.LBLUE)
+        info(f"{p.name} successfully logged in.")
 
         request.resp_headers["cho-token"] = token
         return bytes(data)
@@ -1175,8 +1172,7 @@ async def root_client(request: Request) -> bytes:
             if body[0] == pck:
                 await cb(p, bytes(body))
 
-                if glob.config.debug:
-                    log(f"Packet {pck.name} handled for user {p.name}", Ansi.LMAGENTA)
+                debug(f"Packet {pck.name} handled for user {p.name}")
 
     p.last_ping = time.time()
 

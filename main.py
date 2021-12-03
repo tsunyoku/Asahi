@@ -1,12 +1,9 @@
 #!/usr/bin/env python3.9
-import asyncio
-from pathlib import Path
+import traceback
 
 import aioredis
 import plazy
 from aiohttp import ClientSession
-from cmyui.logging import Ansi
-from cmyui.logging import log
 from cmyui.version import Version
 from discord.ext import commands
 from fatFuckSQL import fatFawkSQL
@@ -15,52 +12,41 @@ from xevel import Xevel
 from constants.countries import country_codes
 from endpoints.assets import assets
 from endpoints.assets import init_customs
-from lists.players import PlayerList
 from objects import glob  # global objects
 from objects.achievement import Achievement
-from objects.channel import Channel
 from objects.clan import Clan
-from objects.player import Player
 from objects.tasks import expired_donor
 from objects.tasks import freeze_timers
 from objects.tasks import prepare_tasks
-
-# internal imports
+from utils import housekeeping
+from utils.logging import debug
+from utils.logging import error
+from utils.logging import info
 
 glob.version = Version(0, 4, 2)  # TODO: autoupdater using this
 
-app = Xevel(glob.config.socket, loop=asyncio.get_event_loop(), gzip=4)  # webserver
+app = Xevel(glob.config.socket, gzip=4)  # webserver
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
-
-AVA_PATH = Path.cwd() / "resources/avatars"
-SS_PATH = Path.cwd() / "resources/screenshots"
-R_PATH = Path.cwd() / "resources/replays"
-RRX_PATH = Path.cwd() / "resources/replays_rx"
-RAP_PATH = Path.cwd() / "resources/replays_ap"
-MAPS_PATH = Path.cwd() / "resources/maps"
-ACHIEVEMENTS_PATH = Path.cwd() / "resources/achievements"
-
-""" TODO: currently breaks due to subprocess, may be re-enabled in the future.
-import uvloop
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-"""
 
 
 @app.before_serving()
 async def connect() -> None:  # ran before server startup, used to do things like connecting to mysql :D
-    log(f"==== Asahi v{glob.version} starting ====", Ansi.GREEN)
+    info(f"Asahi v{glob.version} starting")
 
     glob.web = ClientSession()  # aiohttp session for external web requests
+
+    from lists.players import PlayerList
+
     glob.players = PlayerList()  # init player list
 
     try:
         glob.db = await fatFawkSQL.connect(
             **glob.config.sql
         )  # connect to db using config :p
-        if glob.config.debug:
-            log("==== Asahi connected to MySQL ====", Ansi.GREEN)
-    except Exception as error:
-        log(f"==== Asahi failed to connect to MySQL ====\n\n{error}", Ansi.LRED)
+        debug("Asahi connected to MySQL")
+    except Exception:
+        error(f"Asahi failed to connect to MySQL\n\n{traceback.format_exc()}")
+        raise SystemExit(1)
 
     try:
         glob.redis = await aioredis.create_redis_pool(
@@ -68,32 +54,25 @@ async def connect() -> None:  # ran before server startup, used to do things lik
             db=glob.config.redis["db"],
             password=glob.config.redis["password"] or None,
         )
-        if glob.config.debug:
-            log("==== Asahi connected to Redis ====", Ansi.GREEN)
-    except Exception as error:
-        log(f"==== Asahi failed to connect to Redis ====\n\n{error}", Ansi.LRED)
+        debug("Asahi connected to Redis")
+    except Exception:
+        error(f"Asahi failed to connect to Redis\n\n{traceback.format_exc()}")
+        raise SystemExit(1)
 
-    if not AVA_PATH.exists():
-        AVA_PATH.mkdir(parents=True)
-        log(
-            'Avatars folder has been created, please set a default avatar by placing a file named "default.png" into resources/avatars!',
-            Ansi.LRED,
-        )
-
-    for directory in (
-        SS_PATH,
-        R_PATH,
-        RRX_PATH,
-        RAP_PATH,
-        MAPS_PATH,
-        ACHIEVEMENTS_PATH,
-    ):
-        if not directory.exists():
-            directory.mkdir(parents=True)
+    from objects.player import Player
 
     botinfo = await glob.db.fetchrow(
         "SELECT name, pw, country, name FROM users WHERE id = 1",
     )
+
+    if not botinfo:
+        error(
+            "Bot account not found. "
+            "Please insert the bot account with user ID 1 and start Asahi again"
+        )
+
+        raise SystemExit(1)
+
     glob.bot = Player(
         id=1,
         name=botinfo["name"],
@@ -104,24 +83,24 @@ async def connect() -> None:  # ran before server startup, used to do things lik
     await glob.bot.set_stats()
     glob.players.append(glob.bot)
 
-    if glob.config.debug:
-        log(f"==== Added bot {glob.bot.name} to player list ====", Ansi.GREEN)
+    debug(f"Added bot {glob.bot.name} to player list")
 
-    async for clan_row in glob.db.iter("SELECT * FROM achievements"):
-        clan_row["cond"] = eval(f'lambda s: {clan_row["cond"]}')
-        clan_row["desc"] = clan_row.pop("descr")  # TODO: fix in sql
-        glob.achievements.append(Achievement(**clan_row))
+    async for ach_row in glob.db.iter("SELECT * FROM achievements"):
+        ach_row["cond"] = eval(f'lambda s: {ach_row["cond"]}')
+        ach_row["desc"] = ach_row.pop("descr")
+        glob.achievements.append(Achievement(**ach_row))
 
     init_customs()  # set custom achievements list for assets proxy
 
     # add all channels to cache
-    async for clan_row in glob.db.iter("SELECT * FROM channels"):
-        clan_row["desc"] = clan_row.pop("descr")  # TODO: fix in sql
-        channel = Channel(**clan_row)
+    from objects.channel import Channel
+
+    async for chan_row in glob.db.iter("SELECT * FROM channels"):
+        chan_row["desc"] = chan_row.pop("descr")
+        channel = Channel(**chan_row)
 
         glob.channels[channel.name] = channel
-        if glob.config.debug:
-            log(f"==== Added channel {channel.name} to channel list ====", Ansi.GREEN)
+        debug(f"Added channel {channel.name} to channel list")
 
     # add announce channel to cache
     announce = Channel(
@@ -132,15 +111,13 @@ async def connect() -> None:  # ran before server startup, used to do things lik
     )
     glob.channels[announce.name] = announce
 
-    if glob.config.debug:
-        log("==== Added channel #announce to channel list ====", Ansi.GREEN)
+    debug("Added channel #announce to channel list")
 
     # add lobby channel to cache
     lobby = Channel(name="#lobby", desc="Multiplayer lobby", auto=False, perm=True)
     glob.channels[lobby.name] = lobby
 
-    if glob.config.debug:
-        log("==== Added channel #lobby to channel list ====", Ansi.GREEN)
+    debug("Added channel #lobby to channel list")
 
     # add all clans to cache
     async for clan_row in glob.db.iter("SELECT * FROM clans"):
@@ -177,50 +154,39 @@ async def connect() -> None:  # ran before server startup, used to do things lik
             clan.id,
         )
 
-        if r is None:
-            if clan.score > 0:
-                clan.rank = 1
-        else:
-            clan.rank = r + 1
+        clan.rank = r + 1 if r else 0
+        clan.country_rank = cr + 1 if cr else 0
 
-        if cr is None:
-            if clan.score > 0:
-                clan.country_rank = 1
-        else:
-            clan.country_rank = cr + 1
-
-        if glob.config.debug:
-            log(f"==== Added clan {clan.name} to clan list ====", Ansi.GREEN)
+        debug(f"Added clan {clan.name} to clan list")
 
     await prepare_tasks()  # make new db conn for donor/freeze tasks
+    app.add_task(expired_donor)
+    app.add_task(freeze_timers)
 
-    log(f"==== Asahi v{glob.version} started ====", Ansi.GREEN)
+    info(f"Asahi v{glob.version} started")
 
 
 @app.after_serving()
 async def disconnect() -> None:
-    log(f"==== Asahi v{glob.version} stopping ====", Ansi.GREEN)
+    info(f"Asahi v{glob.version} stopping")
 
     await glob.web.close()
 
     await glob.db.close()
-    if glob.config.debug:
-        log("==== Closed MySQL connection ====", Ansi.GREEN)
+    debug("Closed MySQL connection")
 
     glob.redis.close()
     await glob.redis.wait_closed()
-    if glob.config.debug:
-        log("==== Closed Redis connection ====", Ansi.GREEN)
+    debug("Closed Redis connection")
 
     if glob.config.token:
         bot = dc.cogs["asahiBot"]
         await bot.end_tasks()
+        await dc.close()
 
-    await dc.close()
-    if glob.config.debug:
-        log("==== Asahi Discord bot stopped ====", Ansi.GREEN)
+        debug("Asahi Discord bot stopped")
 
-    log(f"==== Asahi v{glob.version} stopped ====", Ansi.GREEN)
+    info(f"Asahi v{glob.version} stopped")
 
 
 def load_discord_cogs() -> None:
@@ -236,7 +202,21 @@ def load_discord_cogs() -> None:
 
 
 if __name__ == "__main__":
-    load_discord_cogs()
+    try:
+        import uvloop
+
+        uvloop.install()
+    except ImportError:
+        pass
+
+    for safety_check in (
+        housekeeping.ensure_posix,
+        housekeeping.ensure_services,
+        housekeeping.ensure_resources,
+        housekeeping.ensure_dependencies,
+    ):
+        if (exit_code := safety_check()) != 0:
+            raise SystemExit(exit_code)
 
     # add domains (with their respective endpoints)
     from endpoints.bancho import bancho
@@ -252,8 +232,15 @@ if __name__ == "__main__":
 
     # add tasks to run @ startup
     if glob.config.token:
+        load_discord_cogs()
         app.add_task((dc.start, glob.config.token))
-    app.add_task(expired_donor)
-    app.add_task(freeze_timers)
 
-    app.start()
+    raise SystemExit(app.start())
+elif __name__ == "main":
+    if housekeeping.running_via_asgi():
+        raise RuntimeError(
+            "Asahi uses it's own web framework (Xevel) and does not need to be run via an ASGI server "
+            "such as hypercorn. Please run the file directly with `./main.py`",
+        )
+    else:
+        raise RuntimeError("Asahi should be run directly with `./main.py`")
