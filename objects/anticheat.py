@@ -2,15 +2,20 @@ from . import glob
 from .player import Player
 from constants.regexes import osu_ver
 
+from typing import Optional, Union
+
+import re
+
 
 class Anticheat:
-    __slots__ = ("ver", "adapters", "player", "headers", "stream")
+    __slots__ = ("ver", "regex_ver", "adapters", "player", "headers", "stream")
 
     def __init__(self, **kwargs) -> None:
-        self.ver: int = kwargs.get("osuver")
-        self.adapters: dict = kwargs.get("adapters")
-        self.player: Player = kwargs.get("player")
-        self.headers: dict = kwargs.get("headers")
+        self.ver: Optional[str] = kwargs.get("osuver")
+        self.regex_ver: Optional[re.Pattern] = None
+        self.adapters: Optional[dict] = kwargs.get("adapters")
+        self.player: Player = kwargs.get("player", None)
+        self.headers: Optional[dict] = kwargs.get("headers")
 
         self.stream: str = "stable40"  # will be default stream if not ce etc.
 
@@ -86,25 +91,24 @@ class Anticheat:
 
     async def client_check(self) -> bool:
         if (
-            not self.ver
+            not self.ver or not self.headers
             or any(v in self.ver for v in ("ainu", "skooter"))
             or "ainu" in self.headers
         ):
-            return await self.player.restrict(reason="Modified client", fr=glob.bot)
+            await self.player.restrict(reason="Modified client", fr=glob.bot)
+            return False
 
-        matched_ver = osu_ver.match(self.ver)
+        self.regex_ver = osu_ver.match(self.ver)
 
-        if not matched_ver:
-            return await self.player.restrict(reason="Modified client", fr=glob.bot)
+        if not self.regex_ver:
+            await self.player.restrict(reason="Modified client", fr=glob.bot)
+            return False
 
-        self.ver = matched_ver
-
-        if stream := self.ver["stream"]:
+        if stream := self.regex_ver["stream"]:
             self.stream = stream
 
-        if not (real_md5 := glob.cache["vers"].get(self.ver)):
-            subver = self.ver["subver"] or ""
-
+        latest_ver = None
+        if not (glob.cache["latest_ver"].get(self.stream)):
             async with glob.web.get(
                 f"https://osu.ppy.sh/api/v2/changelog",
             ) as update_req:
@@ -118,12 +122,14 @@ class Anticheat:
                         break
 
             glob.cache["latest_ver"][self.stream] = latest_ver
-            if (self.ver["ver"] + (self.ver["subver"] or "")) != latest_ver:
-                return False
-            return True
+
+        if (self.regex_ver["ver"] + (self.regex_ver["subver"] or "")) != latest_ver:
+            return False
+
+        return True
 
     async def version_check(self) -> bool:  # only for update check
         return (
-            self.ver["ver"] + (self.ver["subver"] or "")
+            self.regex_ver["ver"] + (self.regex_ver["subver"] or "")
             != glob.cache["latest_ver"][self.stream]
         )

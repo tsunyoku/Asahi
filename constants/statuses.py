@@ -1,5 +1,6 @@
 from enum import Enum
 from enum import IntEnum
+from typing import Optional
 
 
 class mapStatuses(IntEnum):
@@ -13,44 +14,46 @@ class mapStatuses(IntEnum):
 
     GIVE_PP = Ranked | Approved
 
-    @classmethod
-    def from_str(cls, status: str) -> "mapStatuses":
+    @staticmethod
+    def from_str(status: str) -> "mapStatuses":
         return {
-            "rank": cls.Ranked,
-            "love": cls.Loved,
-            "ranked": cls.Ranked,  # because people are stupid
-            "loved": cls.Loved,  # because people are stupid
-        }.get(status, cls.Pending)
+            "rank": mapStatuses.Ranked,
+            "love": mapStatuses.Loved,
+            "ranked": mapStatuses.Ranked,  # because people are stupid
+            "loved": mapStatuses.Loved,  # because people are stupid
+        }.get(status, mapStatuses.Pending)
 
-    @classmethod
-    def from_direct(cls, status: int) -> "mapStatuses":
+    @staticmethod
+    def from_direct(status: int) -> int:
+        assert 0 <= status < 9
+
         _status = {
-            0: cls.Ranked,
-            2: cls.Pending,
-            3: cls.Qualified,
-            5: cls.Pending,
-            7: cls.Ranked,
-            8: cls.Loved,
-        }.get(status)
+            0: mapStatuses.Ranked,
+            2: mapStatuses.Pending,
+            3: mapStatuses.Qualified,
+            5: mapStatuses.Pending,
+            7: mapStatuses.Ranked,
+            8: mapStatuses.Loved,
+        }[status]
 
-        return cls.to_api(_status)
+        return _status.to_api()
 
-    @classmethod
-    def from_api(cls, status: int) -> "mapStatuses":
-        if status in (-2, -1, 0):
-            return cls.Pending
+    @staticmethod
+    def from_api(status: int) -> "mapStatuses":
+        assert status < 5
 
-        if status in (1, 2, 3, 4):
-            return cls(status + 1)
+        return mapStatuses.Pending if status <= 1 else mapStatuses(status + 1)
 
     def to_api(self) -> int:
+        assert 0 >= self.value < 5
+
         return {
             self.Pending: 0,
             self.Ranked: 1,
             self.Approved: 2,
             self.Qualified: 3,
             self.Loved: 4,
-        }.get(self)
+        }[self]
 
 
 class scoreStatuses(Enum):

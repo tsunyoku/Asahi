@@ -1,17 +1,17 @@
 from functools import cached_property
-from typing import Callable
+from typing import Callable, Optional
 
 
 class Achievement:
     __slots__ = ("__dict__", "id", "image", "name", "desc", "cond", "custom")
 
     def __init__(self, **kwargs) -> None:
-        self.id: int = kwargs.get("id")
-        self.image: str = kwargs.get("image")
-        self.name: str = kwargs.get("name")
-        self.desc: str = kwargs.get("desc")
-        self.cond: Callable = kwargs.get("cond")
-        self.custom: bool = kwargs.get("custom")
+        self.id: Optional[int] = kwargs.get("id")
+        self.image: Optional[str] = kwargs.get("image")
+        self.name: Optional[str] = kwargs.get("name")
+        self.desc: Optional[str] = kwargs.get("desc")
+        self.cond: Callable = kwargs.get("cond", None)
+        self.custom: bool = kwargs.get("custom", False)
 
     @cached_property
     def format(self) -> str:

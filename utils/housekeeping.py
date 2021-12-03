@@ -1,5 +1,6 @@
 import subprocess
 import requests
+import shutil
 import sys
 import os
 
@@ -20,6 +21,8 @@ OPPAI_PATH = Path.cwd() / "oppai-ng"
 OPPAI_LIB = OPPAI_PATH / "liboppai.so"
 
 PACKETS_PATH = Path.cwd() / "packets"
+
+CONFIG_FILE = Path.cwd() / "config.py"
 
 DEFAULT_AVATAR = AVA_PATH / "default.png"
 AVATAR_URL = "https://i.imgur.com/tWWmQbu.png"
@@ -149,6 +152,15 @@ def ensure_dependencies() -> int:
             error("Failed to build packet reader/writer")
             return exit_code
 
-        info("Build packet reader/writer")
+        info("Built packet reader/writer")
+
+    return 0
+
+def ensure_config():
+    if not CONFIG_FILE.exists():
+        shutil.copy("ext/config.sample.py", "config.py")
+        error("Created config file, please edit and start Asahi again")
+
+        return 1
 
     return 0

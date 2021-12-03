@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from objects import glob
 from packets import writer
@@ -11,8 +11,8 @@ class Channel:
     __slots__ = ("name", "desc", "auto", "perm", "players")
 
     def __init__(self, **kwargs):
-        self.name: str = kwargs.get("name")
-        self.desc: str = kwargs.get("desc")
+        self.name: Optional[str] = kwargs.get("name")
+        self.desc: Optional[str] = kwargs.get("desc")
         self.auto: bool = kwargs.get("auto", False)
         self.perm: bool = kwargs.get("perm", False)  # whether the channel should stay
         # in the global channels list even

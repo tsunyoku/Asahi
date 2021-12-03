@@ -1,9 +1,8 @@
-import inspect
 from typing import Callable
-from typing import Coroutine
 from typing import Optional
 from typing import TYPE_CHECKING
-from typing import Union
+
+import asyncio
 
 from . import glob
 
@@ -14,11 +13,10 @@ if TYPE_CHECKING:
 class Menu:
     def __init__(self, **kwargs) -> None:
         self.id: int = kwargs.get("id", 0)
-        self.name: str = kwargs.get("name", "")
+        self.name: Optional[str] = kwargs.get("name")
         self.priv: Privileges = kwargs.get("priv", 0)
 
-        self.callback: Callable = kwargs.get("callback")
-        self.args: Optional[list] = kwargs.get("args")
+        self.callback: Callable = kwargs.get("callback", None)
 
         self.destroy: bool = kwargs.get("destroy", False)  # one-time usage
 
@@ -40,36 +38,5 @@ class Menu:
         if not (c := self.callback):
             return
 
-        call = callable(c)
-        isL = c.__name__ == "<lambda>"
-
-        if inspect.iscoroutinefunction(c):
-            if not self.args:
-                if not call:
-                    return await c
-                if not isL:
-                    return await c()
-
-                return await c(player)
-
-            if not call:
-                return await c  # has args but not a function???
-            if not isL:
-                return await c(*self.args)
-
-            return await c(player)(*self.args)
-
-        if not self.args:
-            if not call:
-                return c
-            if not isL:
-                return c()
-
-            return c(player)
-
-        if not call:
-            return c  # has args but not a function???
-        if not isL:
-            return c(*self.args)
-
-        return c(player)(*self.args)
+        if asyncio.iscoroutinefunction(c): return await c(player)
+        else: return c(player)

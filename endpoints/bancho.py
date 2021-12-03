@@ -3,8 +3,6 @@ import time
 import uuid
 
 import pyfiglet
-from cmyui.logging import Ansi
-from cmyui.logging import log
 from cryptography.hazmat.backends import default_backend as backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
@@ -32,7 +30,7 @@ from packets import reader
 from packets import writer
 from packets.writer import Packets
 
-from utils.logging import warning, error, info
+from utils.logging import warning, info, debug
 
 if glob.config.server_migration:
     import bcrypt
@@ -101,7 +99,7 @@ async def friend_add(user: Player, p: bytes) -> None:
         [user.id, tar],
     )
 
-    info(f"{user.name} added UID {tar} into their friends list.")
+    base_info(f"{user.name} added UID {tar} into their friends list.")
 
 
 @packet(Packets.OSU_FRIEND_REMOVE)
@@ -117,7 +115,7 @@ async def friend_remove(user: Player, p: bytes) -> None:
         [user.id, tar],
     )
 
-    info(f"{user.name} removed UID {tar} from their friends list.")
+    base_info(f"{user.name} removed UID {tar} from their friends list.")
 
 
 @packet(Packets.OSU_LOGOUT, allow_res=True)
@@ -126,7 +124,7 @@ async def logout(user: Player, _) -> None:
         return
 
     user.logout()
-    info(f"{user.name} logged out.")
+    base_info(f"{user.name} logged out.")
 
 
 @packet(Packets.OSU_SEND_PRIVATE_MESSAGE)
@@ -176,7 +174,7 @@ async def send_pm(user: Player, p: bytes) -> None:
             ),
         )
 
-        info(f'{user.name} sent message "{msg}" to {tarname}')
+        base_info(f'{user.name} sent message "{msg}" to {tarname}')
 
 
 @packet(Packets.OSU_SEND_PUBLIC_MESSAGE)
@@ -324,7 +322,7 @@ async def update_action(user: Player, p: bytes) -> None:
         p,
         (
             ("actionid", osuTypes.u8),
-            ("info", osuTypes.string),
+            ("base_info", osuTypes.string),
             ("md5", osuTypes.string),
             ("mods", osuTypes.u32),
             ("mode", osuTypes.u8),
@@ -333,12 +331,12 @@ async def update_action(user: Player, p: bytes) -> None:
     )
 
     if d["actionid"] == 0 and d["mods"] & Mods.RELAX:
-        d["info"] = "on Relax"
+        d["base_info"] = "on Relax"
     elif d["actionid"] == 0 and d["mods"] & Mods.AUTOPILOT:
-        d["info"] = "on Autopilot"
+        d["base_info"] = "on Autopilot"
 
     user.action = d["actionid"]
-    user.info = d["info"]
+    user.base_info = d["base_info"]
     user.map_md5 = d["md5"]
     user.mods = d["mods"]
 
@@ -349,7 +347,7 @@ async def update_action(user: Player, p: bytes) -> None:
     user.map_id = d["mid"]
 
     if d["actionid"] == 2:
-        user.info += f" +{(Mods(user.mods))!r}"  # ugly and i dont care!
+        user.base_info += f" +{(Mods(user.mods))!r}"  # ugly and i dont care!
 
     if not user.restricted:
         glob.players.enqueue(writer.userStats(user))
@@ -414,7 +412,7 @@ async def create_match(user: Player, p: bytes) -> None:
     match.chat = mp_chan
 
     user.join_match(match, match.pw)
-    info(f"{user.name} created a new multiplayer lobby.")
+    base_info(f"{user.name} created a new multiplayer lobby.")
 
 
 @packet(Packets.OSU_JOIN_MATCH)
@@ -836,9 +834,9 @@ async def root_client(request: Request) -> bytes:
     ):  # sometimes a login request will be a re-connect attempt, in which case they will already have a token, if not: login the user
         data = (
             request.body
-        )  # request data, used to get info such as username to login the user
+        )  # request data, used to get base_info such as username to login the user
         if (
-            len(info := data.decode().split("\n")[:-1]) != 3
+            len(base_info := data.decode().split("\n")[:-1]) != 3
         ):  # format data so we can use it easier & also ensure it is valid at the same time
             request.resp_headers[
                 "cho-token"
@@ -846,15 +844,15 @@ async def root_client(request: Request) -> bytes:
             return writer.userID(-2)
 
         if (
-            len(cinfo := info[2].split("|")) != 5
+            len(cinfo := base_info[2].split("|")) != 5
         ):  # format client data (hash, utc etc.) & ensure it is valid
             request.resp_headers[
                 "cho-token"
             ] = "no"  # client knows there is something up if we set token to 'no'
             return writer.userID(-2)
 
-        username = info[0]
-        pw = info[
+        username = base_info[0]
+        pw = base_info[
             1
         ].encode()  # password in md5 form, we will use this to compare against db's stored bcrypt later
 
@@ -915,7 +913,6 @@ async def root_client(request: Request) -> bytes:
                 ):  # compare provided md5 with the stored (cached) pw to ensure they have provided the correct password
                     warning(
                         f"{username}'s login attempt failed: provided an incorrect password",
-                        Ansi.LRED,
                     )
 
                     request.resp_headers[
@@ -935,7 +932,6 @@ async def root_client(request: Request) -> bytes:
                 except Exception:
                     warning(
                         f"{username}'s login attempt failed: provided an incorrect password",
-                        Ansi.LRED,
                     )
 
                     request.resp_headers[

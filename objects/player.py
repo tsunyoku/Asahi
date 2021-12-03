@@ -83,19 +83,19 @@ class Player:
     )
 
     def __init__(self, **kwargs) -> None:
-        self.id: int = kwargs.get("id")
-        self.name: str = kwargs.get("name")
+        self.id: Optional[int] = kwargs.get("id")
+        self.name: Optional[str] = kwargs.get("name")
         self.token: str = kwargs.get(
             "token",
             "",
         )  # we will set default token in case of bot which won't have a token provided
-        self.pw: str = kwargs.get("pw")  # used for /web/ auth
-        self.offset: int = kwargs.get("offset")
-        self.login_time: int = kwargs.get("login_time")
-        self.priv = kwargs.get("priv", Privileges(0))
-        self.country_iso: str = kwargs.get("country_iso")
-        self.country: int = kwargs.get("country")
-        self.loc: list[float, float] = kwargs.get(
+        self.pw: Optional[str] = kwargs.get("pw")  # used for /web/ auth
+        self.offset: Optional[int] = kwargs.get("offset")
+        self.login_time: Optional[int] = kwargs.get("login_time")
+        self.priv: Privileges = kwargs.get("priv", Privileges(0))
+        self.country_iso: Optional[str] = kwargs.get("country_iso")
+        self.country: Optional[int] = kwargs.get("country")
+        self.loc: Optional[list[float]] = kwargs.get(
             "loc",
             [0.0, 0.0],
         )  # store as list cus y not (long, lat)
@@ -127,7 +127,7 @@ class Player:
         self.restricted: bool = False
         self.frozen: bool = False
 
-        self.freeze_timer: int = kwargs.get("freeze_timer", 0)
+        self.freeze_timer: float = kwargs.get("freeze_timer", 0.0)
 
         self.registered_at: int = kwargs.get("registered_at", 0)
         self.silence_end: int = kwargs.get("silence_end", 0)
@@ -136,7 +136,7 @@ class Player:
         self.discord: int = kwargs.get("discord", 0)
 
     @property
-    def full_name(self) -> str:
+    def full_name(self) -> Optional[str]:
         if self.clan:
             return f"[{self.clan.tag}] {self.name}"
         else:
@@ -155,7 +155,7 @@ class Player:
             loc=[user["lon"], user["lat"]],
             pw=user["md5"].decode(),
             priv=Privileges(user["priv"]),
-            freeze_timer=datetime.fromtimestamp(user["freeze_timer"]),
+            freeze_timer=user["freeze_timer"],
         )
 
         if discord := user.get("discord"):
@@ -216,7 +216,7 @@ class Player:
             loc=[0, 0],
             pw="",
             priv=Privileges(user["priv"]),
-            freeze_timer=datetime.fromtimestamp(user["freeze_timer"]),
+            freeze_timer=user["freeze_timer"],
             discord=user.get("discord"),
         )
 
@@ -597,12 +597,12 @@ class Player:
             return  # ?
 
         self.frozen = True
-        self.freeze_timer = expire
+        self.freeze_timer = expire.timestamp()
 
         await self.add_priv(Privileges.Frozen)
         await glob.db.execute(
             "UPDATE users SET freeze_timer = %s WHERE id = %s",
-            [self.freeze_timer.timestamp(), self.id],
+            [self.freeze_timer, self.id],
         )
 
         await glob.db.execute(
@@ -668,7 +668,7 @@ class Player:
             return  # ?
 
         self.frozen = False
-        self.freeze_timer = 0
+        self.freeze_timer = 0.0
 
         await self.remove_priv(Privileges.Frozen)
         await glob.db.execute(

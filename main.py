@@ -3,6 +3,7 @@ import traceback
 
 import aioredis
 import plazy
+import os
 from aiohttp import ClientSession
 from cmyui.version import Version
 from discord.ext import commands
@@ -23,10 +24,12 @@ from utils.logging import debug
 from utils.logging import error
 from utils.logging import info
 
-glob.version = Version(0, 4, 2)  # TODO: autoupdater using this
+glob.version = Version(0, 4, 3)  # TODO: autoupdater using this
 
 app = Xevel(glob.config.socket, gzip=4)  # webserver
 dc = commands.Bot(command_prefix=glob.config.bot_prefix)
+
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
 
 @app.before_serving()
@@ -214,6 +217,7 @@ if __name__ == "__main__":
         housekeeping.ensure_services,
         housekeeping.ensure_resources,
         housekeeping.ensure_dependencies,
+        housekeeping.ensure_config,
     ):
         if (exit_code := safety_check()) != 0:
             raise SystemExit(exit_code)

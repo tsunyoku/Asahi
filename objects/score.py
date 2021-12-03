@@ -89,7 +89,7 @@ class Score:
 
         self.old_best: Optional[Score] = None
 
-        self.osuver: Optional[int] = None
+        self.osuver: Optional[float] = None
         self.ur: Optional[float] = None
 
     async def format(self) -> str:
@@ -177,7 +177,7 @@ class Score:
         ver: str,
     ) -> Optional["Score"]:
         rijndael = RijndaelCbc(  # much better fuck one liners
-            key=f"osu!-scoreburgr---------{ver}",
+            key=f"osu!-scoreburgr---------{ver}".encode(),
             iv=b64decode(iv),
             padding=Pkcs7Padding(32),
             block_size=32,
@@ -262,7 +262,7 @@ class Score:
                 for mreplay in _map:
                     sim = cg.similarity(replay, mreplay)
                     if (
-                        sim < 17
+                        sim < 17.0
                     ):  # suggested circlecore value, idk if this should change
                         # THIS CAN FLAG LEGIT HENCE WHY IT FLAGS, PLEASE CHECK A REPLAY MANUALLY IF FLAGGED!
                         return asyncio.run(
@@ -370,7 +370,7 @@ class Score:
                 ezpp.calculate(path)
                 pp = ezpp.get_pp()
 
-                if pp in (math.inf, math.nan):
+                if math.isinf(pp) or math.isnan(pp):
                     return (0.0, 0.0)
 
                 return (pp, ezpp.get_sr())

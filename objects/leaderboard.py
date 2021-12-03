@@ -153,7 +153,6 @@ class Leaderboard:
                     country_cache.remove(s)
                     break
 
-        print(score_cache)
         if score_cache:
             score_cache.append(score)
 

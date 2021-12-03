@@ -35,10 +35,10 @@ class Privileges(IntFlag):
     )
     Disallowed = Restricted | Banned
 
-    @classmethod
-    def get(cls, name) -> Optional["Privileges"]:
-        if name in cls.__members__:
-            return cls[name]
+    @staticmethod
+    def get(name) -> Optional["Privileges"]:
+        if name in Privileges.__members__:
+            return Privileges[name]
 
 
 class ClientPrivileges(IntFlag):

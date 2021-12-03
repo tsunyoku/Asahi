@@ -9,7 +9,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 from typing import Union
-from urllib.parse import unquote
+from urllib.parse import unquote, unquote_plus
 
 import orjson
 from cryptography.hazmat.backends import default_backend as backend
@@ -42,8 +42,8 @@ ap_path = Path.cwd() / "resources/replays_ap"
 web = Router(f"osu.{glob.config.domain}")
 
 
-async def auth(name: str, md5: str, req: Request) -> bool:
-    name = name.replace("%20", " ")
+async def auth(_name: str, md5: str, req: Request) -> bool:
+    name = unquote(_name)
 
     if not (player := await glob.players.find_login(name, md5)):
         warning(f"{name} failed authentication")
@@ -138,7 +138,7 @@ def directMapFormat(diff: dict) -> str:
     return f'{diff["DiffName"]} ({diff["DifficultyRating"]:.2f}⭐)@{diff["Mode"]}'
 
 
-def directSetFormat(bmap: dict, diffs: list) -> str:
+def directSetFormat(bmap: dict, diffs: str) -> str:
     return (
         f'{bmap["SetID"]}.osz|{bmap["Artist"]}|{bmap["Title"]}|{bmap["Creator"]}'
         f'|{bmap["RankedStatus"]}|10.0|{bmap["LastUpdate"]}|{bmap["SetID"]}|0|0'
@@ -198,7 +198,7 @@ async def osuSearchSet(request: Request) -> bytes:
     elif "s" in args:  # wants beatmapset
         _type, value = ("sid", args["s"])
     else:
-        return
+        return b""
 
     _set = await glob.db.fetchrow(
         f"SELECT DISTINCT * FROM maps WHERE {_type} = %s",
@@ -298,12 +298,12 @@ async def osuMapInfo(request: Request) -> bytes:
         return b""
 
     data = orjson.loads(request.body)
-    player = request.extras.get("player")
+    player = request.extras["player"]
 
     ret = []
 
     for idx, file in enumerate(data["Filenames"]):
-        if not (info := regexes.map_file.match(unquote(file))):  # once again osu why
+        if not (info := regexes.map_file.match(unquote_plus(file))):  # once again osu why
             continue
 
         _map = await glob.db.fetchrow(
@@ -349,7 +349,7 @@ async def getMapScores(request: Request) -> bytes:
     mode = lbModes(int(args["m"]), mods)
     lbm = int(args["v"])
 
-    player = request.extras.get("player")
+    player = request.extras["player"]
 
     if mode.value != player.mode or mods != player.mods:
         player.mode = mode.value
@@ -363,7 +363,7 @@ async def getMapScores(request: Request) -> bytes:
 
     if not bmap:
         file = args["f"].replace("+", "")
-        if not (info := regexes.map_file.match(unquote(file))):  # once again osu why
+        if not (info := regexes.map_file.match(unquote_plus(file))):  # once again osu why
             # invalid file? idfk
             glob.cache["unsub"].append(md5)
             return b"-1|false"
@@ -457,7 +457,16 @@ async def scoreSubmit(request: Request) -> bytes:
     # save replay if not a failed score
     if s.status != scoreStatuses.Failed:
         files = request.files
-        replay = files.get("score")
+        
+        try: 
+            replay = files["score"]
+        except KeyError:
+            await s.player.restrict("Missing replay file", fr=glob.bot)
+            return b"error: ban"
+
+        if replay == b"\r\n":
+            await s.player.restrict("Missing replay file", fr=glob.bot)
+            return b"error: ban"
 
         # i will make this auto-parse the replays one day when im not lazy
         if s.mods & Mods.RELAX:
@@ -493,7 +502,7 @@ async def scoreSubmit(request: Request) -> bytes:
     stats = s.user.stats[s.mode.value]
     old = copy.copy(stats)  # we need a copy of the old stats for submission chart
 
-    elapsed = mpargs.get("st" if s.passed else "ft")  # timewarp check with this soon?
+    elapsed = mpargs["st" if s.passed else "ft"]
 
     if not elapsed and s.user.priv & Privileges.BypassAnticheat:
         await s.user.restrict(
@@ -667,7 +676,7 @@ async def getReplay(request: Request) -> bytes:
     if not await auth(args["u"], args["h"], request):
         return b""
 
-    player = request.extras.get("player")
+    player = request.extras["player"]
     sid = args["c"]
 
     if player.mods & Mods.RELAX:
@@ -680,16 +689,16 @@ async def getReplay(request: Request) -> bytes:
     if f.exists():
         return f.read_bytes()
 
-    return  # osu wants empty response if there's no replay
+    return b"" # osu wants empty response if there's no replay
 
 
 @web.route("/web/lastfm.php")
-async def lastFM(request: Request) -> Optional[bytes]:
+async def lastFM(request: Request) -> bytes:
     args = request.args
     if not await auth(args["us"], args["ha"], request):
         return b""
 
-    player = request.extras.get("player")
+    player = request.extras["player"]
 
     b = args["b"]
 
@@ -739,7 +748,7 @@ async def osuAddSetFavourite(request: Request) -> bytes:
     if not await auth(args["u"], args["h"], request):
         return b"Please login to add favourites!"  # request-specific auth error? XD
 
-    player = request.extras.get("player")
+    player = request.extras["player"]
 
     sid = int(args["a"])
 
@@ -751,6 +760,7 @@ async def osuAddSetFavourite(request: Request) -> bytes:
 
     await glob.db.execute("INSERT INTO favourites " "VALUES (%s, %s)", [player.id, sid])
 
+    return b""
 
 @web.route("/web/osu-getfavourites.php")
 async def osuGetSetFavourites(request: Request) -> bytes:
@@ -758,7 +768,7 @@ async def osuGetSetFavourites(request: Request) -> bytes:
     if not await auth(args["u"], args["h"], request):
         return b""
 
-    player = request.extras.get("player")
+    player = request.extras["player"]
     favourites = await glob.db.fetchall(
         "SELECT sid FROM favourites WHERE uid = %s",
         [player.id],
@@ -774,7 +784,7 @@ async def osuAddMapRating(request: Request) -> bytes:
         return b"auth fail"  # request-specific auth error? XD
 
     md5 = args["c"]
-    player = request.extras.get("player")
+    player = request.extras["player"]
 
     if "v" not in args:  # verifying we can rate the map?
         if md5 in glob.cache["unsub"]:

@@ -1,5 +1,5 @@
 from enum import Enum
-from functools import cache
+from functools import cached_property
 
 from .mods import Mods
 
@@ -29,8 +29,7 @@ class osuModes(Enum):
     def __repr__(self) -> str:
         return m_str[self.value]
 
-    @property
-    @cache
+    @cached_property
     def table(self) -> str:
         if self.value in (4, 5, 6):
             return "scores_rx"
@@ -39,8 +38,7 @@ class osuModes(Enum):
         else:
             return "scores_ap"
 
-    @property
-    @cache
+    @cached_property
     def as_vn(self) -> int:
         if self.value in (0, 4, 7):
             return 0
@@ -51,16 +49,14 @@ class osuModes(Enum):
         else:
             return self.value
 
-    @property
-    @cache
+    @cached_property
     def sort(self) -> str:
         if self.value > 3:
             return "pp"
         else:
             return "score"
 
-    @property
-    @cache
+    @cached_property
     def leaderboard(self) -> str:
         if self.value in (4, 5, 6):
             return "lb_rx"

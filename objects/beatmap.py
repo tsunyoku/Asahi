@@ -58,15 +58,15 @@ class Beatmap:
         self.od: float = kwargs.get("od", 0.0)
         self.hp: float = kwargs.get("hp", 0.0)
         self.sr: float = kwargs.get("sr", 0.00)
-        self.mode: int = osuModes(kwargs.get("mode", 0))
+        self.mode: osuModes = osuModes(kwargs.get("mode", 0))
         self.artist: str = kwargs.get("artist", "")
         self.title: str = kwargs.get("title", "")
         self.diff: str = kwargs.get("diff", "")
         self.mapper: str = kwargs.get("mapper", "")
         self.status: "mapStatuses" = mapStatuses(kwargs.get("status", 0))
         self.frozen: bool = kwargs.get("frozen", 0) == 1
-        self.update: int = kwargs.get("update", 0)
-        self.nc: int = kwargs.get("nc", 0)  # nc = next check (for status update)
+        self.update: dt = kwargs.get("update", 0)
+        self.nc: float = kwargs.get("nc", 0)  # nc = next check (for status update)
         self.lb: "Leaderboard" = kwargs.get("lb")
         self.lb_rx: "Leaderboard" = kwargs.get("lb_rx")
         self.lb_ap: "Leaderboard" = kwargs.get("lb_ap")
@@ -225,17 +225,19 @@ class Beatmap:
                 ezpp.set_mode(self.mode.as_vn)
 
                 ezpp.calculate(path)
-                return round(ezpp.get_pp())  # returning sr soontm
+                pp = round(ezpp.get_pp())  # returning sr soontm
         else:
             if self.mode.as_vn == 3:
                 if acc == 100:
-                    score = 1000000
+                    score = 1_000_000
                 elif acc == 99:
-                    score = 990000
+                    score = 990_000
                 elif acc == 97:
-                    score = 970000
+                    score = 970_000
                 elif acc == 95:
-                    score = 950000
+                    score = 950_000
+                else:
+                    score = acc * 100_000
             else:
                 score = 0
 
@@ -248,12 +250,12 @@ class Beatmap:
             ).calculate(_map)
 
             pp = calc.pp
-            if pp in (math.inf, math.nan):
-                pp = 0
+            if math.isinf(pp) or math.isnan(pp):
+                pp = 0.0
             else:
                 pp = round(pp)
 
-            return pp
+        return pp
 
     @classmethod
     async def from_md5(cls, md5: str) -> Optional["Beatmap"]:
@@ -315,7 +317,7 @@ class Beatmap:
         self.mapper = bmap["creator"]
 
         self.status = mapStatuses.from_api(int(bmap["approved"]))
-        self.update = dt.strptime(bmap["last_update"], "%Y-%m-%d %H:%M:%S").timestamp()
+        self.update = dt.strptime(bmap["last_update"], "%Y-%m-%d %H:%M:%S")
 
         self.nc = time.time()
         e = await glob.db.fetchrow(
@@ -382,7 +384,7 @@ class Beatmap:
             self.update = dt.strptime(
                 bmap["last_update"],
                 "%Y-%m-%d %H:%M:%S",
-            ).timestamp()
+            )
             self.frozen = True
 
             self.nc = time.time()
@@ -426,7 +428,7 @@ class Beatmap:
             self.update = dt.strptime(
                 bmap["last_update"],
                 "%Y-%m-%d %H:%M:%S",
-            ).timestamp()
+            )
             self.frozen = True
 
             self.nc = time.time()
@@ -434,7 +436,7 @@ class Beatmap:
             await self.save()
             glob.cache["maps"][self.md5] = self
 
-    async def check_status(self):
+    async def check_status(self) -> None:
         api = "https://old.ppy.sh/api/get_beatmaps"
         params = {"k": glob.config.api_key, "s": self.sid}
 
@@ -500,7 +502,7 @@ class Beatmap:
                         cached.status = self.status
                         cached.nc = self.nc
 
-    async def save(self):
+    async def save(self) -> None:
         await glob.db.execute(
             "REPLACE INTO maps (id, sid, md5, bpm, cs, ar, od, hp, sr, mode, artist, title, diff, mapper, status, frozen, `update`, nc, plays, passes) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",

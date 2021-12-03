@@ -172,7 +172,7 @@ class Match:
     def embed(self) -> str:
         return f"[{self.invite} {self.name}]"
 
-    def next_free(self) -> int:
+    def next_free(self) -> Optional[int]:
         for sn, s in enumerate(self.slots):
             if s.status == slotStatus.open:
                 return sn
@@ -182,7 +182,7 @@ class Match:
             if user is slot.player:
                 return slot
 
-    def get_slot_id(self, user: "Player") -> int:
+    def get_slot_id(self, user: "Player") -> Optional[int]:
         for sn, slot in enumerate(self.slots):
             if user is slot.player:
                 return sn

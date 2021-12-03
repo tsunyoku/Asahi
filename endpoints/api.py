@@ -2,7 +2,7 @@ import hashlib
 import struct
 from datetime import datetime
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
 
 from cmyui.osu.oppai_ng import OppaiWrapper
 from xevel import Request
@@ -36,27 +36,15 @@ if glob.config.debug:
 
 async def get_rank(mode: str, uid: int, pp: int) -> int:
     rank = await glob.redis.zrevrank(f"asahi:leaderboard:{mode}", uid)
-    if rank is not None:
-        return rank + 1
-
-    if pp == 0:
-        return 0
-
-    return 1
+    return rank + 1 if rank else 0
 
 
 async def get_country_rank(mode: str, uid: int, pp: int, country: str) -> int:
     rank = await glob.redis.zrevrank(f"asahi:leaderboard:{mode}:{country}", uid)
-    if rank is not None:
-        return rank + 1
-
-    if pp == 0:
-        return 0
-
-    return 1
+    return rank + 1 if rank else 0
 
 
-def make_safe(username: str) -> str:
+def make_safe(username: str) -> Optional[str]:
     if not username:
         return
 
@@ -65,7 +53,7 @@ def make_safe(username: str) -> str:
 
 
 @api.route("/player_count")
-async def onlinePlayers(request: Request) -> dict:
+async def onlinePlayers(_: Request) -> dict:
     return {"online": len(glob.players) - 1}
 
 
@@ -201,8 +189,7 @@ async def getLb(request: Request) -> list:
     if country:
         lb_str += f":{country.upper()}"
 
-    lb = [int(u) for u in await glob.redis.zrangebyscore(lb_str)]
-    lb.reverse()  # redis returns backwards??
+    lb = [int(u) for u in await glob.redis.zrevrangebyscore(lb_str)]
 
     # limit amount of users to return
     lb = lb[:limit]
@@ -298,6 +285,9 @@ async def getReplay(request: Request) -> Union[tuple, bytes]:
         return (400, {"message": "please specify a score id!"})
 
     BASE_DIR = Path.cwd() / "resources"
+    
+    if not 0 <= rx < 3:
+        return (400, {"message": "invalid relax value (must be 0, 1 or 2)"})
 
     if rx == 0:
         REPLAY_PATH = BASE_DIR / "replays"
@@ -384,7 +374,7 @@ async def getReplay(request: Request) -> Union[tuple, bytes]:
 
 
 @api.route("/player_scores")
-async def playerScores(req: Request) -> Union[tuple, list]:
+async def playerScores(req: Request) -> Union[tuple, dict]:
     args = req.args
 
     _type = args.get("type")
@@ -392,7 +382,7 @@ async def playerScores(req: Request) -> Union[tuple, list]:
     rx = int(args.get("rx", 0))
 
     uid = int(args.get("id", 0))
-    username = make_safe(args.get("username"))
+    username = make_safe(args.get("username", None))
 
     limit = int(args.get("limit", 5))
 
@@ -476,10 +466,10 @@ async def playerScores(req: Request) -> Union[tuple, list]:
 
 
 @api.route("/player_search")
-async def searchPlayers(req: Request) -> tuple[dict[str, object]]:
+async def searchPlayers(req: Request) -> Union[tuple, dict]:
     args = req.args
 
-    query = make_safe(args.get("search"))
+    query = make_safe(args.get("search", None))
 
     if not query:
         return (400, {"message": "please provide a search query!"})
@@ -502,6 +492,9 @@ async def mostPlayed(req: Request) -> Union[tuple, dict]:
     r = int(args.get("rx", 0))
 
     limit = int(args.get("limit", 6))
+
+    if not 0 <= r < 3:
+        return (400, {"message": "invalid relax value (must be 0, 1 or 2)"})
 
     if r == 0:
         rx = Mods.NOMOD
@@ -565,6 +558,9 @@ async def getClan(req: Request) -> Union[tuple, dict]:
 
     if not (clan := glob.clans.get(clan_id)):
         return (400, {"message": "clan couldn't be found!"})
+
+    if not 0 <= r < 3:
+        return (400, {"message": "invalid relax value (must be 0, 1 or 2)"})
 
     if r == 0:
         rx = Mods.NOMOD
