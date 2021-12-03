@@ -25,9 +25,9 @@ mp_cmds = []
 
 
 def command(
-    priv: Privileges = Privileges.Normal,
-    name: str = None,
-    aliases: list = [],
+    priv: Optional[Privileges] = Privileges.Normal,
+    name: Optional[str] = None,
+    aliases: Optional[list[str]] = None,
     elapsed: bool = True,
     allow_public: bool = False,
 ):
@@ -36,7 +36,7 @@ def command(
             {
                 "name": name,
                 "priv": priv,
-                "aliases": aliases,
+                "aliases": aliases or [],
                 "elapsed": elapsed,
                 "cb": cmd_cb,
                 "allow_public": allow_public,
@@ -252,7 +252,7 @@ async def _clan_response(user: Player, args: list) -> Optional[str]:
 
 
 @command(name="battle")
-async def clan_battle(user: Player, args: list) -> str:
+async def clan_battle(user: Player, args: list) -> Optional[str]:
     """Battle other clans in a scrim-like multi lobby"""
     if len(args) < 1:
         return "Please provide a clan to request a battle, or an action to an invite!"
@@ -584,7 +584,7 @@ async def crash(_, args: list) -> str:
     name="recalculate",
     aliases=["recalc", "calc", "calculate"],
 )
-async def recalc(user: Player, args: list) -> str:
+async def recalc(user: Player, args: list) -> str:  # TODO: rewrite
     """Recalculate scores globally or on a specific map"""
     if len(args) < 1:
         return "You must specify what to recalc! (map/all)"
@@ -778,9 +778,7 @@ async def process(user: Player, msg: str, public: bool = False) -> Optional[str]
             if public and not c["allow_public"]:
                 return
 
-            o = await c["cb"](user, args[1:])
-
-            ret = o
+            ret = await c["cb"](user, args[1:])
             if c["elapsed"]:
                 ret += f" | Time Elapsed: {(time.time() - start) * 1000:.2f}ms"
 
@@ -789,12 +787,12 @@ async def process(user: Player, msg: str, public: bool = False) -> Optional[str]
         return f"Unknown command! Use {glob.config.prefix}help for a list of available commands."
 
 
-def mp_command(name: str, aliases: list = [], host: bool = True):
+def mp_command(name: Optional[str] = None, aliases: Optional[list[str]] = None, host: bool = True):
     def wrapper(cmd_cb):
         mp_cmds.append(
             {
                 "name": name,
-                "aliases": aliases,
+                "aliases": aliases or [],
                 "cb": cmd_cb,
                 "host": host,
                 "desc": cmd_cb.__doc__,
@@ -821,7 +819,7 @@ async def mp_help(user: Player, _, __) -> str:
 
 
 @mp_command(name="start")
-async def mp_start(_, args: list, match: Match) -> str:
+async def mp_start(_, args: list, match: Match) -> Optional[str]:
     """Starts the current match, either forcefully or on a timer"""
     if len(args) < 1:
         return "Please provide either a timer to start or cancel/force"
@@ -881,7 +879,7 @@ async def mp_start(_, args: list, match: Match) -> str:
 
 
 @mp_command(name="abort")
-async def mp_abort(_, __, match: Match) -> str:
+async def mp_abort(_, __, match: Match) -> Optional[str]:
     """Abort current multiplayer session"""
     if not match.in_prog:
         return
@@ -949,7 +947,7 @@ async def mp_fm(user: Player, args: list, match: Match) -> str:
 
 
 @mp_command(name="host", host=False)
-async def mp_host(user: Player, args: list, match: Match) -> str:
+async def mp_host(user: Player, args: list, match: Match) -> Optional[str]:
     if user not in (match.host, match.first_host):
         return
 
@@ -978,7 +976,7 @@ async def process_multiplayer(user: Player, msg: str) -> Optional[str]:
 
     for c in mp_cmds:
         if c["name"] == cmd or cmd in c["aliases"]:
-            if user is not user.match.host and cmd["host"]:
+            if user is not user.match.host and c["host"]:
                 return "You must be the host to perform this command!"
 
             o = await c["cb"](user, args[2:], user.match)
