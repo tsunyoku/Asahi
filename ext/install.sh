@@ -22,8 +22,9 @@ sudo add-apt-repository ppa:deadsnakes/ppa
 sudo apt update
 sudo apt install python3.9 python3.9-dev python3.9-distutils nginx build-essential certbot mariadb-server redis-server
 wget https://bootstrap.pypa.io/get-pip.py
-python3.9 get-pip.py && rm get-pip.py
+python3.9 get-pip.py && python3 get-pip.py && rm get-pip.py
 python3.9 -m pip install -r ext/requirements.txt
+python3 -m pip install requests
 git submodule init && git submodule update
 
 echo "Creating certificate... You will need to follow the instructions in console!"
