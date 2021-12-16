@@ -469,7 +469,7 @@ async def join_match(user: Player, p: bytes) -> None:
 
         battle = glob.clan_battles[user.clan]
         if set(total) == set(battle["total"]):
-            await match.strat_battle()
+            await match.start_battle()
 
 
 @packet(Packets.OSU_PART_MATCH)
