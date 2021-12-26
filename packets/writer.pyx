@@ -319,7 +319,7 @@ cpdef bytes userStats(player):
         Packets.CHO_USER_STATS,
         (player.id, osuTypes.i32),
         (player.action, osuTypes.u8), # action
-        (player.info, osuTypes.string), # info text
+        (player.base_info, osuTypes.string), # info text
         (player.map_md5, osuTypes.string), # map md5
         (player.mods, osuTypes.i32), # mods
         (player.mode_vn, osuTypes.u8), # game mode
