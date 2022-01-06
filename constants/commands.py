@@ -780,7 +780,8 @@ async def process(user: Player, msg: str, public: bool = False) -> Optional[str]
 
             ret = await c["cb"](user, args[1:])
             if c["elapsed"]:
-                ret += f" | Time Elapsed: {(time.time() - start) * 1000:.2f}ms"
+                if ret != None:
+                    ret += f" | Time Elapsed: {(time.time() - start) * 1000:.2f}ms"
 
             return ret or None
     else:
