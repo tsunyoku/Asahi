@@ -242,7 +242,7 @@ async def ingameRegistration(request: Request) -> Union[dict, bytes]:
     if await glob.db.fetchval("SELECT 1 FROM users WHERE name = %s", [name]):
         errors["username"].append("Username already taken!")
 
-    if await glob.db.fetchval("SELECT 1 FROM users WHERE name = %s", [email]):
+    if await glob.db.fetchval("SELECT 1 FROM users WHERE email = %s", [email]):
         errors["user_email"].append("Email already in use!")
 
     if not len(pw) >= 8:
