@@ -32,7 +32,7 @@ from objects.leaderboard import Leaderboard
 from objects.score import Score
 from packets import writer
 
-from utils.logging import warning, error, debug, info
+from utils.logging import warning, error, info
 
 ss_path = Path.cwd() / "resources/screenshots"
 vn_path = Path.cwd() / "resources/replays"
