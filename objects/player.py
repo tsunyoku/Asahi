@@ -57,7 +57,7 @@ class Player:
         "friends",
         "queue",
         "action",
-        "info",
+        "base_info",
         "map_md5",
         "mods",
         "mode",
@@ -102,7 +102,7 @@ class Player:
         self.friends: list[int] = []
         self.queue = bytearray()
         self.action: int = 0
-        self.info: str = ""
+        self.base_info: str = ""
         self.map_md5: str = ""
         self.mods: int = 0
         self.mode: int = 0

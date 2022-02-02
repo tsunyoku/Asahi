@@ -32,7 +32,7 @@ from objects.leaderboard import Leaderboard
 from objects.score import Score
 from packets import writer
 
-from utils.logging import warning, error, debug, info
+from utils.logging import warning, error, info
 
 ss_path = Path.cwd() / "resources/screenshots"
 vn_path = Path.cwd() / "resources/replays"
@@ -242,7 +242,7 @@ async def ingameRegistration(request: Request) -> Union[dict, bytes]:
     if await glob.db.fetchval("SELECT 1 FROM users WHERE name = %s", [name]):
         errors["username"].append("Username already taken!")
 
-    if await glob.db.fetchval("SELECT 1 FROM users WHERE name = %s", [email]):
+    if await glob.db.fetchval("SELECT 1 FROM users WHERE email = %s", [email]):
         errors["user_email"].append("Email already in use!")
 
     if not len(pw) >= 8:
