@@ -787,7 +787,9 @@ async def process(user: Player, msg: str, public: bool = False) -> Optional[str]
         return f"Unknown command! Use {glob.config.prefix}help for a list of available commands."
 
 
-def mp_command(name: Optional[str] = None, aliases: Optional[list[str]] = None, host: bool = True):
+def mp_command(
+    name: Optional[str] = None, aliases: Optional[list[str]] = None, host: bool = True,
+):
     def wrapper(cmd_cb):
         mp_cmds.append(
             {

@@ -14,7 +14,6 @@ from .menu import Menu
 from constants.modes import osuModes
 from constants.privs import Privileges
 from constants.statuses import mapStatuses
-
 from utils.logging import info
 
 if TYPE_CHECKING:

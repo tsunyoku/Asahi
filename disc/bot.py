@@ -6,8 +6,8 @@ from discord import Status
 from discord.ext import commands
 from discord.ext import tasks
 
-from utils.logging import debug
 from objects import glob
+from utils.logging import debug
 
 
 class asahiBot(commands.Cog):

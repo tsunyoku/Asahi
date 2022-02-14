@@ -2,7 +2,8 @@ import hashlib
 import struct
 from datetime import datetime
 from pathlib import Path
-from typing import Union, Optional
+from typing import Optional
+from typing import Union
 
 from cmyui.osu.oppai_ng import OppaiWrapper
 from xevel import Request
@@ -15,12 +16,13 @@ from constants.privs import Privileges
 from objects import glob
 from objects.beatmap import Beatmap
 from packets import writer
-
-from utils.logging import error, info
+from utils.logging import error
+from utils.logging import info
 
 api = Router(f"api.{glob.config.domain}")
 
 if glob.config.debug:
+
     @api.after_request()
     async def logRequest(resp: Request) -> Request:
         if resp.code >= 400:
@@ -285,7 +287,7 @@ async def getReplay(request: Request) -> Union[tuple, bytes]:
         return (400, {"message": "please specify a score id!"})
 
     BASE_DIR = Path.cwd() / "resources"
-    
+
     if not 0 <= rx < 3:
         return (400, {"message": "invalid relax value (must be 0, 1 or 2)"})
 

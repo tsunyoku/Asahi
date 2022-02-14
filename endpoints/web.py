@@ -9,7 +9,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 from typing import Union
-from urllib.parse import unquote, unquote_plus
+from urllib.parse import unquote
+from urllib.parse import unquote_plus
 
 import orjson
 from cryptography.hazmat.backends import default_backend as backend
@@ -31,8 +32,9 @@ from objects.beatmap import Beatmap
 from objects.leaderboard import Leaderboard
 from objects.score import Score
 from packets import writer
-
-from utils.logging import warning, error, info
+from utils.logging import error
+from utils.logging import info
+from utils.logging import warning
 
 ss_path = Path.cwd() / "resources/screenshots"
 vn_path = Path.cwd() / "resources/replays"
@@ -303,7 +305,9 @@ async def osuMapInfo(request: Request) -> bytes:
     ret = []
 
     for idx, file in enumerate(data["Filenames"]):
-        if not (info := regexes.map_file.match(unquote_plus(file))):  # once again osu why
+        if not (
+            info := regexes.map_file.match(unquote_plus(file))
+        ):  # once again osu why
             continue
 
         _map = await glob.db.fetchrow(
@@ -363,7 +367,9 @@ async def getMapScores(request: Request) -> bytes:
 
     if not bmap:
         file = args["f"].replace("+", "")
-        if not (info := regexes.map_file.match(unquote_plus(file))):  # once again osu why
+        if not (
+            info := regexes.map_file.match(unquote_plus(file))
+        ):  # once again osu why
             # invalid file? idfk
             glob.cache["unsub"].append(md5)
             return b"-1|false"
@@ -457,8 +463,8 @@ async def scoreSubmit(request: Request) -> bytes:
     # save replay if not a failed score
     if s.status != scoreStatuses.Failed:
         files = request.files
-        
-        try: 
+
+        try:
             replay = files["score"]
         except KeyError:
             await s.player.restrict("Missing replay file", fr=glob.bot)
@@ -689,7 +695,7 @@ async def getReplay(request: Request) -> bytes:
     if f.exists():
         return f.read_bytes()
 
-    return b"" # osu wants empty response if there's no replay
+    return b""  # osu wants empty response if there's no replay
 
 
 @web.route("/web/lastfm.php")
@@ -761,6 +767,7 @@ async def osuAddSetFavourite(request: Request) -> bytes:
     await glob.db.execute("INSERT INTO favourites " "VALUES (%s, %s)", [player.id, sid])
 
     return b""
+
 
 @web.route("/web/osu-getfavourites.php")
 async def osuGetSetFavourites(request: Request) -> bytes:

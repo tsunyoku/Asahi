@@ -21,8 +21,8 @@ from constants.privs import ClientPrivileges
 from constants.privs import Privileges
 from constants.types import teamTypes
 from packets import writer
-
-from utils.logging import warning, info
+from utils.logging import info
+from utils.logging import warning
 
 if TYPE_CHECKING:
     from objects.achievement import Achievement
@@ -288,7 +288,7 @@ class Player:
         t100 = s[:100]
 
         stats.acc = sum([row["acc"] for row in s[:50]]) / min(50, len(t100))
-        weighted = sum([row["pp"] * 0.95 ** i for i, row in enumerate(t100)])
+        weighted = sum([row["pp"] * 0.95**i for i, row in enumerate(t100)])
         bonus = 416.6667 * (1 - 0.9994 ** len(s))
         stats.pp = round(weighted + bonus)
 
