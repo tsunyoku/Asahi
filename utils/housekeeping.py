@@ -73,7 +73,8 @@ def ensure_services() -> int:
                 break
         else:
             pgrep_exit_code = subprocess.call(
-                ["pgrep", "mysqld"], stdout=subprocess.DEVNULL,
+                ["pgrep", "mysqld"],
+                stdout=subprocess.DEVNULL,
             )
 
             if pgrep_exit_code != 0:
