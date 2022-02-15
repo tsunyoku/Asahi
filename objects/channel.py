@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
+from typing import TYPE_CHECKING
 
 from objects import glob
 from packets import writer

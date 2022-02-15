@@ -1,5 +1,6 @@
 from functools import cached_property
-from typing import Callable, Optional
+from typing import Callable
+from typing import Optional
 
 
 class Achievement:

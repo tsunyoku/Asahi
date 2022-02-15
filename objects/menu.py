@@ -1,8 +1,7 @@
+import asyncio
 from typing import Callable
 from typing import Optional
 from typing import TYPE_CHECKING
-
-import asyncio
 
 from . import glob
 
@@ -38,5 +37,7 @@ class Menu:
         if not (c := self.callback):
             return
 
-        if asyncio.iscoroutinefunction(c): return await c(player)
-        else: return c(player)
+        if asyncio.iscoroutinefunction(c):
+            return await c(player)
+        else:
+            return c(player)

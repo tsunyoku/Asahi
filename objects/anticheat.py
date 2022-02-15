@@ -1,10 +1,10 @@
+import re
+from typing import Optional
+from typing import Union
+
 from . import glob
 from .player import Player
 from constants.regexes import osu_ver
-
-from typing import Optional, Union
-
-import re
 
 
 class Anticheat:
@@ -91,7 +91,8 @@ class Anticheat:
 
     async def client_check(self) -> bool:
         if (
-            not self.ver or not self.headers
+            not self.ver
+            or not self.headers
             or any(v in self.ver for v in ("ainu", "skooter"))
             or "ainu" in self.headers
         ):

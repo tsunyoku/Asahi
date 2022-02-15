@@ -29,8 +29,9 @@ from objects.player import Player
 from packets import reader
 from packets import writer
 from packets.writer import Packets
-
-from utils.logging import warning, info, debug
+from utils.logging import debug
+from utils.logging import info
+from utils.logging import warning
 
 if glob.config.server_migration:
     import bcrypt

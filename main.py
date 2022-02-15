@@ -1,9 +1,9 @@
 #!/usr/bin/env python3.9
+import os
 import traceback
 
 import aioredis
 import plazy
-import os
 from aiohttp import ClientSession
 from cmyui.version import Version
 from discord.ext import commands
@@ -71,7 +71,7 @@ async def connect() -> None:  # ran before server startup, used to do things lik
     if not botinfo:
         error(
             "Bot account not found. "
-            "Please insert the bot account with user ID 1 and start Asahi again"
+            "Please insert the bot account with user ID 1 and start Asahi again",
         )
 
         raise SystemExit(1)
