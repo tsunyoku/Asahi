@@ -1,0 +1,43 @@
+version: "3"
+
+services:
+  asahi:
+    build: .
+    environment:
+      MYSQL_DSN: 'mysql://asahi:123@mysql:3306/asahi'
+      REDIS_DSN: 'redis://redis'
+      SERVER_DOMAIN: 'tsunyoku.xyz'
+      SERVER_PORT: '999'
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - ./:/asahi
+    ports:
+      - 5000:999
+    depends_on:
+      - mysql
+      - redis
+      - nginx
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: 'asahi'
+      MYSQL_USER: 'asahi'
+      MYSQL_PASSWORD: '123'
+      MYSQL_ROOT_PASSWORD: '123'
+    volumes:
+      - mysql:/var/lib/mysql
+    ports:
+      - 5001:3306
+  redis:
+    image: redis:alpine
+  nginx:
+    image: nginx:latest
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./ext/docker.conf:/etc/nginx/conf.d/default.conf
+      - ./ext/db.sql:/docker-entry-point-initdb.d/asahi.sql
+
+volumes:
+  mysql:

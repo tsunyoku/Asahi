@@ -1,0 +1,7 @@
+uvicorn
+fastapi
+databases
+aiomysql
+aioredis
+orjson
+pymysql[rsa]

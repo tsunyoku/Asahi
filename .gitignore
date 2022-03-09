@@ -1,0 +1,5 @@
+/.vscode
+__pycache__/
+/resources
+.env
+*.lprof
