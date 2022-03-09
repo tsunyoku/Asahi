@@ -1,7 +1,8 @@
-uvicorn
-fastapi
-databases
 aiomysql
 aioredis
+databases
+fastapi
+geoip2
 orjson
 pymysql[rsa]
+uvicorn

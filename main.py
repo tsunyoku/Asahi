@@ -1,11 +1,14 @@
 #!/usr/bin/env python3.9
-import uvicorn
+from __future__ import annotations
+
 import logging
-import log
 import os
+
+import uvicorn
 
 import app.config
 import app.utils
+import log
 
 
 def main() -> int:
@@ -29,7 +32,7 @@ def main() -> int:
             if app.utils.socket_in_use(app.config.SERVER_SOCKET):
                 log.error(
                     "This socket is already in use by another process (likely Asahi).\n"
-                    "Please stop this process and run Asahi again!"
+                    "Please stop this process and run Asahi again!",
                 )
 
                 return 1

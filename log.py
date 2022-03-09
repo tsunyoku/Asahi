@@ -1,11 +1,12 @@
+from __future__ import annotations
+
+import sys
+import time
+from enum import IntEnum
 from functools import cache
 from typing import Union
-from enum import IntEnum
 
 import app.config
-
-import time
-import sys
 
 
 def formatted_time() -> str:
@@ -13,7 +14,7 @@ def formatted_time() -> str:
 
 
 class Ansi(
-    IntEnum
+    IntEnum,
 ):  # https://github.com/cmyui/cmyui_pkg/blob/master/cmyui/logging.py#L20-L45
     BLACK = 30
     RED = 31
@@ -46,7 +47,7 @@ def log(content: str, log_type: str, colour: Ansi = Ansi.WHITE) -> None:
     sys.stdout.write(
         f"\033[37m{Ansi.GRAY!r}\033[49m[{formatted_time()} - {log_type}]"
         f"\033[37m{colour!r}\033[49m {content}"
-        "\033[39m\n"
+        "\033[39m\n",
     )
 
 

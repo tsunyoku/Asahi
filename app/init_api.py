@@ -1,14 +1,19 @@
-from starlette.middleware.base import RequestResponseEndpoint
-from fastapi.responses import Response, ORJSONResponse
-from fastapi.exceptions import RequestValidationError
-from fastapi.encoders import jsonable_encoder
-from fastapi.requests import Request
-from fastapi import FastAPI, status
+from __future__ import annotations
 
+import pprint
+
+from fastapi import FastAPI
+from fastapi import status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.requests import Request
+from fastapi.responses import ORJSONResponse
+from fastapi.responses import Response
+from starlette.middleware.base import RequestResponseEndpoint
+
+import app.api
 import app.config
 import app.state
-import app.api
-import pprint
 import log
 
 
@@ -55,7 +60,8 @@ def init_events(asgi_app: FastAPI) -> None:
 
     @asgi_app.exception_handler(RequestValidationError)
     async def handle_validation_error(
-        request: Request, e: RequestValidationError
+        request: Request,
+        e: RequestValidationError,
     ) -> Response:
         log.warning(f"Validation error on {request.url}:\n{pprint.pformat(e.errors())}")
 
