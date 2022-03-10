@@ -2,14 +2,21 @@ from __future__ import annotations
 
 import struct
 from enum import IntEnum
+from functools import cache
 from typing import Iterator
+from typing import TYPE_CHECKING
 
-from app.objects.player import Player
+if TYPE_CHECKING:
+    from app.objects.channel import Channel
+    from app.objects.player import Player
+
+from app.typing import Channel as osuChannel
 from app.typing import f32
 from app.typing import i16
 from app.typing import i32
 from app.typing import i32_list
 from app.typing import i64
+from app.typing import Message
 from app.typing import PacketHandler
 from app.typing import String
 from app.typing import u32
@@ -98,6 +105,7 @@ class PacketArray:
             packet_id, length = parse_header(self.data)
 
             if packet_id not in self.packet_map.keys():
+                self.data = self.data[7 + length :]
                 continue
 
             packet_data = self.data[: 7 + length]
@@ -218,18 +226,21 @@ class Packets(IntEnum):
     OSU_TOURNAMENT_LEAVE_MATCH_CHANNEL = 109
 
 
+@cache
 def user_id(id: int) -> bytearray:
     packet = Packet.from_id(Packets.CHO_USER_ID)
     packet += i32.write(id)
     return packet.serialize()
 
 
+@cache
 def protocol_version(version: int) -> bytearray:
     packet = Packet.from_id(Packets.CHO_PROTOCOL_VERSION)
     packet += i32.write(version)
     return packet.serialize()
 
 
+@cache
 def bancho_privileges(priv: int) -> bytearray:
     packet = Packet.from_id(Packets.CHO_PRIVILEGES)
     packet += i32.write(priv)
@@ -279,36 +290,128 @@ def user_stats(player: Player) -> bytearray:
     return packet.serialize()
 
 
+@cache
 def notification(msg: str) -> bytearray:
     packet = Packet.from_id(Packets.CHO_NOTIFICATION)
     packet += String.write(msg)
     return packet.serialize()
 
 
+@cache
 def channel_info_end() -> bytearray:
     packet = Packet.from_id(Packets.CHO_CHANNEL_INFO_END)
     return packet.serialize()
 
 
+@cache
 def restart_server(time: int) -> bytearray:
     packet = Packet.from_id(Packets.CHO_RESTART)
     packet += i32.write(time)
     return packet.serialize()
 
 
+@cache
 def menu_icon() -> bytearray:
     packet = Packet.from_id(Packets.CHO_MAIN_MENU_ICON)
     packet += String.write("|")  # TODO: implement
     return packet.serialize()
 
 
-def friends(friends_list: list[int]) -> bytearray:
+@cache
+def friends_list(friends_list: list[int]) -> bytearray:
     packet = Packet.from_id(Packets.CHO_FRIENDS_LIST)
     packet += i32_list.write(friends_list)
     return packet.serialize()
 
 
+@cache
 def silence_end(time: int) -> bytearray:
-    packet = Packet.from_id()
+    packet = Packet.from_id(Packets.CHO_SILENCE_END)
     packet += i32.write(time)
     return packet.serialize()
+
+
+def send_message(message: Message) -> bytearray:
+    packet = Packet.from_id(Packets.CHO_SEND_MESSAGE)
+    packet += message.serialize()
+    return packet.serialize()
+
+
+@cache
+def logout(user_id: int) -> bytearray:
+    packet = Packet.from_id(Packets.CHO_USER_LOGOUT)
+
+    packet += i32.write(user_id)
+    packet += u8.write(0)  # ?
+
+    return packet.serialize()
+
+
+@cache
+def block_dm() -> bytearray:
+    packet = Packet.from_id(Packets.CHO_USER_DM_BLOCKED)
+    return packet.serialize()
+
+
+@cache
+def spectator_joined(user_id: int) -> bytearray:
+    packet = Packet.from_id(Packets.CHO_FELLOW_SPECTATOR_JOINED)
+    packet += i32.write(user_id)
+    return packet.serialize()
+
+
+@cache
+def host_spectator_joined(user_id: int) -> bytearray:
+    packet = Packet.from_id(Packets.CHO_SPECTATOR_JOINED)
+    packet += i32.write(user_id)
+    return packet.serialize()
+
+
+@cache
+def spectator_left(user_id: int) -> bytearray:
+    packet = Packet.from_id(Packets.CHO_FELLOW_SPECTATOR_LEFT)
+    packet += i32.write(user_id)
+    return packet.serialize()
+
+
+@cache
+def host_spectator_left(user_id: int) -> bytearray:
+    packet = Packet.from_id(Packets.CHO_SPECTATOR_LEFT)
+    packet += i32.write(user_id)
+    return packet.serialize()
+
+
+def spectate_frames(frames: bytes) -> bytearray:
+    packet = Packet.from_id(Packets.CHO_SPECTATE_FRAMES)
+    packet += frames
+    return packet.serialize()
+
+
+@cache
+def join_channel(channel: str) -> bytearray:
+    packet = Packet.from_id(Packets.CHO_CHANNEL_JOIN_SUCCESS)
+    packet += String.write(channel)
+    return packet.serialize()
+
+
+def channel_info(channel: Channel) -> bytearray:
+    packet = Packet.from_id(Packets.CHO_CHANNEL_INFO)
+
+    channel = osuChannel(channel.name, channel.topic, channel.player_count)
+    return channel.serialize()
+
+
+@cache
+def channel_kick(channel: str) -> bytearray:
+    packet = Packet.from_id(Packets.CHO_CHANNEL_KICK)
+    packet += String.write(channel)
+    return packet.serialize()
+
+
+@cache
+def version_update_forced() -> bytearray:
+    packet = Packet.from_id(Packets.CHO_VERSION_UPDATE_FORCED)
+    return packet.serialize()
+
+
+# TODO: match packets

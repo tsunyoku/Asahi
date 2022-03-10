@@ -5,4 +5,5 @@ fastapi
 geoip2
 orjson
 pymysql[rsa]
+python-multipart
 uvicorn

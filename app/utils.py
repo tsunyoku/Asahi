@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 from typing import Any
@@ -75,3 +76,7 @@ def escape_enum(
 
 def make_safe(name: str) -> str:
     return name.replace(" ", "_").lower()
+
+
+def generate_md5(text: str) -> str:
+    return hashlib.md5(text.encode()).hexdigest().decode()

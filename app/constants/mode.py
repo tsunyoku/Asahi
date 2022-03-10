@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from functools import cache
 from functools import cached_property
 
 from app.constants.mods import Mods
@@ -31,7 +32,6 @@ class Mode(Enum):
     CATCH_RX = 6
     STD_AP = 7
 
-    @cached_property
     def __repr__(self) -> str:
         return mode_str[self.value]
 

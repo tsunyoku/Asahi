@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from functools import cache
+from typing import TYPE_CHECKING
 
 from app.constants.privileges import Privileges
-from app.objects.player import Player
+
+if TYPE_CHECKING:
+    from app.objects.player import Player
 
 
 class Channel:
@@ -28,6 +31,10 @@ class Channel:
     @cache
     def __repr__(self) -> str:
         return f"<{self.name}>"
+
+    @property
+    def player_count(self) -> int:
+        return len(self.players)
 
     def __contains__(self, player: Player) -> bool:
         return player in self.players

@@ -47,7 +47,6 @@ class Mods(IntFlag):
 
     UNRANKED = SCOREV2 | AUTOPLAY | TARGET
 
-    @cache
     def __repr__(self) -> str:
         if not self.value:
             return "NM"

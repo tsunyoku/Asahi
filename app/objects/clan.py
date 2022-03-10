@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from functools import cache
+from typing import TYPE_CHECKING
 
 import databases.core
 
-from app.objects.player import Player
+if TYPE_CHECKING:
+    from app.objects.player import Player
 
 
 class Clan:
@@ -29,10 +31,10 @@ class Clan:
     def __repr__(self) -> str:
         return f"[{self.tag}] {self.name}"
 
-    async def add_member(self, player: Player) -> None:
+    async def add_member(self, player: "Player") -> None:
         ...
 
-    async def remove_member(self, player: Player) -> None:
+    async def remove_member(self, player: "Player") -> None:
         ...
 
     async def get_members(self, db_conn: databases.core.Connection) -> None:

@@ -2,23 +2,51 @@ from __future__ import annotations
 
 import time
 import uuid
+from dataclasses import dataclass
 from functools import cache
 from functools import cached_property
 from typing import Optional
 from typing import Union
 
 import app.config
+from app.constants.action import Action
 from app.constants.mode import Mode
+from app.constants.mods import Mods
 from app.constants.privileges import BanchoPrivileges
 from app.constants.privileges import Privileges
 from app.models import Achievement
-from app.models import Geolocation
 from app.models import LastBeatmap
-from app.models import Stats
-from app.models import Status
 from app.objects.channel import Channel
 from app.objects.clan import Clan
 from app.objects.match import Match
+from app.state.services import Geolocation
+
+
+@dataclass
+class Stats:
+    tscore: int
+    rscore: int
+    pp: int
+    acc: float
+    plays: int
+    playtime: int
+    max_combo: int
+    total_hits: int
+
+    rank: int
+    country_rank: int
+
+    # TODO: grades
+
+
+@dataclass
+class Status:  # NOTE: maybe use bmap object over id & md5?
+    action: Action = Action.IDLE
+    info_text: str = ""
+    map_md5: str = ""
+    mods: Mods = Mods.NOMOD
+    mode: Mode = Mode.STD
+    map_id: int = 0
 
 
 class Player:

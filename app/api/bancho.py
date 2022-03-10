@@ -12,14 +12,18 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.responses import Response
 
+import app.packets
 import app.state
 import app.utils
 import log
-from app.models import Geolocation
+from app.constants.privileges import BanchoPrivileges
+from app.constants.privileges import Privileges
 from app.models import LoginData
 from app.objects.player import Player
 from app.packets import Packet
 from app.packets import PacketArray
+from app.state.services import Geolocation
+from app.typing import Message
 from app.typing import PacketHandler
 
 router = APIRouter(tags=["osu! Bancho API"])
@@ -44,13 +48,16 @@ async def bancho_handler(
             login_data = await login(body, db_conn, geoloc)
 
         return Response(
-            content=login_data["body"],
+            content=bytes(login_data["body"]),
             headers={"cho-token": login_data["token"]},
         )
 
     player = await app.state.sessions.players.get(token=osu_token)
     if not player:
-        return Response(content=b"")  # notification + server restart packet goes here
+        return Response(
+            content=app.packets.notification("Server restarted!")
+            + app.packets.restart_server(0),
+        )
 
     packet_map = app.state.PACKETS
     if player.restricted:
@@ -136,8 +143,10 @@ async def login(
         else:
             return {
                 "token": "no",
-                "body": b"",
-            }  # TODO: notification (already logged in)
+                "body": app.packets.notification(
+                    "You are already logged in at another location!",
+                ),
+            }
 
     user_info = await db_conn.fetch_one(
         "SELECT id, name, priv, pw, country, "
@@ -149,10 +158,81 @@ async def login(
     if not user_info:
         return {
             "token": "no",
-            "body": b"",
-        }  # TODO: notification and userid packet
+            "body": app.packets.notification("Unknown username!")
+            + app.packets.user_id(-1),
+        }
 
     user_info = dict(user_info)
+
+    if not app.state.cache.password.verify_password(password_md5, user_info["pw"]):
+        return {
+            "token": "no",
+            "body": app.packets.notification("Incorrect password!")
+            + app.packets.user_id(-1),
+        }
+
+    user_info["geoloc"] = geoloc
+    if user_info["country"] == "xx":
+        await db_conn.execute(
+            f"UPDATE users SET country = :country WHERE id = :user_id",
+            {"country": geoloc.country.acronym, "user_id": user_info["id"]},
+        )
+
+    player = Player(
+        **user_info,
+        utc_offset=utc_offset,
+        osu_ver=osu_ver,
+        login_time=login_time,
+        friend_only_dms=friend_only_dms,
+    )
+
+    data = bytearray(app.packets.protocol_version(19))
+
+    data += app.packets.user_id(player.id)
+    data += app.packets.bancho_privileges(
+        player.bancho_priv | BanchoPrivileges.SUPPORTER,
+    )
+
+    # TODO: channel list
+
+    data += app.packets.channel_info_end()
+
+    # TODO: fetch achievements, stats, friends from sql
+
+    data += app.packets.menu_icon()
+    data += app.packets.friends_list(player.friends)
+    data += app.packets.silence_end(player.remaining_silence)
+
+    user_data = app.packets.user_presence(player) + app.packets.user_stats(player)
+    data += user_data
+
+    for target in app.state.sessions.players:
+        if not player.restricted:
+            target.enqueue(user_data)
+
+        if not target.restricted:
+            data += app.packets.user_presence(target) + app.packets.user_stats(target)
+
+    if not player.priv & Privileges.VERIFIED:
+        # add verified
+
+        if player.id == 3:  # first user
+            # add master
+            ...
+
+        data += app.packets.send_message(
+            Message(
+                "Asahi",  # TODO: bot user
+                "Welcome to Asahi!",
+                player.name,
+                1,  # TODO: bot user
+            ),
+        )
+
+    app.state.sessions.players.append(player)
+    log.info(f"{player.name} logged in using {osu_ver}!")
+
+    return {"token": player.token, "body": data}
 
 
 def register_packet(packet_id: int, allow_restricted: bool = False):
@@ -168,13 +248,17 @@ def register_packet(packet_id: int, allow_restricted: bool = False):
                 data = structure()
 
                 for field, _type in structure.__annotations__.items():
-                    data.__dict__[field] = _type.reada(packet)
+                    data.__dict__[field] = _type.read(packet)
 
-            await handler(packet, player, data)
-            return structure is not None  # should increment
+                return await handler(
+                    player,
+                    data,
+                )  # def handler(player: Player, packet_data: StructureClass) -> None
+
+            # no data, just pass player
+            await handler(player)  # def handler(player: Player) -> None
 
         app.state.PACKETS[packet_id] = wrapper
-
         if allow_restricted:
             app.state.RESTRICTED_PACKETS[packet_id] = wrapper
 

@@ -4,12 +4,14 @@ import struct
 from typing import Any
 from typing import Awaitable
 from typing import Callable
+from typing import TYPE_CHECKING
 
-from app.packets import Packet
+if TYPE_CHECKING:
+    from app.packets import Packet
 
 PacketHandler = Callable[
     [bytearray, Any],
-    Awaitable[bool],
+    Awaitable[None],
 ]  # TODO: type-hint packet data
 
 
@@ -167,3 +169,86 @@ class String(osuType):
 
         buffer += encoded_string
         return buffer
+
+
+class Message(osuType):
+    def __init__(
+        self,
+        sender_username: str,
+        content: str,
+        recipient_username: str,
+        sender_id: int,
+    ) -> None:
+        self.sender_username = sender_username
+        self.content = content
+        self.recipient_username = recipient_username
+        self.sender_id = sender_id
+
+    @classmethod
+    def read(cls, packet: Packet) -> Message:
+        return Message(
+            sender_username=String.read(packet),
+            content=String.read(packet),
+            recipient_username=String.read(packet),
+            sender_id=i32.read(packet),
+        )
+
+    @classmethod
+    def write(
+        cls,
+        sender_username: str,
+        content: str,
+        recipient_username: str,
+        sender_id: int,
+    ) -> bytearray:
+        message = Message(sender_username, content, recipient_username, sender_id)
+
+        return message.serialize()
+
+    def serialize(self) -> bytearray:
+        data = bytearray(String.write(self.sender_username))
+
+        data += String.write(self.content)
+        data += String.write(self.recipient_username)
+        data += i32.write(self.sender_id)
+
+        return data
+
+
+class Channel(osuType):
+    def __init__(
+        self,
+        name: str,
+        topic: str,
+        player_count: int,
+    ):
+        self.name = name
+        self.topic = topic
+        self.player_count = player_count
+
+    @classmethod
+    def read(cls, packet: Packet) -> Channel:
+        return Channel(
+            name=String.read(packet),
+            topic=String.read(packet),
+            player_count=i32.read(packet),
+        )
+
+    @classmethod
+    def write(
+        cls,
+        name: str,
+        topic: str,
+        player_count: int,
+    ) -> bytearray:
+        channel = Channel(name, topic, player_count)
+
+        return channel.serialize()
+
+    def serialize(self) -> bytearray:
+        data = bytearray(String.write(self.name))
+
+        data += String.write(self.topic)
+        data += i32.write(self.player_count)
+
+        return data
