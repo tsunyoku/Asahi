@@ -13,6 +13,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 
 import app.api
 import app.config
+import app.lists
 import app.state
 import log
 
@@ -33,6 +34,8 @@ def init_events(asgi_app: FastAPI) -> None:
     async def on_startup() -> None:
         await app.state.services.database.connect()
         await app.state.services.redis.initialize()
+
+        await app.lists.populate_lists()
 
         log.debug("Asahi started!")
 

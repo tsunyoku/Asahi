@@ -9,6 +9,7 @@ from typing import Optional
 from typing import Union
 
 import app.config
+import app.state
 from app.constants.action import Action
 from app.constants.mode import Mode
 from app.constants.mods import Mods
@@ -29,14 +30,11 @@ class Stats:
     pp: int
     acc: float
     plays: int
-    playtime: int
-    max_combo: int
-    total_hits: int
 
     rank: int
     country_rank: int
 
-    # TODO: grades
+    # TODO: grades, playtime, max combo, total hits
 
 
 @dataclass
@@ -95,12 +93,11 @@ class Player:
         self.login_time = login_time
         self.last_ping = login_time
 
-        self.last_np: LastBeatmap = LastBeatmap()
+        self.last_np: Optional[LastBeatmap] = None
         self.tourney_client = extras.get("tourney_client", False)
 
         self._queue = bytearray()
 
-    @cache
     def __repr__(self) -> str:
         return f"<{self.name} ({self.id})>"
 
@@ -185,3 +182,40 @@ class Player:
             self._queue.clear()
 
             return data
+
+    async def get_global_rank(self, mode: Mode) -> int:
+        if self.restricted:
+            return 0
+
+        rank = await app.state.services.redis.zrevrank(
+            f"asahi:leaderboard:{mode.redis_name}",
+            self.id,
+        )
+
+        return rank + 1 if rank is not None else 0
+
+    async def get_country_rank(self, mode: Mode) -> int:
+        if self.restricted:
+            return 0
+
+        rank = await app.state.services.redis.zrevrank(
+            f"asahi:leaderboard:{mode.redis_name}:{self.geoloc.country.acronym.upper()}",
+            self.id,
+        )
+
+        return rank + 1 if rank is not None else 0
+
+    async def stats_from_sql(self) -> None:
+        stats = await app.state.services.database.fetch_all(
+            "SELECT tscore, rscore, pp, acc, plays FROM stats WHERE id = :id ORDER BY mode ASC",
+            {"id": self.id},
+        )
+
+        for mode_int, stat in enumerate(stats):
+            stat = dict(stat)  # mutable
+
+            mode = Mode(mode_int)
+            stat["rank"] = await self.get_global_rank(mode)
+            stat["country_rank"] = await self.get_country_rank(mode)
+
+            self.stats[mode] = Stats(**stat)

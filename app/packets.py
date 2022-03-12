@@ -6,6 +6,11 @@ from functools import cache
 from typing import Iterator
 from typing import TYPE_CHECKING
 
+from app.constants.action import Action
+from app.constants.mode import Mode
+from app.constants.mods import Mods
+from app.state.services import Country
+
 if TYPE_CHECKING:
     from app.objects.channel import Channel
     from app.objects.player import Player
@@ -247,7 +252,26 @@ def bancho_privileges(priv: int) -> bytearray:
     return packet.serialize()
 
 
+@cache
+def bot_presence(player: Player) -> bytearray:
+    packet = Packet.from_id(Packets.CHO_USER_PRESENCE)
+
+    packet += i32.write(player.id)
+    packet += String.write(player.name)
+    packet += u8.write(24)  # utc offset
+    packet += u8.write(player.geoloc.country.code)
+    packet += u8.write(player.bancho_priv)
+    packet += f32.write(player.geoloc.long)
+    packet += f32.write(player.geoloc.lat)
+    packet += i32.write(0)  # rank
+
+    return packet.serialize()
+
+
 def user_presence(player: Player) -> bytearray:
+    if player.id == 1:
+        return bot_presence(player)
+
     packet = Packet.from_id(Packets.CHO_USER_PRESENCE)
 
     packet += i32.write(player.id)
@@ -262,7 +286,31 @@ def user_presence(player: Player) -> bytearray:
     return packet.serialize()
 
 
+@cache
+def bot_stats(player: Player) -> bytearray:
+    packet = Packet.from_id(Packets.CHO_USER_STATS)
+
+    packet += i32.write(player.id)
+    packet += u8.write(Action.WATCHING.value)
+    packet += String.write("over Asahi")
+    packet += String.write("")  # map md5
+    packet += i32.write(Mods.NOMOD.value)
+    packet += u8.write(Mode.STD.value)
+    packet += i32.write(0)  # map id
+    packet += i64.write(0)  # ranked score
+    packet += f32.write(0.0)  # accuracy
+    packet += i32.write(0)  # playcount
+    packet += i64.write(0)  # total score
+    packet += i32.write(0)  # rank
+    packet += i16.write(0)  # pp
+
+    return packet.serialize()
+
+
 def user_stats(player: Player) -> bytearray:
+    if player.id == 1:
+        return bot_stats(player)
+
     packet = Packet.from_id(Packets.CHO_USER_STATS)
 
     stats = player.current_stats
@@ -317,8 +365,7 @@ def menu_icon() -> bytearray:
     return packet.serialize()
 
 
-@cache
-def friends_list(friends_list: list[int]) -> bytearray:
+def friends_list(friends_list: set[int]) -> bytearray:
     packet = Packet.from_id(Packets.CHO_FRIENDS_LIST)
     packet += i32_list.write(friends_list)
     return packet.serialize()

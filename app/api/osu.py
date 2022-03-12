@@ -76,6 +76,21 @@ async def register_user(
             },
         )
 
-        await db_conn.execute("INSERT INTO stats (id) VALUES (:id)", {"id": user_id})
+        await db_conn.execute_many(
+            "INSERT INTO stats (id, mode) VALUES (:id, :mode)",
+            [
+                {"id": user_id, "mode": mode}
+                for mode in (
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                )
+            ],
+        )
 
     return b"ok"

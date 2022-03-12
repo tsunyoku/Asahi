@@ -47,6 +47,10 @@ class Mode(Enum):
             return self.value
 
     @cached_property
+    def redis_name(self) -> str:
+        return self.name.lower()
+
+    @cached_property
     def sort(self) -> str:
         return "pp" if self.value > 3 else "score"
 

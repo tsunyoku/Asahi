@@ -23,6 +23,10 @@ def main() -> int:
     if os.geteuid() == 0:
         log.warning("Running as root is not recommended, especially in production...")
 
+    log.info(
+        "If you are migrating from old Asahi, you will need to run the DB migrations in the migrations folder!",
+    )
+
     args = {}
     if app.config.SERVER_PORT:
         args["host"] = app.config.SERVER_HOST

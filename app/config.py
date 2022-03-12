@@ -14,3 +14,6 @@ SERVER_PORT: int = cfg("SERVER_PORT", cast=int, default=None)
 SERVER_HOST: str = cfg("SERVER_HOST", default="0.0.0.0")
 
 DEBUG: bool = cfg("DEBUG", cast=bool, default=False)
+
+# pre-rewrite version = 0.4.3
+VERSION = "0.5.0"  # DO NOT CHANGE

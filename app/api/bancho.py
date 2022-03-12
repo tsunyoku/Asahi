@@ -55,17 +55,18 @@ async def bancho_handler(
     player = await app.state.sessions.players.get(token=osu_token)
     if not player:
         return Response(
-            content=app.packets.notification("Server restarted!")
-            + app.packets.restart_server(0),
+            content=bytes(
+                app.packets.notification("Server restarted!")
+                + app.packets.restart_server(0),
+            ),
         )
 
     packet_map = app.state.PACKETS
     if player.restricted:
         packet_map = app.state.RESTRICTED_PACKETS
 
-    with bytearray(body) as body_view:
-        for packet, handler in PacketArray(body_view, packet_map):
-            await handler(packet, player)
+    for packet, handler in PacketArray(bytearray(body), packet_map):
+        await handler(packet, player)
 
     player.last_ping = time.time()
     return Response(content=player.dequeue())
@@ -76,6 +77,8 @@ async def login(
     db_conn: databases.core.Connection,
     geoloc: Geolocation,
 ) -> LoginData:
+    start = time.perf_counter_ns()
+
     if len(split := body.decode().split("\n")[:-1]) != 3:
         log.warning(f"Invalid login request from {geoloc.ip}")
 
@@ -164,7 +167,10 @@ async def login(
 
     user_info = dict(user_info)
 
-    if not app.state.cache.password.verify_password(password_md5, user_info["pw"]):
+    if not app.state.cache.password.verify_password(
+        password_md5,
+        app.state.cache.encode_password(user_info["pw"]),
+    ):
         return {
             "token": "no",
             "body": app.packets.notification("Incorrect password!")
@@ -185,6 +191,7 @@ async def login(
         login_time=login_time,
         friend_only_dms=friend_only_dms,
     )
+    await player.stats_from_sql()
 
     data = bytearray(app.packets.protocol_version(19))
 
@@ -197,7 +204,7 @@ async def login(
 
     data += app.packets.channel_info_end()
 
-    # TODO: fetch achievements, stats, friends from sql
+    # TODO: fetch achievements, friends from sql
 
     data += app.packets.menu_icon()
     data += app.packets.friends_list(player.friends)
@@ -230,8 +237,13 @@ async def login(
         )
 
     app.state.sessions.players.append(player)
-    log.info(f"{player.name} logged in using {osu_ver}!")
 
+    end = time.perf_counter_ns()
+    total = end - start
+
+    log.info(
+        f"{player.name} logged in with version {osu_ver} in {log.format_time(total)}!",
+    )
     return {"token": player.token, "body": data}
 
 

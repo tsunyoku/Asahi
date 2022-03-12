@@ -120,20 +120,19 @@ INSERT INTO `achievements` (`id`, `image`, `name`, `descr`, `cond`, `custom`) VA
 --
 
 CREATE TABLE `channels` (
-  `id` int(11) NOT NULL,
-  `name` text NOT NULL,
-  `descr` text NOT NULL,
-  `auto` int(11) NOT NULL DEFAULT '1',
-  `perm` int(11) NOT NULL DEFAULT '1'
+  `name` varchar(64) NOT NULL,
+  `topic` text NOT NULL,
+  `auto_join` int(11) NOT NULL DEFAULT '1',
+  `priv` int(11) NOT NULL DEFAULT '1'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --
 -- Dumping data for table `channels`
 --
 
-INSERT INTO `channels` (`id`, `name`, `descr`, `auto`, `perm`) VALUES
-(1, '#osu', 'So true!!!', 1, 1),
-(2, '#asahi', 'owo', 0, 1);
+INSERT INTO `channels` (`id`, `name`, `topic`, `auto_join`, `priv`) VALUES
+('#osu', 'So true!!!', 1, 1),
+('#asahi', 'owo', 0, 1);
 
 -- --------------------------------------------------------
 
@@ -316,66 +315,23 @@ CREATE TABLE `scores_rx` (
 
 CREATE TABLE `stats` (
   `id` bigint(20) NOT NULL,
-  `rscore_std` bigint(20) NOT NULL DEFAULT '0',
-  `acc_std` double NOT NULL DEFAULT '0',
-  `pc_std` bigint(20) NOT NULL DEFAULT '0',
-  `tscore_std` bigint(20) NOT NULL DEFAULT '0',
-  `pp_std` bigint(20) NOT NULL DEFAULT '0',
-  `rscore_mania` bigint(20) NOT NULL DEFAULT '0',
-  `acc_mania` double NOT NULL DEFAULT '0',
-  `pc_mania` bigint(20) NOT NULL DEFAULT '0',
-  `tscore_mania` bigint(20) NOT NULL DEFAULT '0',
-  `rscore_catch` bigint(20) NOT NULL DEFAULT '0',
-  `acc_catch` double NOT NULL DEFAULT '0',
-  `pc_catch` bigint(20) NOT NULL DEFAULT '0',
-  `tscore_catch` bigint(20) NOT NULL DEFAULT '0',
-  `rscore_taiko` bigint(20) NOT NULL DEFAULT '0',
-  `acc_taiko` double NOT NULL DEFAULT '0',
-  `pc_taiko` bigint(20) NOT NULL DEFAULT '0',
-  `tscore_taiko` bigint(20) NOT NULL DEFAULT '0',
-  `pp_taiko` bigint(20) NOT NULL DEFAULT '0',
-  `pp_catch` bigint(20) NOT NULL DEFAULT '0',
-  `pp_mania` bigint(20) NOT NULL DEFAULT '0',
-  `rscore_catch_rx` bigint(20) NOT NULL DEFAULT '0',
-  `acc_catch_rx` double NOT NULL DEFAULT '0',
-  `pc_catch_rx` bigint(20) NOT NULL DEFAULT '0',
-  `tscore_catch_rx` bigint(20) NOT NULL DEFAULT '0',
-  `rscore_taiko_rx` bigint(20) NOT NULL DEFAULT '0',
-  `acc_taiko_rx` double NOT NULL DEFAULT '0',
-  `pc_taiko_rx` bigint(20) NOT NULL DEFAULT '0',
-  `tscore_taiko_rx` bigint(20) NOT NULL DEFAULT '0',
-  `rscore_std_ap` bigint(20) NOT NULL DEFAULT '0',
-  `acc_std_ap` double NOT NULL DEFAULT '0',
-  `pc_std_ap` bigint(20) NOT NULL DEFAULT '0',
-  `tscore_std_ap` bigint(20) NOT NULL DEFAULT '0',
-  `rscore_std_rx` bigint(20) NOT NULL DEFAULT '0',
-  `acc_std_rx` double NOT NULL DEFAULT '0',
-  `pc_std_rx` bigint(20) NOT NULL DEFAULT '0',
-  `tscore_std_rx` bigint(20) NOT NULL DEFAULT '0',
-  `pp_std_rx` bigint(20) NOT NULL DEFAULT '0',
-  `pp_std_ap` bigint(20) NOT NULL DEFAULT '0',
-  `pp_taiko_rx` bigint(20) NOT NULL DEFAULT '0',
-  `pp_catch_rx` bigint(20) NOT NULL DEFAULT '0',
-  `mc_std` bigint(20) NOT NULL DEFAULT '0',
-  `mc_std_rx` bigint(20) NOT NULL DEFAULT '0',
-  `mc_std_ap` bigint(20) NOT NULL DEFAULT '0',
-  `mc_taiko` bigint(20) NOT NULL DEFAULT '0',
-  `mc_taiko_rx` bigint(20) NOT NULL DEFAULT '0',
-  `mc_catch` bigint(20) NOT NULL DEFAULT '0',
-  `mc_catch_rx` bigint(20) NOT NULL DEFAULT '0',
-  `mc_mania` bigint(20) NOT NULL DEFAULT '0',
-  `pt_std` bigint(20) NOT NULL DEFAULT '0',
-  `pt_std_rx` bigint(20) NOT NULL DEFAULT '0',
-  `pt_std_ap` bigint(20) NOT NULL DEFAULT '0',
-  `pt_taiko` bigint(20) NOT NULL DEFAULT '0',
-  `pt_taiko_rx` bigint(20) NOT NULL DEFAULT '0',
-  `pt_catch` bigint(20) NOT NULL DEFAULT '0',
-  `pt_catch_rx` bigint(20) NOT NULL DEFAULT '0',
-  `pt_mania` bigint(20) NOT NULL DEFAULT '0'
+  `mode` tinyint(1) NOT NULL,
+  `rscore` bigint(20) NOT NULL DEFAULT '0',
+  `acc` double NOT NULL DEFAULT '0',
+  `plays` bigint(20) NOT NULL DEFAULT '0',
+  `tscore` bigint(20) NOT NULL DEFAULT '0',
+  `pp` bigint(20) NOT NULL DEFAULT '0',
+   PRIMARY KEY (id, mode)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO `stats` (`id`, `rscore_std`, `acc_std`, `pc_std`, `tscore_std`, `pp_std`, `rscore_mania`, `acc_mania`, `pc_mania`, `tscore_mania`, `rscore_catch`, `acc_catch`, `pc_catch`, `tscore_catch`, `rscore_taiko`, `acc_taiko`, `pc_taiko`, `tscore_taiko`, `pp_taiko`, `pp_catch`, `pp_mania`, `rscore_catch_rx`, `acc_catch_rx`, `pc_catch_rx`, `tscore_catch_rx`, `rscore_taiko_rx`, `acc_taiko_rx`, `pc_taiko_rx`, `tscore_taiko_rx`, `rscore_std_ap`, `acc_std_ap`, `pc_std_ap`, `tscore_std_ap`, `rscore_std_rx`, `acc_std_rx`, `pc_std_rx`, `tscore_std_rx`, `pp_std_rx`, `pp_std_ap`, `pp_taiko_rx`, `pp_catch_rx`, `mc_std`, `mc_std_rx`, `mc_std_ap`, `mc_taiko`, `mc_taiko_rx`, `mc_catch`, `mc_catch_rx`, `mc_mania`, `pt_std`, `pt_std_rx`, `pt_std_ap`, `pt_taiko`, `pt_taiko_rx`, `pt_catch`, `pt_catch_rx`, `pt_mania`) VALUES
-(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+INSERT INTO stats (id, mode) VALUES (1, 0);
+INSERT INTO stats (id, mode) VALUES (1, 1);
+INSERT INTO stats (id, mode) VALUES (1, 2);
+INSERT INTO stats (id, mode) VALUES (1, 3);
+INSERT INTO stats (id, mode) VALUES (1, 4);
+INSERT INTO stats (id, mode) VALUES (1, 5);
+INSERT INTO stats (id, mode) VALUES (1, 6);
+INSERT INTO stats (id, mode) VALUES (1, 7);
 
 -- --------------------------------------------------------
 
@@ -461,7 +417,7 @@ ALTER TABLE `achievements`
 -- Indexes for table `channels`
 --
 ALTER TABLE `channels`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`name`);
 
 --
 -- Indexes for table `clans`
@@ -558,11 +514,6 @@ ALTER TABLE `ratings`
 --
 ALTER TABLE `achievements`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=73;
---
--- AUTO_INCREMENT for table `channels`
---
-ALTER TABLE `channels`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 --
 -- AUTO_INCREMENT for table `clans`
 --

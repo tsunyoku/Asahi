@@ -15,19 +15,16 @@ class Clan:
         id: int,
         name: str,
         tag: str,
-        created_at: int,
         owner: int,
         members: list[int] = [],
     ) -> None:
         self.id = id
         self.name = name
         self.tag = tag
-        self.created_at = created_at
         self.owner = owner
 
         self.members = members
 
-    @cache
     def __repr__(self) -> str:
         return f"[{self.tag}] {self.name}"
 

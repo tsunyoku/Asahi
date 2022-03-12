@@ -93,11 +93,11 @@ class i32_list(osuType):
         )
 
     @classmethod
-    def write(cls, data: list[int]) -> bytearray:
+    def write(cls, data: set[int]) -> bytearray:
         buffer = bytearray(len(data).to_bytes(2, "little"))
 
         for item in data:
-            buffer += item.to - bytes(4, "little")
+            buffer += item.to_bytes(4, "little")
 
         return buffer
 
@@ -126,6 +126,10 @@ class i64(osuType):
     @classmethod
     def read(cls, packet: Packet) -> int:
         return read_int(packet.read(8))
+
+    @classmethod
+    def write(cls, data: int) -> bytearray:
+        return struct.pack("<q", data)
 
 
 class String(osuType):

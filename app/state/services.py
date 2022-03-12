@@ -25,6 +25,12 @@ class Country:
     code: int
     acronym: str
 
+    @classmethod
+    def from_iso(cls, acronym: str) -> Country:
+        code = OSU_GEOLOC[acronym]
+
+        return Country(code, acronym)
+
 
 class Geolocation:
     def __init__(
@@ -54,7 +60,8 @@ class Geolocation:
             city = app.state.services.geoloc.city(ip)
 
             iso_code = city.country.iso_code.lower()
-            country = Country(OSU_GEOLOC[iso_code], iso_code)
+            country = Country.from_iso(iso_code)
+
             geoloc = Geolocation(
                 city.location.longitude,
                 city.location.latitude,

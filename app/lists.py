@@ -4,9 +4,14 @@ from typing import Iterator
 from typing import Optional
 from typing import Union
 
+import app.state
 import app.utils
 from app.constants.privileges import Privileges
+from app.objects.channel import Channel
+from app.objects.clan import Clan
 from app.objects.player import Player
+from app.state.services import Country
+from app.state.services import Geolocation
 
 
 class PlayerList(list[Player]):
@@ -105,3 +110,119 @@ class PlayerList(list[Player]):
             return
 
         super().remove(player)
+
+
+class ClanList(list[Clan]):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __iter__(self) -> Iterator[Clan]:
+        return super().__iter__()
+
+    def __contains__(self, clan: Union[Clan, str, int]) -> bool:
+        if isinstance(clan, str):
+            return clan in [name for name in self.names]
+        elif isinstance(clan, int):
+            return clan in [id for id in self.ids]
+        else:
+            return super().__contains__(clan)
+
+    def __repr__(self) -> str:
+        return f"[{', '.join(map(repr, self))}]"
+
+    @property
+    def ids(self) -> list[int]:
+        return [c.id for c in self]
+
+    @property
+    def names(self) -> list[str]:
+        return [c.name for c in self]
+
+    def get(self, id: int) -> Optional[Clan]:  # XX: allow sql/kwargs?
+        for clan in self:
+            if clan.id == id:
+                return clan
+
+    def append(self, clan: Clan) -> None:
+        if clan in self:
+            return
+
+        super().append(clan)
+
+    def remove(self, clan: Clan) -> None:
+        if clan not in self:
+            return
+
+        super().remove(clan)
+
+
+class ChannelList(list[Channel]):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __iter__(self) -> Iterator[Channel]:
+        return super().__iter__()
+
+    def __contains__(self, channel: Union[Channel, str, int]) -> bool:
+        if isinstance(channel, str):
+            return channel in [name for name in self.names]
+        elif isinstance(channel, int):
+            return channel in [id for id in self.ids]
+        else:
+            return super().__contains__(channel)
+
+    def __repr__(self) -> str:
+        return f"[{', '.join(map(repr, self))}]"
+
+    @property
+    def ids(self) -> list[int]:
+        return [c.id for c in self]
+
+    @property
+    def names(self) -> list[str]:
+        return [c.name for c in self]
+
+    def get(self, name: int) -> Optional[Channel]:  # XX: allow sql/kwargs?
+        for channel in self:
+            if channel.name == name:
+                return channel
+
+    def append(self, channel: Channel) -> None:
+        if channel in self:
+            return
+
+        super().append(channel)
+
+    def remove(self, channel: Channel) -> None:
+        if channel not in self:
+            return
+
+        super().remove(channel)
+
+
+async def populate_lists() -> None:
+    # XX: using multiple cursors as the plan in the future is for these to
+    #     become background tasks
+
+    bot_user = await app.state.services.database.fetch_one(
+        "SELECT * FROM users WHERE id = 1",
+    )
+    app.state.sessions.bot = Player(**bot_user)
+    app.state.sessions.bot.geoloc = Geolocation(
+        country=Country.from_iso(bot_user["country"]),
+    )
+    app.state.sessions.players.append(app.state.sessions.bot)
+
+    async with app.state.services.database.connection() as clan_cursor:
+        clans = await clan_cursor.fetch_all("SELECT * FROM clans")
+
+        for clan in clans:
+            clan_obj = Clan(**clan)
+            app.state.sessions.clans.append(clan_obj)
+
+    async with app.state.services.database.connection() as channel_cursor:
+        channels = await channel_cursor.fetch_all("SELECT * FROM channels")
+
+        for channel in channels:
+            channel_obj = Channel(**channel)
+            app.state.sessions.channels.append(channel_obj)

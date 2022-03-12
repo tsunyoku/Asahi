@@ -14,21 +14,18 @@ class Channel:
         self,
         name: str,
         topic: str,
-        read_priv: Privileges = Privileges.NORMAL,
-        write_priv: Privileges = Privileges.NORMAL,
+        priv: Privileges = Privileges.NORMAL,
         auto_join: bool = True,
         instance: bool = False,
     ) -> None:
         self.name = name
         self.topic = topic
-        self.read_priv = read_priv
-        self.write_priv = write_priv
+        self.priv = priv
         self.auto_join = auto_join
         self.instance = instance
 
         self.players: list[Player] = []
 
-    @cache
     def __repr__(self) -> str:
         return f"<{self.name}>"
 
@@ -39,17 +36,11 @@ class Channel:
     def __contains__(self, player: Player) -> bool:
         return player in self.players
 
-    def can_read(self, priv: Privileges) -> bool:
-        if not self.read_priv:
+    def has_permission(self, priv: Privileges) -> bool:
+        if not self.priv:
             return True
 
-        return priv & self.read_priv != 0
-
-    def can_write(self, priv: Privileges) -> bool:
-        if not self.write_priv:
-            return True
-
-        return priv & self.write_priv != 0
+        return priv & self.priv != 0
 
     def add_player(self, player: Player) -> None:
         if player in self:
@@ -64,7 +55,7 @@ class Channel:
         self.players.remove(player)
 
     def send(self, msg: str, sender: Player, to_self: bool = False) -> None:
-        if not self.can_write(sender.priv):
+        if not self.has_permission(sender.priv):
             return
 
         ...
@@ -75,7 +66,7 @@ class Channel:
         sender: Player,
         recipients: list[Player],
     ) -> None:
-        if not self.can_write(sender.priv):
+        if not self.has_permission(sender.priv):
             return
 
         ...
