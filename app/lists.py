@@ -74,7 +74,7 @@ class PlayerList(list[Player]):
                 return p
 
     async def get(self, **kwargs: dict[str, Union[str, int]]) -> Optional[Player]:
-        if player := self._get(kwargs):
+        if player := self._get(**kwargs):
             return player
 
         if kwargs.get("sql", False):

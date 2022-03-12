@@ -79,4 +79,4 @@ def make_safe(name: str) -> str:
 
 
 def generate_md5(text: str) -> str:
-    return hashlib.md5(text.encode()).hexdigest().decode()
+    return hashlib.md5(text.encode()).hexdigest()

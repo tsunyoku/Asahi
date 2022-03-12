@@ -136,7 +136,7 @@ async def login(
 
     # TODO: tourney client checks
 
-    if player := app.state.sessions.players.get(name=username):
+    if player := await app.state.sessions.players.get(name=username):
         if (login_time - player.last_ping) > 10:
             # player.logout()
             ...
