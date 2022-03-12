@@ -78,5 +78,5 @@ def make_safe(name: str) -> str:
     return name.replace(" ", "_").lower()
 
 
-def generate_md5(text: str) -> str:
-    return hashlib.md5(text.encode()).hexdigest()
+def generate_md5(text: str) -> bytes:
+    return hashlib.md5(text.encode()).hexdigest().encode()

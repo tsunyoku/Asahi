@@ -72,7 +72,7 @@ async def register_user(
                 "safe_name": safe_name,
                 "pw": encrypted_password,
                 "email": email,
-                "registered_at": int(time.time()),
+                "register": int(time.time()),
             },
         )
 
